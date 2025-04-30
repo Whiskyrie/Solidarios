@@ -14,6 +14,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
+import { SecurityHeadersLoggerMiddleware } from './common/middleware/security-headers-logger.middleware';
 
 @Module({
   imports: [
@@ -61,7 +62,8 @@ import { SecurityHeadersMiddleware } from './common/middleware/security-headers.
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Aplica o middleware de headers de segurança a todas as rotas
-    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+    consumer
+      .apply(SecurityHeadersLoggerMiddleware, SecurityHeadersMiddleware)
+      .forRoutes('*');
   }
 }
