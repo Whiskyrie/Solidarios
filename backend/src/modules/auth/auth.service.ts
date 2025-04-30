@@ -3,12 +3,21 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { User } from '../users/entities/user.entity';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    @InjectRepository(RefreshToken)
+    private refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
   async validateUser(
@@ -34,9 +43,11 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    const tokens = await this.generateTokens(user);
+
     return {
       user,
-      access_token: this.generateToken(user),
+      ...tokens,
     };
   }
 
@@ -44,11 +55,50 @@ export class AuthService {
     const newUser = await this.usersService.create(registerDto);
 
     const { ...userWithoutPassword } = newUser;
+    const tokens = await this.generateTokens(newUser);
 
     return {
       user: userWithoutPassword,
-      access_token: this.generateToken(newUser),
+      ...tokens,
     };
+  }
+
+  async refreshTokens(refreshToken: string) {
+    const refreshTokenDoc = await this.findRefreshToken(refreshToken);
+
+    // Verificar se o token existe, não foi revogado e não expirou
+    if (
+      !refreshTokenDoc ||
+      refreshTokenDoc.isRevoked ||
+      refreshTokenDoc.isExpired()
+    ) {
+      throw new UnauthorizedException('Refresh token inválido ou expirado');
+    }
+
+    const user = await this.usersService.findOne(refreshTokenDoc.userId);
+
+    // Revogar o token atual
+    await this.revokeRefreshToken(refreshTokenDoc.id);
+
+    // Gerar novos tokens
+    const tokens = await this.generateTokens(user);
+
+    return tokens;
+  }
+
+  async revokeAllUserTokens(userId: string) {
+    await this.refreshTokenRepository.update(
+      { userId, isRevoked: false },
+      { isRevoked: true },
+    );
+  }
+
+  async findRefreshToken(token: string): Promise<RefreshToken | null> {
+    return this.refreshTokenRepository.findOne({ where: { token } });
+  }
+
+  async revokeRefreshToken(id: string): Promise<void> {
+    await this.refreshTokenRepository.update(id, { isRevoked: true });
   }
 
   getProfile(user: User): Partial<User> {
@@ -56,7 +106,22 @@ export class AuthService {
     return userWithoutPassword;
   }
 
-  private generateToken(user: Partial<User>): string {
+  private async generateTokens(user: Partial<User>) {
+    const accessToken = this.generateAccessToken(user);
+
+    if (!user.id) {
+      throw new Error('User ID is required to generate tokens');
+    }
+
+    const refreshToken = await this.generateRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  private generateAccessToken(user: Partial<User>): string {
     const payload = {
       email: user.email,
       sub: user.id,
@@ -64,5 +129,37 @@ export class AuthService {
     };
 
     return this.jwtService.sign(payload);
+  }
+
+  private async generateRefreshToken(userId: string): Promise<string> {
+    // Gerar um token aleatório
+    const tokenValue = uuidv4();
+
+    // Hash do token para armazenamento seguro
+    const hashedToken = await bcrypt.hash(tokenValue, 10);
+
+    // Expiração do refresh token (por exemplo, 7 dias)
+    const expiresIn = this.configService.get<number>(
+      'REFRESH_TOKEN_EXPIRATION_DAYS',
+      7,
+    );
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expiresIn);
+
+    // Criar e salvar o registro de refresh token
+    const refreshToken = this.refreshTokenRepository.create({
+      userId,
+      token: hashedToken,
+      expiresAt,
+    });
+
+    await this.refreshTokenRepository.save(refreshToken);
+
+    return tokenValue;
+  }
+
+  async logout(userId: string): Promise<void> {
+    // Revogar todos os tokens do usuário ao fazer logout
+    await this.revokeAllUserTokens(userId);
   }
 }
