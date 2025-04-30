@@ -1,5 +1,10 @@
 // src/app.module.ts
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import {
+  Module,
+  NestModule,
+  MiddlewareConsumer,
+  RequestMethod,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -15,6 +20,13 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import { SecurityHeadersLoggerMiddleware } from './common/middleware/security-headers-logger.middleware';
+import {
+  CsrfTokenMiddleware,
+  CsrfProtectionMiddleware,
+  SameOriginMiddleware,
+} from './common/middleware/csrf.middleware';
+import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 @Module({
   imports: [
@@ -61,9 +73,54 @@ import { SecurityHeadersLoggerMiddleware } from './common/middleware/security-he
   ],
 })
 export class AppModule implements NestModule {
+  constructor(private configService: ConfigService) {}
+
   configure(consumer: MiddlewareConsumer) {
+    // Middleware de segurança básica
     consumer
-      .apply(SecurityHeadersLoggerMiddleware, SecurityHeadersMiddleware)
+      .apply(
+        helmet(),
+        cookieParser(
+          this.configService.get('COOKIE_SECRET', 'your-cookie-secret'),
+        ),
+        SecurityHeadersLoggerMiddleware,
+        SecurityHeadersMiddleware,
+      )
       .forRoutes('*');
+
+    // Middleware para verificação de origem
+    consumer
+      .apply(SameOriginMiddleware)
+      .exclude(
+        { path: 'auth/login', method: RequestMethod.POST },
+        { path: 'auth/register', method: RequestMethod.POST },
+        { path: 'auth/refresh', method: RequestMethod.POST },
+      )
+      .forRoutes(
+        { path: '*', method: RequestMethod.POST },
+        { path: '*', method: RequestMethod.PUT },
+        { path: '*', method: RequestMethod.PATCH },
+        { path: '*', method: RequestMethod.DELETE },
+      );
+
+    // Middleware para geração de tokens CSRF em todas as respostas GET
+    consumer
+      .apply(CsrfTokenMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.GET });
+
+    // Middleware para validação de tokens CSRF em todas as requisições que modificam dados
+    consumer
+      .apply(CsrfProtectionMiddleware)
+      .exclude(
+        { path: 'auth/login', method: RequestMethod.POST },
+        { path: 'auth/register', method: RequestMethod.POST },
+        { path: 'auth/refresh', method: RequestMethod.POST },
+      )
+      .forRoutes(
+        { path: '*', method: RequestMethod.POST },
+        { path: '*', method: RequestMethod.PUT },
+        { path: '*', method: RequestMethod.PATCH },
+        { path: '*', method: RequestMethod.DELETE },
+      );
   }
 }

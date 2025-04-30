@@ -1,4 +1,4 @@
-// src/main.ts (modificado)
+// src/main.ts (com CORS)
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -6,13 +6,23 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { SanitizeInputInterceptor } from './common/interceptors/sanitize.interceptor';
+import {
+  createCorsConfig,
+  corsSecurityHeaders,
+} from './common/config/cors.config';
+import { ConfigService } from '@nestjs/config';
 import { useContainer } from 'class-validator';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
-  // Configurar validadores personalizados para injeção de dependência
+  // Injeção de dependência para validadores personalizados
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
+  // Configuração CORS restritiva
+  app.enableCors(createCorsConfig(configService));
+  app.use(corsSecurityHeaders);
 
   // Configurar ValidationPipe global com opções avançadas
   app.useGlobalPipes(
@@ -50,9 +60,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-
-  // CORS será configurado separadamente
-  // app.enableCors();
 
   await app.listen(3000);
 }
