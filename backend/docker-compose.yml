@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development # Use o estágio de desenvolvimento para hot-reloading
+    container_name: solidarios_app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules # Evita sobrescrever node_modules do host
+    env_file:
+      - .env # Carrega variáveis do .env
+    environment:
+      - DATABASE_HOST=postgres # Aponta para o serviço postgres
+      - NODE_ENV=development
+    depends_on:
+      - postgres
+    command: npm run start:dev # Comando para iniciar em modo de desenvolvimento
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: solidarios_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres} # Usa variável do .env ou padrão
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secret}
+      POSTGRES_DB: ${DATABASE_NAME:-solidarios}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Volume para persistência dos dados
+
+volumes:
+  postgres_data:
+    driver: local
+
