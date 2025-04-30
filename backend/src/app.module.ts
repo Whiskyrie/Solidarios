@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+// src/app.module.ts
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -12,6 +13,7 @@ import { DistributionsModule } from './modules/distributions/distributions.modul
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
+import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        type: 'postgres', // ou outro banco compatível com TypeORM
+        type: 'postgres',
         host: configService.get('DB_HOST', 'localhost'),
         port: configService.get('DB_PORT', 5432),
         username: configService.get('DB_USERNAME', 'postgres'),
@@ -37,7 +39,6 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       }),
     }),
 
-    // Módulos da aplicação
     UsersModule,
     AuthModule,
     CategoriesModule,
@@ -48,16 +49,19 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
   controllers: [AppController],
   providers: [
     AppService,
-    // Registra o JwtAuthGuard globalmente
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // Registra o RolesGuard globalmente
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Aplica o middleware de headers de segurança a todas as rotas
+    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+  }
+}
