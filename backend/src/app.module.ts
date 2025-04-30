@@ -1,32 +1,63 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ItemsModule } from './modules/items/items.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { DistributionsModule } from './modules/distributions/distributions.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
   imports: [
+    // Configuração do ambiente
     ConfigModule.forRoot({
-      isGlobal: true, // Torna as variáveis de ambiente disponíveis globalmente
-      envFilePath: '.env',
+      isGlobal: true,
     }),
+
+    // Configuração do TypeORM com banco de dados
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get<string>('DATABASE_HOST'),
-        port: configService.get<number>('DATABASE_PORT'),
-        username: configService.get<string>('DATABASE_USERNAME'),
-        password: configService.get<string>('DATABASE_PASSWORD'),
-        database: configService.get<string>('DATABASE_NAME'),
-        entities: [__dirname + '/../**/*.entity{.ts,.js}'], // Caminho para as entidades
-        synchronize: false, // Cuidado: use apenas em desenvolvimento, cria/atualiza tabelas automaticamente
-        autoLoadEntities: true, // Carrega entidades automaticamente
-      }),
       inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres', // ou outro banco compatível com TypeORM
+        host: configService.get('DB_HOST', 'localhost'),
+        port: configService.get('DB_PORT', 5432),
+        username: configService.get('DB_USERNAME', 'postgres'),
+        password: configService.get('DB_PASSWORD', 'postgres'),
+        database: configService.get('DB_DATABASE', 'solidarios'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: configService.get('DB_SYNCHRONIZE', false),
+        logging: configService.get('DB_LOGGING', false),
+      }),
     }),
+
+    // Módulos da aplicação
+    UsersModule,
+    AuthModule,
+    CategoriesModule,
+    ItemsModule,
+    InventoryModule,
+    DistributionsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Registra o JwtAuthGuard globalmente
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // Registra o RolesGuard globalmente
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}
