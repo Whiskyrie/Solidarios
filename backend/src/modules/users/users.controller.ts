@@ -1,3 +1,4 @@
+// src/modules/users/users.controller.ts
 import {
   Controller,
   Get,
@@ -9,23 +10,31 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-// import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Será adicionado depois
-// import { RolesGuard } from '../auth/guards/roles.guard'; // Será adicionado depois
-// import { Roles } from '../auth/decorators/roles.decorator'; // Será adicionado depois
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from './entities/user.entity';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-} from '@nestjs/swagger'; // Para Swagger
+  ApiQuery,
+} from '@nestjs/swagger';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { User } from './entities/user.entity';
 
-@ApiTags('users') // Tag para Swagger
+@ApiTags('users')
 @Controller('users')
-// @UseGuards(JwtAuthGuard, RolesGuard) // Proteger todas as rotas e verificar roles
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -34,31 +43,34 @@ export class UsersController {
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso.' })
   @ApiResponse({ status: 400, description: 'Dados inválidos.' })
   @ApiResponse({ status: 409, description: 'Email já está em uso.' })
-  // @Roles(UserRole.ADMIN) // Apenas admin pode criar usuários diretamente (ajustar conforme necessário)
+  @Roles(UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   create(@Body() createUserDto: CreateUserDto) {
-    // A senha já será hasheada pela entidade User (@BeforeInsert)
     return this.usersService.create(createUserDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos os usuários' })
+  @ApiOperation({ summary: 'Listar todos os usuários (com paginação)' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de usuários retornada com sucesso.',
+    description: 'Lista paginada de usuários retornada com sucesso.',
+    type: PageDto,
   })
-  @ApiBearerAuth() // Indica que precisa de token JWT
-  // @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO) // Apenas admin e funcionário podem listar todos
-  findAll() {
-    return this.usersService.findAll();
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  findAll(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<User>> {
+    return this.usersService.findAllPaginated(pageOptionsDto);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar um usuário pelo ID' })
   @ApiResponse({ status: 200, description: 'Usuário encontrado.' })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado.' })
-  @ApiBearerAuth()
-  // @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO) // Ou permitir que o próprio usuário veja seus dados
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
   }
@@ -69,8 +81,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado.' })
   @ApiResponse({ status: 400, description: 'Dados inválidos.' })
   @ApiResponse({ status: 409, description: 'Email já está em uso.' })
-  @ApiBearerAuth()
-  // @Roles(UserRole.ADMIN) // Ou permitir que o próprio usuário atualize seus dados
+  @Roles(UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -83,8 +94,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Remover um usuário pelo ID' })
   @ApiResponse({ status: 204, description: 'Usuário removido com sucesso.' })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado.' })
-  @ApiBearerAuth()
-  // @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }

@@ -1,3 +1,4 @@
+// src/modules/items/items.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -10,6 +11,9 @@ import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { UsersService } from '../users/users.service';
 import { User, UserRole } from '../users/entities/user.entity';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 
 @Injectable()
 export class ItemsService {
@@ -47,8 +51,28 @@ export class ItemsService {
     return this.itemsRepository.save(item);
   }
 
+  // Método antigo sem paginação, mantido para compatibilidade
   async findAll(): Promise<Item[]> {
-    return this.itemsRepository.find({ relations: ['donor'] }); // Inclui o doador na busca
+    return this.itemsRepository.find({ relations: ['donor'] });
+  }
+
+  // Novo método com paginação
+  async findAllPaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Item>> {
+    const queryBuilder = this.itemsRepository
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.donor', 'donor')
+      .leftJoinAndSelect('item.category', 'category')
+      .orderBy('item.receivedDate', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const items = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(items, pageMetaDto);
   }
 
   async findOne(id: string): Promise<Item> {

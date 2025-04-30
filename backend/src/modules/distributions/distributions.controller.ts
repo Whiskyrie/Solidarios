@@ -1,3 +1,4 @@
+// src/modules/distributions/distributions.controller.ts
 import {
   Controller,
   Get,
@@ -12,6 +13,7 @@ import {
   UseGuards,
   Request,
   ForbiddenException,
+  Query,
 } from '@nestjs/common';
 import { DistributionsService } from './distributions.service';
 import { CreateDistributionDto } from './dto/create-distribution.dto';
@@ -25,7 +27,11 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { Distribution } from './entities/distribution.entity';
 
 @ApiTags('distributions')
 @Controller('distributions')
@@ -51,14 +57,22 @@ export class DistributionsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as distribuições' })
+  @ApiOperation({ summary: 'Listar todas as distribuições (com paginação)' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de distribuições retornada com sucesso.',
+    description: 'Lista paginada de distribuições retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
-  findAll() {
-    return this.distributionsService.findAll();
+  findAll(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Distribution>> {
+    return this.distributionsService.findAllPaginated(pageOptionsDto);
   }
 
   @Get(':id')
@@ -71,14 +85,23 @@ export class DistributionsController {
   }
 
   @Get('beneficiary/:beneficiaryId')
-  @ApiOperation({ summary: 'Buscar distribuições por beneficiário' })
+  @ApiOperation({
+    summary: 'Buscar distribuições por beneficiário (com paginação)',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de distribuições retornada com sucesso.',
+    description: 'Lista paginada de distribuições retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.BENEFICIARIO)
   findByBeneficiary(
     @Param('beneficiaryId', ParseUUIDPipe) beneficiaryId: string,
+    @Query() pageOptionsDto: PageOptionsDto,
     @Request() req,
   ) {
     // Verificar se o usuário é o próprio beneficiário ou tem permissão para ver
@@ -92,7 +115,10 @@ export class DistributionsController {
         'Você não tem permissão para ver distribuições de outros beneficiários.',
       );
     }
-    return this.distributionsService.findByBeneficiary(beneficiaryId);
+    return this.distributionsService.findByBeneficiary(
+      beneficiaryId,
+      pageOptionsDto,
+    );
   }
 
   @Patch(':id')

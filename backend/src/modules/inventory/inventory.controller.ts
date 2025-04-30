@@ -1,3 +1,4 @@
+// src/modules/inventory/inventory.controller.ts
 import {
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
@@ -24,7 +26,11 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { Inventory } from './entities/inventory.entity';
 
 @ApiTags('inventory')
 @Controller('inventory')
@@ -53,14 +59,24 @@ export class InventoryController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos os itens no inventário' })
+  @ApiOperation({
+    summary: 'Listar todos os itens no inventário (com paginação)',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de inventário retornada com sucesso.',
+    description: 'Lista paginada de inventário retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
-  findAll() {
-    return this.inventoryService.findAll();
+  findAll(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Inventory>> {
+    return this.inventoryService.findAllPaginated(pageOptionsDto);
   }
 
   @Get(':id')

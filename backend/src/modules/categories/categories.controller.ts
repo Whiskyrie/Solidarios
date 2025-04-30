@@ -1,3 +1,4 @@
+// src/modules/categories/categories.controller.ts
 import {
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -24,8 +26,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
-import { Public } from '../auth/decorators/public.decorator'; // Importar Public
+import { Public } from '../auth/decorators/public.decorator';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { Category } from './entities/category.entity';
 
 @ApiTags('categories')
 @Controller('categories')
@@ -48,13 +54,19 @@ export class CategoriesController {
 
   @Public() // Tornar este endpoint público
   @Get()
-  @ApiOperation({ summary: 'Listar todas as categorias' })
+  @ApiOperation({ summary: 'Listar todas as categorias (com paginação)' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de categorias retornada com sucesso.',
+    description: 'Lista paginada de categorias retornada com sucesso.',
+    type: PageDto,
   })
-  findAll() {
-    return this.categoriesService.findAll();
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
+  })
+  findAll(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<Category>> {
+    return this.categoriesService.findAllPaginated(pageOptionsDto);
   }
 
   @Public() // Tornar este endpoint público
