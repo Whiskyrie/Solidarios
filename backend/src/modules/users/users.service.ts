@@ -1,3 +1,4 @@
+// src/modules/users/users.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -8,6 +9,9 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 
 @Injectable()
 export class UsersService {
@@ -29,8 +33,26 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
+  // Método antigo sem paginação, mantido para compatibilidade
   async findAll(): Promise<User[]> {
     return await this.usersRepository.find();
+  }
+
+  // Novo método com paginação
+  async findAllPaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    const queryBuilder = this.usersRepository
+      .createQueryBuilder('user')
+      .orderBy('user.createdAt', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const users = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(users, pageMetaDto);
   }
 
   async findOne(id: string): Promise<User> {

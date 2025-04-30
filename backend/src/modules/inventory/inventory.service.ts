@@ -1,3 +1,4 @@
+// src/modules/inventory/inventory.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -9,16 +10,19 @@ import { Repository } from 'typeorm';
 import { Inventory } from './entities/inventory.entity';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { ItemsService } from '../items/items.service'; // Importa ItemsService
+import { ItemsService } from '../items/items.service';
 import { ItemStatus } from '../items/entities/item.entity';
 import { User, UserRole } from '../users/entities/user.entity';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 
 @Injectable()
 export class InventoryService {
   constructor(
     @InjectRepository(Inventory)
     private inventoryRepository: Repository<Inventory>,
-    private itemsService: ItemsService, // Injeta ItemsService para validar o item
+    private itemsService: ItemsService,
   ) {}
 
   async create(
@@ -60,8 +64,29 @@ export class InventoryService {
     return this.inventoryRepository.save(inventoryEntry);
   }
 
+  // Método antigo sem paginação, mantido para compatibilidade
   async findAll(): Promise<Inventory[]> {
-    return this.inventoryRepository.find({ relations: ['item', 'item.donor'] }); // Inclui o item e o doador do item
+    return this.inventoryRepository.find({ relations: ['item', 'item.donor'] });
+  }
+
+  // Novo método com paginação
+  async findAllPaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Inventory>> {
+    const queryBuilder = this.inventoryRepository
+      .createQueryBuilder('inventory')
+      .leftJoinAndSelect('inventory.item', 'item')
+      .leftJoinAndSelect('item.donor', 'donor')
+      .leftJoinAndSelect('item.category', 'category')
+      .orderBy('inventory.createdAt', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const inventory = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(inventory, pageMetaDto);
   }
 
   async findOne(id: string): Promise<Inventory> {

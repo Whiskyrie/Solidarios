@@ -1,3 +1,4 @@
+// src/modules/items/items.controller.ts
 import {
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -24,7 +26,11 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { Item } from './entities/item.entity';
 
 @ApiTags('items')
 @Controller('items')
@@ -46,14 +52,20 @@ export class ItemsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos os itens/doações' })
+  @ApiOperation({ summary: 'Listar todos os itens/doações (com paginação)' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de itens retornada com sucesso.',
+    description: 'Lista paginada de itens retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO) // Apenas Admin e Funcionário podem listar todos
-  findAll() {
-    return this.itemsService.findAll();
+  findAll(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<Item>> {
+    return this.itemsService.findAllPaginated(pageOptionsDto);
   }
 
   @Get(':id')

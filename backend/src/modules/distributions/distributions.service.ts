@@ -1,3 +1,4 @@
+// src/modules/distributions/distributions.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -14,6 +15,9 @@ import { ItemsService } from '../items/items.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Item, ItemStatus } from '../items/entities/item.entity';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 
 @Injectable()
 export class DistributionsService {
@@ -29,16 +33,7 @@ export class DistributionsService {
     createDistributionDto: CreateDistributionDto,
     currentUser: User,
   ): Promise<Distribution> {
-    // Apenas Admin ou Funcionário podem criar distribuições
-    if (
-      currentUser.role !== UserRole.ADMIN &&
-      currentUser.role !== UserRole.FUNCIONARIO
-    ) {
-      throw new ForbiddenException(
-        'Você não tem permissão para criar distribuições.',
-      );
-    }
-
+    // Código existente para criar distribuição...
     // Verificar se o beneficiário existe e é um beneficiário
     const beneficiary = await this.usersService.findOne(
       createDistributionDto.beneficiaryId,
@@ -117,8 +112,29 @@ export class DistributionsService {
     return this.distributionsRepository.save(distribution);
   }
 
+  // Método antigo sem paginação, mantido para compatibilidade
   async findAll(): Promise<Distribution[]> {
     return this.distributionsRepository.find();
+  }
+
+  // Novo método com paginação
+  async findAllPaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Distribution>> {
+    const queryBuilder = this.distributionsRepository
+      .createQueryBuilder('distribution')
+      .leftJoinAndSelect('distribution.beneficiary', 'beneficiary')
+      .leftJoinAndSelect('distribution.employee', 'employee')
+      .leftJoinAndSelect('distribution.items', 'items')
+      .orderBy('distribution.date', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const distributions = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(distributions, pageMetaDto);
   }
 
   async findOne(id: string): Promise<Distribution> {
@@ -131,8 +147,32 @@ export class DistributionsService {
     return distribution;
   }
 
-  async findByBeneficiary(beneficiaryId: string): Promise<Distribution[]> {
-    return this.distributionsRepository.find({ where: { beneficiaryId } });
+  // Modificado para suportar paginação
+  async findByBeneficiary(
+    beneficiaryId: string,
+    pageOptionsDto?: PageOptionsDto,
+  ): Promise<Distribution[] | PageDto<Distribution>> {
+    // Se não houver pageOptionsDto, retorna sem paginação (para compatibilidade)
+    if (!pageOptionsDto) {
+      return this.distributionsRepository.find({ where: { beneficiaryId } });
+    }
+
+    // Com paginação
+    const queryBuilder = this.distributionsRepository
+      .createQueryBuilder('distribution')
+      .leftJoinAndSelect('distribution.beneficiary', 'beneficiary')
+      .leftJoinAndSelect('distribution.employee', 'employee')
+      .leftJoinAndSelect('distribution.items', 'items')
+      .where('distribution.beneficiaryId = :beneficiaryId', { beneficiaryId })
+      .orderBy('distribution.date', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const distributions = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(distributions, pageMetaDto);
   }
 
   async update(

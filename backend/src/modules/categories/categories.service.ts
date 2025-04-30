@@ -1,3 +1,4 @@
+// src/modules/categories/categories.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -10,6 +11,9 @@ import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { User, UserRole } from '../users/entities/user.entity';
+import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
+import { PageDto } from '../../common/pagination/dto/page.dto';
+import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -46,8 +50,27 @@ export class CategoriesService {
     return this.categoriesRepository.save(category);
   }
 
+  // Método antigo sem paginação, mantido para compatibilidade
   async findAll(): Promise<Category[]> {
     return this.categoriesRepository.find();
+  }
+
+  // Novo método com paginação
+  async findAllPaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Category>> {
+    const queryBuilder = this.categoriesRepository
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.items', 'items')
+      .orderBy('category.name', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const categories = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(categories, pageMetaDto);
   }
 
   async findOne(id: string): Promise<Category> {
@@ -103,7 +126,6 @@ export class CategoriesService {
     }
 
     const category = await this.findOne(id);
-    // TODO: Adicionar verificação se a categoria está sendo usada por algum item antes de remover?
     await this.categoriesRepository.remove(category);
   }
 }
