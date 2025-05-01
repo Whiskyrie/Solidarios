@@ -1,5 +1,5 @@
 # Estágio base
-FROM node:${NODE_VERSION}-alpine AS base
+FROM node:22.15-alpine AS base 
 WORKDIR /usr/src/app
 COPY package*.json ./
 
@@ -7,8 +7,9 @@ COPY package*.json ./
 FROM base AS development
 # Instalar dependências de compilação do bcrypt
 RUN apk add --no-cache make gcc g++ python3 
-RUN npm install bcrypt
 RUN npm install
+RUN npm uninstall bcrypt || true
+RUN npm install bcrypt --build-from-source
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
@@ -18,7 +19,8 @@ FROM base AS production
 # Instalar dependências de compilação
 RUN apk add --no-cache make gcc g++ python3
 RUN npm ci --only=production
-
+RUN npm uninstall bcrypt || true
+RUN npm install bcrypt --build-from-source
 
 COPY . .
 EXPOSE 3000
