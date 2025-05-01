@@ -2,10 +2,13 @@ version: '3.8'
 
 services:
   app:
+    platform: linux/amd64  # Adicionar plataforma para evitar problemas de compatibilidade
     build:
       context: .
       dockerfile: Dockerfile
       target: development # Use o estágio de desenvolvimento para hot-reloading
+      args:
+        NODE_VERSION: '22.15'  # Especificar a versão do Node.js como argumento
     container_name: solidarios_app
     ports:
       - "3000:3000"
@@ -36,4 +39,3 @@ services:
 volumes:
   postgres_data:
     driver: local
-
