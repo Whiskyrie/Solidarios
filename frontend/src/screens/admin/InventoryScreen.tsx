@@ -185,7 +185,7 @@ const InventoryScreen: React.FC = () => {
         rightComponent={
           <Badge
             label={`${pagination?.totalItems || 0} Total`}
-            variant="secondary"
+            variant="info"
             size="small"
           />
         }
@@ -230,12 +230,12 @@ const InventoryScreen: React.FC = () => {
             <InventoryCard
               inventory={item}
               onPress={() =>
-                navigation.navigate(ADMIN_ROUTES.INVENTORY_DETAIL, {
+                navigation.navigate("InventoryDetail", {
                   id: item.id,
                 })
               }
               onUpdatePress={() =>
-                navigation.navigate(ADMIN_ROUTES.INVENTORY_DETAIL, {
+                navigation.navigate("InventoryDetail", {
                   id: item.id,
                 })
               }
@@ -257,7 +257,7 @@ const InventoryScreen: React.FC = () => {
                   : "Não há itens cadastrados no inventário."
               }
               actionLabel="Verificar itens disponíveis"
-              onAction={() => navigation.navigate(ADMIN_ROUTES.ITEMS_LIST)}
+              onAction={() => navigation.navigate("InventoryList")}
             />
           }
         />
