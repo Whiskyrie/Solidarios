@@ -1,23 +1,26 @@
-import React from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import Typography from './Typography';
-import theme from '../../theme';
-import { ItemStatus } from '../../types/items.types';
+import React from "react";
+import { View, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import Typography from "./Typography";
+import theme from "../../theme";
+import { ItemStatus } from "../../types/items.types";
 
-export type BadgeVariant = 
-  | 'available' 
-  | 'reserved' 
-  | 'distributed' 
-  | 'lowStock'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'info';
+export const BADGE_VARIANTS = {
+  available: "available",
+  reserved: "reserved",
+  distributed: "distributed",
+  lowStock: "lowStock",
+  success: "success",
+  warning: "warning",
+  error: "error",
+  info: "info",
+} as const;
+
+export type BadgeVariant = keyof typeof BADGE_VARIANTS;
 
 export interface BadgeProps {
   label: string;
   variant?: BadgeVariant;
-  size?: 'small' | 'medium';
+  size?: "small" | "medium";
   style?: StyleProp<ViewStyle>;
 }
 
@@ -25,71 +28,64 @@ export interface BadgeProps {
 export const mapStatusToBadgeVariant = (status: ItemStatus): BadgeVariant => {
   switch (status) {
     case ItemStatus.DISPONIVEL:
-      return 'available';
+      return "available";
     case ItemStatus.RESERVADO:
-      return 'reserved';
+      return "reserved";
     case ItemStatus.DISTRIBUIDO:
-      return 'distributed';
+      return "distributed";
     default:
-      return 'info';
+      return "info";
   }
 };
 
 const Badge: React.FC<BadgeProps> = ({
   label,
-  variant = 'info',
-  size = 'medium',
+  variant = "info",
+  size = "medium",
   style,
 }) => {
   // Determinar as cores baseadas na variante
   let backgroundColor, textColor;
 
   switch (variant) {
-    case 'available':
+    case "available":
       backgroundColor = theme.colors.badges.available.background;
       textColor = theme.colors.badges.available.text;
       break;
-    case 'reserved':
+    case "reserved":
       backgroundColor = theme.colors.badges.reserved.background;
       textColor = theme.colors.badges.reserved.text;
       break;
-    case 'distributed':
+    case "distributed":
       backgroundColor = theme.colors.badges.distributed.background;
       textColor = theme.colors.badges.distributed.text;
       break;
-    case 'lowStock':
+    case "lowStock":
       backgroundColor = theme.colors.badges.lowStock.background;
       textColor = theme.colors.badges.lowStock.text;
       break;
-    case 'success':
+    case "success":
       backgroundColor = theme.colors.notifications.success.background;
       textColor = theme.colors.notifications.success.text;
       break;
-    case 'warning':
+    case "warning":
       backgroundColor = theme.colors.notifications.warning.background;
       textColor = theme.colors.notifications.warning.text;
       break;
-    case 'error':
+    case "error":
       backgroundColor = theme.colors.notifications.error.background;
       textColor = theme.colors.notifications.error.text;
       break;
-    case 'info':
+    case "info":
     default:
       backgroundColor = theme.colors.notifications.info.background;
       textColor = theme.colors.notifications.info.text;
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor },
-        styles[size],
-        style,
-      ]}
-    >
+    <View style={[styles.container, { backgroundColor }, styles[size], style]}>
       <Typography
-        variant={size === 'small' ? 'small' : 'bodySecondary'}
+        variant={size === "small" ? "small" : "bodySecondary"}
         color={textColor}
         style={styles.text}
       >
@@ -103,8 +99,8 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     paddingHorizontal: theme.spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   small: {
     paddingVertical: 2,
@@ -115,7 +111,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xs,
   },
   text: {
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
 
