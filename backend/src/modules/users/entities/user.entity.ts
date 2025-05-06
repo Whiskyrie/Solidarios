@@ -47,6 +47,8 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+  resetPasswordToken: string | null;
+  resetPasswordExpires: Date | null;
 
   @BeforeInsert()
   @BeforeUpdate()

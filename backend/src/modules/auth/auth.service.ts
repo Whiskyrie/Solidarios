@@ -162,4 +162,49 @@ export class AuthService {
     // Revogar todos os tokens do usuário ao fazer logout
     await this.revokeAllUserTokens(userId);
   }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      // Não informar se o email não existe por questões de segurança
+      return;
+    }
+
+    // Gerar token de redefinição de senha
+    const resetToken = uuidv4();
+    const hashedToken = await bcrypt.hash(resetToken, 10);
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // Token expira em 1 hora
+
+    // Salvar token de redefinição (pode ser em uma nova entidade ou no usuário)
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = expiresAt;
+    await this.usersService.update(user.id, user);
+
+    // Enviar email com o token (implementação de envio de email não inclusa)
+    // Exemplo: await this.emailService.sendResetPasswordEmail(email, resetToken);
+    console.log(`Token de redefinição para ${email}: ${resetToken}`);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByResetToken(token);
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < new Date()
+    ) {
+      throw new UnauthorizedException(
+        'Token de redefinição inválido ou expirado',
+      );
+    }
+
+    // Atualizar senha
+    user.password = newPassword; // A entidade deve cuidar do hash
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await this.usersService.update(user.id, user);
+
+    // Revogar todos os tokens do usuário por segurança
+    await this.revokeAllUserTokens(user.id);
+  }
 }

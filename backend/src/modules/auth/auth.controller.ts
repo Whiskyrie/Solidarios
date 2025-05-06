@@ -68,6 +68,42 @@ export class AuthController {
     return this.authService.refreshTokens(refreshTokenDto.refreshToken);
   }
 
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Solicitar redefinição de senha' })
+  @ApiResponse({
+    status: 204,
+    description: 'Solicitação de redefinição de senha enviada.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { email: { type: 'string', format: 'email' } },
+    },
+  })
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async forgotPassword(@Body('email') email: string) {
+    await this.authService.forgotPassword(email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Redefinir senha com token' })
+  @ApiResponse({ status: 204, description: 'Senha redefinida com sucesso.' })
+  @ApiResponse({ status: 401, description: 'Token inválido ou expirado.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { token: { type: 'string' }, password: { type: 'string' } },
+    },
+  })
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    await this.authService.resetPassword(body.token, body.password);
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Fazer logout (revogar tokens)' })

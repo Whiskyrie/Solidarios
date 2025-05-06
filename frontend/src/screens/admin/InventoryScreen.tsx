@@ -1,18 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AdminInventoryStackParamList } from "../../navigation/types";
 
 // Componentes
 import {
-  Typography,
   Header,
   SearchBar,
   EmptyState,
@@ -29,7 +22,6 @@ import { useAuth } from "../../hooks/useAuth";
 import { useInventory } from "../../hooks/useInventory";
 
 // Tipos e rotas
-import { ADMIN_ROUTES } from "../../navigation/routes";
 import { Inventory } from "../../types/inventory.types";
 
 // Opções de filtro
@@ -51,7 +43,7 @@ const SORT_OPTIONS = [
 const InventoryScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<AdminInventoryStackParamList>>();
-  const { user } = useAuth();
+  useAuth();
   const {
     inventoryItems,
     isLoading,
