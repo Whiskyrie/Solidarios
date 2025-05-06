@@ -12,6 +12,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -69,6 +70,19 @@ export class UsersService {
       throw new NotFoundException(`Usuário com email ${email} não encontrado`);
     }
     return user;
+  }
+
+  async findByResetToken(token: string): Promise<User> {
+    const users = await this.usersRepository.find();
+    for (const user of users) {
+      if (
+        user.resetPasswordToken &&
+        (await bcrypt.compare(token, user.resetPasswordToken))
+      ) {
+        return user;
+      }
+    }
+    throw new NotFoundException('Token de redefinição não encontrado');
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
