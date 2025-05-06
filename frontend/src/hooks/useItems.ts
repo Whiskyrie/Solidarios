@@ -50,8 +50,10 @@ export const useItems = () => {
       });
       return response;
     } catch (err: any) {
-      setError(err.message || "Erro ao buscar itens");
-      return null;
+      const errorMessage =
+        err.response?.data?.message || err.message || "Erro ao buscar itens";
+      setError(errorMessage);
+      throw new Error(errorMessage); // Lançar erro para ser capturado pelo componente
     } finally {
       setIsLoading(false);
     }

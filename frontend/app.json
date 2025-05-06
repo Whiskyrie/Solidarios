@@ -1,17 +1,12 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Solidarios",
+    "slug": "solidarios",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/favicon.svg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/favicon.svg",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true
     },

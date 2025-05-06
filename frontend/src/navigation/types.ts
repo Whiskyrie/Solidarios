@@ -30,7 +30,7 @@ export type AdminTabScreenProps<T extends keyof AdminTabParamList> =
 export type AdminItemsStackParamList = {
   ItemsList: undefined;
   ItemDetail: { id: string };
-  CreateItem: undefined;
+  CreateItem: { id?: string; isEditing?: boolean } | undefined;
 };
 
 export type AdminItemsScreenProps<T extends keyof AdminItemsStackParamList> =
