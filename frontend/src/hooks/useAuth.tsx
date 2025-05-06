@@ -1,7 +1,12 @@
 /**
  * Hook personalizado para gerenciamento de autenticação
  */
-import { useCallback } from "react";
+import React, {
+  useCallback,
+  useContext,
+  createContext,
+  ReactNode,
+} from "react";
 import { LoginDto, RegisterDto } from "../types/auth.types";
 import {
   login as loginAction,
@@ -14,8 +19,37 @@ import {
 import { useAppDispatch, useAppSelector } from "../store";
 import { UserRole } from "../types/users.types";
 
-// Hook personalizado para autenticação
-export const useAuth = () => {
+// Definição do tipo para o contexto de autenticação
+type AuthContextType = {
+  user: any | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  login: (credentials: LoginDto) => Promise<boolean>;
+  register: (userData: RegisterDto) => Promise<boolean>;
+  logout: () => Promise<boolean>;
+  getProfile: () => Promise<any | null>;
+  refreshTokens: () => Promise<boolean>;
+  clearErrors: () => void;
+  hasRole: (role: UserRole | UserRole[]) => boolean;
+  isAdmin: () => boolean;
+  isFuncionario: () => boolean;
+  isDoador: () => boolean;
+  isBeneficiario: () => boolean;
+};
+
+// Criar o contexto
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Props para o provedor de autenticação
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+// Provedor de autenticação
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const dispatch = useAppDispatch();
 
   // Selecionar estado de autenticação da store
@@ -123,8 +157,8 @@ export const useAuth = () => {
     return hasRole(UserRole.BENEFICIARIO);
   }, [hasRole]);
 
-  // Retornar as funções e estado
-  return {
+  // Criar o objeto de valor do contexto
+  const authContextValue: AuthContextType = {
     // Estado
     user,
     accessToken,
@@ -148,6 +182,22 @@ export const useAuth = () => {
     isDoador,
     isBeneficiario,
   };
+
+  // Retornar o provedor com o valor do contexto
+  return (
+    <AuthContext.Provider value={authContextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-export default useAuth;
+// Hook customizado para utilizar o contexto de autenticação
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
+  }
+  return context;
+};
+
+export default AuthProvider;

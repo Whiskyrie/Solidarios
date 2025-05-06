@@ -69,6 +69,28 @@ const AuthService = {
     const response = await apiClient.get<User>("/auth/profile");
     return response.data;
   },
+
+  /**
+   * Solicitar redefinição de senha
+   * @param email Email do usuário que esqueceu a senha
+   * @returns Void - Resposta é vazia com status 204
+   */
+  forgotPassword: async (email: string): Promise<void> => {
+    await apiClient.post("/auth/forgot-password", { email });
+  },
+
+  /**
+   * Redefinir senha com token
+   * @param token Token de redefinição recebido por email
+   * @param newPassword Nova senha
+   * @returns Void - Resposta é vazia com status 204
+   */
+  resetPassword: async (token: string, newPassword: string): Promise<void> => {
+    await apiClient.post("/auth/reset-password", {
+      token,
+      password: newPassword,
+    });
+  },
 };
 
 export default AuthService;

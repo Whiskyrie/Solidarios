@@ -1,5 +1,4 @@
-// src/screens/admin/DashboardScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -34,29 +33,24 @@ import { useUsers } from "../../hooks/useUsers";
 
 // Tipos e rotas
 import {
-  AdminTabParamList,
-  AdminItemsStackParamList,
-  AdminInventoryStackParamList,
-  AdminDistributionsStackParamList,
-  AdminUsersStackParamList,
+  FuncionarioTabParamList,
+  FuncionarioItemsStackParamList,
+  FuncionarioInventoryStackParamList,
+  FuncionarioDistributionsStackParamList,
 } from "../../navigation/types";
 import { Item } from "../../types/items.types";
 import { Distribution } from "../../types/distributions.types";
-import { User } from "../../types/users.types";
 import { Inventory } from "../../types/inventory.types";
 import { StatData } from "../../components/cards/StatsCard";
 
 // Definição do tipo de navegação composta para o Dashboard
 type DashboardScreenProps = CompositeScreenProps<
-  BottomTabScreenProps<AdminTabParamList, "Dashboard">,
+  BottomTabScreenProps<FuncionarioTabParamList, "Dashboard">,
   CompositeScreenProps<
-    NativeStackScreenProps<AdminItemsStackParamList>,
+    NativeStackScreenProps<FuncionarioItemsStackParamList>,
     CompositeScreenProps<
-      NativeStackScreenProps<AdminInventoryStackParamList>,
-      CompositeScreenProps<
-        NativeStackScreenProps<AdminDistributionsStackParamList>,
-        NativeStackScreenProps<AdminUsersStackParamList>
-      >
+      NativeStackScreenProps<FuncionarioInventoryStackParamList>,
+      NativeStackScreenProps<FuncionarioDistributionsStackParamList>
     >
   >
 >;
@@ -72,7 +66,6 @@ const DashboardScreen: React.FC = () => {
   const itemsHook = useItems();
   const inventoryHook = useInventory();
   const distributionsHook = useDistributions();
-  const usersHook = useUsers();
 
   // Dados agregados para dashboard
   const [stats, setStats] = useState({
@@ -80,9 +73,6 @@ const DashboardScreen: React.FC = () => {
     availableItems: 0,
     totalDistributions: 0,
     lowStockItems: 0,
-    totalUsers: 0,
-    totalBeneficiaries: 0,
-    totalDonors: 0,
   });
 
   // Dados para cards
@@ -103,13 +93,11 @@ const DashboardScreen: React.FC = () => {
         itemsResponse,
         inventoryResponse,
         distributionsResponse,
-        usersResponse,
         lowStockResponse,
       ] = await Promise.all([
         itemsHook.fetchItems({ page: 1, take: 50 }),
         inventoryHook.fetchInventory({ page: 1, take: 50 }),
         distributionsHook.fetchDistributions({ page: 1, take: 10 }),
-        usersHook.fetchUsers({ page: 1, take: 50 }),
         inventoryHook.fetchLowStock({ page: 1, take: 5 }),
       ]);
 
@@ -118,27 +106,18 @@ const DashboardScreen: React.FC = () => {
         itemsResponse &&
         inventoryResponse &&
         distributionsResponse &&
-        usersResponse
+        lowStockResponse
       ) {
         const items = itemsResponse.data;
         const availableItems = items.filter(
           (item) => item.status === "disponivel"
-        ).length;
-        const beneficiaries = usersResponse.data.filter(
-          (user) => user.role === "beneficiario"
-        ).length;
-        const donors = usersResponse.data.filter(
-          (user) => user.role === "doador"
         ).length;
 
         setStats({
           totalItems: itemsResponse.meta.itemCount,
           availableItems,
           totalDistributions: distributionsResponse.meta.itemCount,
-          lowStockItems: lowStockResponse ? lowStockResponse.meta.itemCount : 0,
-          totalUsers: usersResponse.meta.itemCount,
-          totalBeneficiaries: beneficiaries,
-          totalDonors: donors,
+          lowStockItems: lowStockResponse.meta.itemCount,
         });
 
         // Definir itens recentes
@@ -148,9 +127,7 @@ const DashboardScreen: React.FC = () => {
         setRecentDistributions(distributionsResponse.data.slice(0, 3));
 
         // Definir itens com estoque baixo
-        if (lowStockResponse) {
-          setLowStockInventory(lowStockResponse.data.slice(0, 3));
-        }
+        setLowStockInventory(lowStockResponse.data.slice(0, 3));
       }
     } catch (err) {
       console.error("Erro ao carregar dados do dashboard:", err);
@@ -222,33 +199,12 @@ const DashboardScreen: React.FC = () => {
     },
   ];
 
-  const usersData: StatData[] = [
-    {
-      title: "Total de Usuários",
-      value: stats.totalUsers,
-      type: "number",
-      color: theme.colors.primary.main,
-    },
-    {
-      title: "Beneficiários",
-      value: stats.totalBeneficiaries,
-      type: "number",
-      color: theme.colors.status.info,
-    },
-    {
-      title: "Doadores",
-      value: stats.totalDonors,
-      type: "number",
-      color: theme.colors.primary.secondary,
-    },
-  ];
-
   return (
     <View style={styles.container}>
       {/* Cabeçalho */}
       <Header
         title="Dashboard"
-        subtitle={`Olá, ${user?.name?.split(" ")[0] || "Administrador"}`}
+        subtitle={`Olá, ${user?.name?.split(" ")[0] || "Funcionário"}`}
         backgroundColor={theme.colors.primary.main}
       />
 
@@ -265,16 +221,6 @@ const DashboardScreen: React.FC = () => {
           title="Estatísticas do Sistema"
           stats={statsData}
           style={styles.statsCard}
-        />
-
-        <StatsCard
-          title="Usuários"
-          stats={usersData}
-          style={styles.statsCard}
-          actionLabel="Ver todos os usuários"
-          onActionPress={() =>
-            navigation.navigate("Users", { screen: "UsersList" })
-          }
         />
 
         {/* Itens recentes */}
