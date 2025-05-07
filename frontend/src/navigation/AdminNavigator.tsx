@@ -2,7 +2,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View } from "react-native";
 import theme from "../theme";
 
 // Tipos de navegação
@@ -13,48 +12,23 @@ import {
   AdminDistributionsStackParamList,
   AdminUsersStackParamList,
 } from "./types";
+// Ícones (usando react-native-vector-icons)
+import Icon from "react-native-vector-icons/Ionicons";
 
-// Ícones (pseudo-implementação - você precisará importar os ícones reais)
-const DashboardIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.main,
-    }}
-  />
+const DashboardIcon = ({ color }: { color: string }) => (
+  <Icon name="speedometer" size={24} color={color} />
 );
-const ItemsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.secondary,
-    }}
-  />
+const ItemsIcon = ({ color }: { color: string }) => (
+  <Icon name="list" size={24} color={color} />
 );
-const InventoryIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.accent,
-    }}
-  />
+const InventoryIcon = ({ color }: { color: string }) => (
+  <Icon name="cube" size={24} color={color} />
 );
-const DistributionsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.status.success,
-    }}
-  />
+const DistributionsIcon = ({ color }: { color: string }) => (
+  <Icon name="car" size={24} color={color} />
 );
-const UsersIcon = () => (
-  <View
-    style={{ width: 24, height: 24, backgroundColor: theme.colors.status.info }}
-  />
+const UsersIcon = ({ color }: { color: string }) => (
+  <Icon name="people" size={24} color={color} />
 );
 
 // Telas
@@ -165,7 +139,7 @@ const AdminNavigator: React.FC = () => {
         name="Dashboard"
         component={DashboardNavigator}
         options={{
-          tabBarIcon: ({ color }) => <DashboardIcon />,
+          tabBarIcon: ({ color }) => <DashboardIcon color={color} />,
           tabBarLabel: "Dashboard",
         }}
       />
@@ -173,7 +147,7 @@ const AdminNavigator: React.FC = () => {
         name="Items"
         component={ItemsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <ItemsIcon />,
+          tabBarIcon: ({ color }) => <ItemsIcon color={color} />,
           tabBarLabel: "Itens",
         }}
       />
@@ -181,7 +155,7 @@ const AdminNavigator: React.FC = () => {
         name="Inventory"
         component={InventoryNavigator}
         options={{
-          tabBarIcon: ({ color }) => <InventoryIcon />,
+          tabBarIcon: ({ color }) => <InventoryIcon color={color} />,
           tabBarLabel: "Estoque",
         }}
       />
@@ -189,7 +163,7 @@ const AdminNavigator: React.FC = () => {
         name="Distributions"
         component={DistributionsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <DistributionsIcon />,
+          tabBarIcon: ({ color }) => <DistributionsIcon color={color} />,
           tabBarLabel: "Distribuições",
         }}
       />
@@ -197,7 +171,7 @@ const AdminNavigator: React.FC = () => {
         name="Users"
         component={UsersNavigator}
         options={{
-          tabBarIcon: ({ color }) => <UsersIcon />,
+          tabBarIcon: ({ color }) => <UsersIcon color={color} />,
           tabBarLabel: "Usuários",
         }}
       />

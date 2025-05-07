@@ -12,7 +12,7 @@ import Typography from "../common/Typography";
 import Avatar from "../common/Avatar";
 import Badge from "../common/Badge";
 import Divider from "../common/Divider";
-import { formatDate, formatDateTime } from "../../utils/formatters";
+import { formatDateTime } from "../../utils/formatters";
 import { Distribution } from "../../types/distributions.types";
 import theme from "../../theme";
 
