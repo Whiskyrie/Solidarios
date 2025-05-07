@@ -42,6 +42,12 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ nullable: true })
+  address: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
