@@ -1,27 +1,27 @@
-# Estágio base
-FROM node:22.15-alpine AS base 
-WORKDIR /usr/src/app
+# Etapa de build
+FROM node:22-alpine AS builder
+# Diretório de trabalho
+WORKDIR /app
+# Copiar arquivos de dependências primeiro, para melhor caching
 COPY package*.json ./
-
-# Estágio de desenvolvimento
-FROM base AS development
-# Instalar dependências de compilação do bcrypt
-RUN apk add --no-cache make gcc g++ python3 
-RUN npm install
-RUN npm uninstall bcrypt || true
-RUN npm install bcrypt --build-from-source
+RUN npm ci
+# Copiar código fonte
 COPY . .
+# Compilar a aplicação
+RUN npm run build
+# Etapa de produção
+FROM node:22-alpine AS production
+# Diretório de trabalho
+WORKDIR /app
+# Instalar apenas dependências de produção
+COPY package*.json ./
+RUN npm ci --omit=dev
+# Copiar apenas os arquivos compilados da etapa de build
+COPY --from=builder /app/dist ./dist
+# Expor a porta usada pela aplicação
 EXPOSE 3000
-CMD ["npm", "run", "start:dev"]
-
-# Estágio de produção
-FROM base AS production
-# Instalar dependências de compilação
-RUN apk add --no-cache make gcc g++ python3
-RUN npm ci --only=production
-RUN npm uninstall bcrypt || true
-RUN npm install bcrypt --build-from-source
-
-COPY . .
-EXPOSE 3000
-CMD ["npm", "run", "start"]
+# Criar usuário não-root para executar a aplicação
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+# Comando para executar a aplicação
+CMD ["node", "dist/main.js"]
