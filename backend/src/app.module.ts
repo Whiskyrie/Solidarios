@@ -51,10 +51,9 @@ import helmet from 'helmet';
             entities: [__dirname + '/**/*.entity{.ts,.js}'],
             synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
             logging: configService.get<boolean>('DB_LOGGING', false),
-            ssl:
-              configService.get('DB_SSL_REJECT_UNAUTHORIZED') === 'false'
-                ? { rejectUnauthorized: false } // Aceita certificados auto-assinados
-                : true, // Mantém a validação de certificados
+            ssl: {
+              rejectUnauthorized: false, // Força aceitar certificados auto-assinados
+            },
           };
         }
 
@@ -69,17 +68,12 @@ import helmet from 'helmet';
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
           logging: configService.get<boolean>('DB_LOGGING', false),
-          extra: {},
-        };
-
-        if (configService.get('DB_SSL') === 'true') {
-          dbConfig.extra = {
+          extra: {
             ssl: {
-              rejectUnauthorized:
-                configService.get('DB_SSL_REJECT_UNAUTHORIZED') !== 'false',
+              rejectUnauthorized: false, // Força aceitar certificados auto-assinados
             },
-          };
-        }
+          },
+        };
 
         return dbConfig;
       },
