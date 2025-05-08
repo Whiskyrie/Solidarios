@@ -11,10 +11,10 @@ import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
 
 export enum UserRole {
-  ADMIN = 'admin',
-  FUNCIONARIO = 'funcionario',
-  DOADOR = 'doador',
-  BENEFICIARIO = 'beneficiario',
+  ADMIN = 'ADMIN',
+  FUNCIONARIO = 'FUNCIONARIO',
+  DOADOR = 'DOADOR',
+  BENEFICIARIO = 'BENEFICIARIO',
 }
 
 @Entity('users')

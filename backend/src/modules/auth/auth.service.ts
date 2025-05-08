@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -52,6 +52,11 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    // Define um valor padrão para role caso não seja fornecido
+    if (!registerDto.role) {
+      registerDto.role = UserRole.DOADOR; // Define DOADOR como papel padrão
+    }
+
     const newUser = await this.usersService.create(registerDto);
 
     const { ...userWithoutPassword } = newUser;
