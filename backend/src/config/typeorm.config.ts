@@ -29,7 +29,7 @@ export const AppDataSource = new DataSource({
   entities: [entitiesPath],
   migrations: [migrationsPath],
   // Usar a variável de ambiente DB_SYNCHRONIZE em vez de baseado no ambiente
-  synchronize: process.env.DB_SYNCHRONIZE === 'true',
+  synchronize: process.env.DB_SYNCHRONIZE === 'false',
   logging: process.env.DB_LOGGING === 'true',
   migrationsRun: false, // Impede a execução automática de migrações
   migrationsTableName: 'migrations',
