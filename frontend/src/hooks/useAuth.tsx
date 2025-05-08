@@ -56,14 +56,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { user, accessToken, refreshToken, isAuthenticated, isLoading, error } =
     useAppSelector((state) => state.auth);
 
-  // Função para fazer login
+  // Função para login
   const login = useCallback(
     async (credentials: LoginDto) => {
       try {
+        console.log("[useAuth] Disparando ação de login");
         // Usar o tipo correto para o dispatch (AppDispatch já está tipado para suportar thunks)
         await dispatch(loginAction(credentials)).unwrap();
+        console.log("[useAuth] Login realizado com sucesso");
         return true;
       } catch (error) {
+        console.error("[useAuth] Erro no login:", error);
         return false;
       }
     },
@@ -74,10 +77,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = useCallback(
     async (userData: RegisterDto) => {
       try {
+        console.log("[useAuth] Disparando ação de registro");
         // Usar o tipo correto para o dispatch
         await dispatch(registerAction(userData)).unwrap();
+        console.log("[useAuth] Registro realizado com sucesso");
         return true;
       } catch (error) {
+        console.error("[useAuth] Erro no registro:", error);
         return false;
       }
     },

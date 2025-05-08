@@ -27,14 +27,21 @@ export const login = createAsyncThunk(
   "auth/login",
   async (credentials: LoginDto, { rejectWithValue }) => {
     try {
+      console.log("[authSlice] Iniciando requisição de login");
       const response = await AuthService.login(credentials);
+      console.log("[authSlice] Login bem-sucedido, tokens recebidos");
 
       // Salvar tokens no armazenamento persistente
       await AsyncStorage.setItem("@auth_token", response.accessToken);
       await AsyncStorage.setItem("@refresh_token", response.refreshToken);
+      console.log("[authSlice] Tokens salvos no AsyncStorage");
 
       return response;
     } catch (error: any) {
+      console.error(
+        "[authSlice] Erro no login:",
+        error.response?.data || error.message || error
+      );
       return rejectWithValue(
         error.response?.data?.message || "Erro ao realizar login"
       );
@@ -46,14 +53,37 @@ export const register = createAsyncThunk(
   "auth/register",
   async (userData: RegisterDto, { rejectWithValue }) => {
     try {
+      console.log("[authSlice] Iniciando requisição de registro");
+      console.log("[authSlice] Dados:", {
+        ...userData,
+        password: "***ESCONDIDO***",
+      });
+
       const response = await AuthService.register(userData);
+      console.log("[authSlice] Registro bem-sucedido, tokens recebidos");
 
       // Salvar tokens no armazenamento persistente
       await AsyncStorage.setItem("@auth_token", response.accessToken);
       await AsyncStorage.setItem("@refresh_token", response.refreshToken);
+      console.log("[authSlice] Tokens salvos no AsyncStorage após registro");
 
       return response;
     } catch (error: any) {
+      console.error(
+        "[authSlice] Erro no registro:",
+        error.response?.data || error.message || error
+      );
+
+      // Mensagem de erro mais descritiva para problemas de conexão
+      if (error.message === "Network Error") {
+        console.error(
+          "[authSlice] Erro de conexão com o servidor. Verifique se o backend está rodando."
+        );
+        return rejectWithValue(
+          "Erro de conexão. Verifique sua internet ou se o servidor está disponível."
+        );
+      }
+
       return rejectWithValue(
         error.response?.data?.message || "Erro ao registrar usuário"
       );
@@ -194,12 +224,16 @@ const authSlice = createSlice({
     // Login
     builder
       .addCase(login.pending, (state) => {
+        console.log("[authSlice] Login pendente");
         state.isLoading = true;
         state.error = null;
       })
       .addCase(
         login.fulfilled,
         (state, action: PayloadAction<LoginResponse>) => {
+          console.log(
+            "[authSlice] Login concluído com sucesso, atualizando estado"
+          );
           state.isLoading = false;
           state.isAuthenticated = true;
           state.user = action.payload.user;
@@ -209,6 +243,7 @@ const authSlice = createSlice({
         }
       )
       .addCase(login.rejected, (state, action) => {
+        console.log("[authSlice] Login rejeitado, erro:", action.payload);
         state.isLoading = false;
         state.isAuthenticated = false;
         state.error = action.payload as string;
@@ -217,12 +252,16 @@ const authSlice = createSlice({
     // Register
     builder
       .addCase(register.pending, (state) => {
+        console.log("[authSlice] Registro pendente");
         state.isLoading = true;
         state.error = null;
       })
       .addCase(
         register.fulfilled,
         (state, action: PayloadAction<LoginResponse>) => {
+          console.log(
+            "[authSlice] Registro concluído com sucesso, atualizando estado"
+          );
           state.isLoading = false;
           state.isAuthenticated = true;
           state.user = action.payload.user;
@@ -232,6 +271,7 @@ const authSlice = createSlice({
         }
       )
       .addCase(register.rejected, (state, action) => {
+        console.log("[authSlice] Registro rejeitado, erro:", action.payload);
         state.isLoading = false;
         state.isAuthenticated = false;
         state.error = action.payload as string;

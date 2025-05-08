@@ -20,8 +20,10 @@ async function bootstrap() {
   // Injeção de dependência para validadores personalizados
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
-  // Configuração CORS restritiva
+  // Configurar CORS
   app.enableCors(createCorsConfig(configService));
+
+  // Aplicar middleware de cabeçalhos de segurança após a configuração CORS
   app.use(corsSecurityHeaders);
 
   // Configurar ValidationPipe global com opções avançadas
@@ -61,7 +63,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(3000);
+  await app.listen(configService.get('PORT', 3000));
 }
 
 bootstrap().catch((err) => {

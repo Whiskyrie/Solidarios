@@ -13,7 +13,7 @@ import { handleLogout, handleRefreshTokens } from "../utils/authUtils";
 // Criando uma instância do Axios com configurações padrão
 const apiClient: AxiosInstance = axios.create({
   // A URL base deve ser ajustada para a URL do backend em produção
-  baseURL: "http://10.0.2.2:3000", // Para desenvolvimento local
+  baseURL: "http://localhost:3000", // Para desenvolvimento local
   timeout: 15000, // Timeout de 15 segundos
   headers: {
     "Content-Type": "application/json",
