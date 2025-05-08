@@ -2,61 +2,35 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View } from "react-native";
+import Icon from "react-native-vector-icons/Ionicons";
 import theme from "../theme";
-import DashboardScreen from "../screens/funcionario/DashboardScreen";
-import ItemsScreen from "../screens/funcionario/ItemsScreen";
-import ItemDetailScreen from "../screens/funcionario/ItemDetailScreen";
-import InventoryScreen from "../screens/funcionario/InventoryScreen";
-import InventoryDetailScreen from "../screens/funcionario/InventoryDetailScreen";
-import DistributionsScreen from "../screens/funcionario/DistributionsScreen";
-import DistributionDetailScreen from "../screens/funcionario/DistributionDetailScreen";
+import DashboardScreen from "../screens/admin/DashboardScreen";
+import ItemsScreen from "../screens/admin/ItemsScreen";
+import ItemDetailScreen from "../screens/admin/ItemDetailScreen";
+import InventoryScreen from "../screens/admin/InventoryScreen";
+import InventoryDetailScreen from "../screens/admin/InventoryDetailScreen";
+import DistributionsScreen from "../screens/admin/DistributionsScreen";
+import DistributionDetailScreen from "../screens/admin/DistributionDetailScreen";
+import CreateItemScreen from "../screens/admin/CreateItemScreen";
+import CreateDistributionScreen from "../screens/admin/CreateDistributionScreen";
 import BeneficiariesScreen from "../screens/funcionario/BeneficiariesScreen";
 import BeneficiaryDetailScreen from "../screens/funcionario/BeneficiaryDetailScreen";
-import CreateItemScreen from "../screens/funcionario/CreateItemScreen";
-import CreateDistributionScreen from "../screens/funcionario/CreateDistributionScreen";
 
-// Ícones (pseudo-implementação - você precisará importar os ícones reais)
-const DashboardIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.main,
-    }}
-  />
+// Implementação real dos ícones usando react-native-vector-icons
+const DashboardIcon = ({ color }: { color: string }) => (
+  <Icon name="speedometer" size={24} color={color} />
 );
-const ItemsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.secondary,
-    }}
-  />
+const ItemsIcon = ({ color }: { color: string }) => (
+  <Icon name="list" size={24} color={color} />
 );
-const InventoryIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.accent,
-    }}
-  />
+const InventoryIcon = ({ color }: { color: string }) => (
+  <Icon name="cube" size={24} color={color} />
 );
-const DistributionsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.status.success,
-    }}
-  />
+const DistributionsIcon = ({ color }: { color: string }) => (
+  <Icon name="car" size={24} color={color} />
 );
-const BeneficiariesIcon = () => (
-  <View
-    style={{ width: 24, height: 24, backgroundColor: theme.colors.status.info }}
-  />
+const BeneficiariesIcon = ({ color }: { color: string }) => (
+  <Icon name="people" size={24} color={color} />
 );
 
 // Stack Navigators para cada tab
@@ -156,7 +130,7 @@ const FuncionarioNavigator: React.FC = () => {
         name="Dashboard"
         component={DashboardNavigator}
         options={{
-          tabBarIcon: ({ color }) => <DashboardIcon />,
+          tabBarIcon: ({ color }) => <DashboardIcon color={color} />,
           tabBarLabel: "Dashboard",
         }}
       />
@@ -164,7 +138,7 @@ const FuncionarioNavigator: React.FC = () => {
         name="Items"
         component={ItemsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <ItemsIcon />,
+          tabBarIcon: ({ color }) => <ItemsIcon color={color} />,
           tabBarLabel: "Itens",
         }}
       />
@@ -172,7 +146,7 @@ const FuncionarioNavigator: React.FC = () => {
         name="Inventory"
         component={InventoryNavigator}
         options={{
-          tabBarIcon: ({ color }) => <InventoryIcon />,
+          tabBarIcon: ({ color }) => <InventoryIcon color={color} />,
           tabBarLabel: "Estoque",
         }}
       />
@@ -180,7 +154,7 @@ const FuncionarioNavigator: React.FC = () => {
         name="Distributions"
         component={DistributionsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <DistributionsIcon />,
+          tabBarIcon: ({ color }) => <DistributionsIcon color={color} />,
           tabBarLabel: "Distribuições",
         }}
       />
@@ -188,7 +162,7 @@ const FuncionarioNavigator: React.FC = () => {
         name="Beneficiaries"
         component={BeneficiariesNavigator}
         options={{
-          tabBarIcon: ({ color }) => <BeneficiariesIcon />,
+          tabBarIcon: ({ color }) => <BeneficiariesIcon color={color} />,
           tabBarLabel: "Beneficiários",
         }}
       />
