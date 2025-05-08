@@ -39,17 +39,31 @@ import helmet from 'helmet';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_DATABASE', 'solidarios'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('DB_SYNCHRONIZE', false),
-        logging: configService.get('DB_LOGGING', true),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = {
+          type: 'postgres' as const,
+          host: configService.get('DB_HOST', 'localhost'),
+          port: configService.get<number>('DB_PORT', 5432),
+          username: configService.get('DB_USERNAME', 'postgres'),
+          password: configService.get('DB_PASSWORD', 'postgres'),
+          database: configService.get('DB_DATABASE', 'solidarios'),
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+          logging: configService.get<boolean>('DB_LOGGING', false),
+          extra: {},
+        };
+
+        if (configService.get('DB_SSL') === 'true') {
+          dbConfig.extra = {
+            ssl: {
+              rejectUnauthorized:
+                configService.get('DB_SSL_REJECT_UNAUTHORIZED') === 'true',
+            },
+          };
+        }
+
+        return dbConfig;
+      },
     }),
 
     UsersModule,
