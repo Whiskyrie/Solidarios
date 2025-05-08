@@ -40,6 +40,25 @@ import helmet from 'helmet';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
+        // Verificar se existe uma DATABASE_URL definida
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+
+        if (databaseUrl) {
+          // Configuração com string de conexão completa
+          return {
+            type: 'postgres' as const,
+            url: databaseUrl,
+            entities: [__dirname + '/**/*.entity{.ts,.js}'],
+            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+            logging: configService.get<boolean>('DB_LOGGING', false),
+            ssl: {
+              rejectUnauthorized:
+                configService.get('DB_SSL_REJECT_UNAUTHORIZED') !== 'false',
+            },
+          };
+        }
+
+        // Configuração com parâmetros individuais (fallback)
         const dbConfig = {
           type: 'postgres' as const,
           host: configService.get('DB_HOST', 'localhost'),
