@@ -20,12 +20,29 @@ const migrationsPath = join(
 
 // Exporta o DataSource para ser usado pela CLI do TypeORM e pelo aplicativo
 export const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || '811920',
-  database: process.env.DB_DATABASE || 'solidarios',
+  ...(process.env.DATABASE_URL
+    ? {
+        type: 'postgres',
+        url: process.env.DATABASE_URL,
+        ssl: {
+          rejectUnauthorized:
+            process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+        },
+      }
+    : {
+        type: 'postgres',
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        username: process.env.DB_USERNAME || 'postgres',
+        password: process.env.DB_PASSWORD || '811920',
+        database: process.env.DB_DATABASE || 'solidarios',
+        ...(process.env.DB_SSL === 'true' && {
+          ssl: {
+            rejectUnauthorized:
+              process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+          },
+        }),
+      }),
   entities: [entitiesPath],
   migrations: [migrationsPath],
   // Usar a variável de ambiente DB_SYNCHRONIZE em vez de baseado no ambiente
