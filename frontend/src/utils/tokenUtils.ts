@@ -6,7 +6,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // URL base da API
-const API_BASE_URL = "http://localhost:3000"; // Ajustar conforme necessário
+const API_BASE_URL = "http://10.0.2.2:3000"; // Ajustar conforme necessário
 
 /**
  * Atualiza tokens usando o refresh token sem depender do módulo auth.ts
@@ -28,8 +28,7 @@ export const refreshTokens = async (refreshToken: string) => {
     return { accessToken, refreshToken: newRefreshToken };
   } catch (error) {
     // Remover tokens caso ocorra um erro
-    await AsyncStorage.removeItem("@auth_token");
-    await AsyncStorage.removeItem("@refresh_token");
+    await clearTokens();
     throw error;
   }
 };

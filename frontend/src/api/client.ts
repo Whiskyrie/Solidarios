@@ -8,7 +8,7 @@ import axios, {
   AxiosResponse,
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { handleRefreshTokens, handleLogout } from "../store/slices/authHelpers";
+import { handleLogout, handleRefreshTokens } from "../utils/authUtils";
 
 // Criando uma instância do Axios com configurações padrão
 const apiClient: AxiosInstance = axios.create({

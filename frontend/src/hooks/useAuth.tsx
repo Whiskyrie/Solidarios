@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = useCallback(
     async (credentials: LoginDto) => {
       try {
-        // @ts-ignore - thunk action com dispatch
+        // Usar o tipo correto para o dispatch (AppDispatch já está tipado para suportar thunks)
         await dispatch(loginAction(credentials)).unwrap();
         return true;
       } catch (error) {
@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = useCallback(
     async (userData: RegisterDto) => {
       try {
-        // @ts-ignore - thunk action com dispatch
+        // Usar o tipo correto para o dispatch
         await dispatch(registerAction(userData)).unwrap();
         return true;
       } catch (error) {
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Função para fazer logout
   const logout = useCallback(async () => {
     try {
-      // @ts-ignore - thunk action com dispatch
+      // Usar o tipo correto para o dispatch
       await dispatch(logoutAction()).unwrap();
       return true;
     } catch (error) {
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Função para obter perfil do usuário
   const getProfile = useCallback(async () => {
     try {
-      // @ts-ignore - thunk action com dispatch
+      // Usar o tipo correto para o dispatch
       return await dispatch(getProfileAction()).unwrap();
     } catch (error) {
       return null;
@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!refreshToken) return false;
 
     try {
-      // @ts-ignore - thunk action com dispatch
+      // Usar o tipo correto para o dispatch
       await dispatch(refreshTokensAction(refreshToken)).unwrap();
       return true;
     } catch (error) {
