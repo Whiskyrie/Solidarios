@@ -24,10 +24,10 @@ export const AppDataSource = new DataSource({
     ? {
         type: 'postgres',
         url: process.env.DATABASE_URL,
-        ssl: {
-          rejectUnauthorized:
-            process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
-        },
+        ssl:
+          process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false'
+            ? { rejectUnauthorized: false } // Aceita certificados auto-assinados
+            : true, // Mantém a validação de certificados
       }
     : {
         type: 'postgres',
