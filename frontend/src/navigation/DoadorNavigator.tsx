@@ -58,6 +58,13 @@ const NewDonationStack =
   createNativeStackNavigator<DoadorNewDonationStackParamList>();
 const ProfileStack = createNativeStackNavigator<DoadorProfileStackParamList>();
 
+// Melhorar a tipagem da navegação
+import {
+  getFocusedRouteNameFromRoute,
+  ParamListBase,
+  RouteProp,
+} from "@react-navigation/native";
+
 // Stack Navigator para Minhas Doações
 const DonationsNavigator = () => {
   return (
@@ -109,6 +116,25 @@ const ProfileNavigator = () => {
 // Tab Navigator principal
 const Tab = createBottomTabNavigator<DoadorTabParamList>();
 
+// Função para ajudar com a navegação entre stacks
+const getTabBarVisibility = (
+  route: RouteProp<ParamListBase, string>
+): boolean => {
+  // O nome da rota focalizada pode ser undefined ou string
+  const routeName = getFocusedRouteNameFromRoute(route) as string | undefined;
+
+  // Ocultar a barra de tabs em telas específicas
+  if (
+    routeName === "DonationDetail" ||
+    routeName === "Impact" ||
+    routeName === "DonationHistory" ||
+    routeName === "EditProfile"
+  ) {
+    return false;
+  }
+  return true;
+};
+
 const DoadorNavigator: React.FC = () => {
   return (
     <Tab.Navigator
@@ -126,10 +152,13 @@ const DoadorNavigator: React.FC = () => {
       <Tab.Screen
         name="MyDonations"
         component={DonationsNavigator}
-        options={{
+        options={({ route }) => ({
           tabBarIcon: ({ color }) => <DonationsIcon />,
           tabBarLabel: "Minhas Doações",
-        }}
+          tabBarStyle: getTabBarVisibility(route)
+            ? undefined
+            : { display: "none" },
+        })}
       />
       <Tab.Screen
         name="NewDonation"
@@ -142,10 +171,13 @@ const DoadorNavigator: React.FC = () => {
       <Tab.Screen
         name="Profile"
         component={ProfileNavigator}
-        options={{
+        options={({ route }) => ({
           tabBarIcon: ({ color }) => <ProfileIcon />,
           tabBarLabel: "Perfil",
-        }}
+          tabBarStyle: getTabBarVisibility(route)
+            ? undefined
+            : { display: "none" },
+        })}
       />
     </Tab.Navigator>
   );
