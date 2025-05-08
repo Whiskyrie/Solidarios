@@ -108,6 +108,15 @@ const MyDonationsScreen: React.FC = () => {
     }
   };
 
+  // Função para navegar para a tela de nova doação
+  const navigateToNewDonation = () => {
+    // Navegar para a tab NewDonation
+    const rootNavigation = navigation.getParent();
+    if (rootNavigation) {
+      rootNavigation.navigate("NewDonation");
+    }
+  };
+
   // Se estiver carregando inicialmente, mostrar loading
   if (isLoading && !refreshing && !items.length) {
     return (
@@ -188,7 +197,7 @@ const MyDonationsScreen: React.FC = () => {
                   : "Você ainda não tem doações registradas"
               }
               actionLabel="Fazer uma doação"
-              onAction={() => navigation.navigate(DOADOR_ROUTES.NEW_DONATION)}
+              onAction={navigateToNewDonation}
             />
           }
         />
@@ -196,7 +205,7 @@ const MyDonationsScreen: React.FC = () => {
         {/* Botão flutuante para nova doação */}
         <TouchableOpacity
           style={styles.floatingButton}
-          onPress={() => navigation.navigate(DOADOR_ROUTES.NEW_DONATION)}
+          onPress={navigateToNewDonation}
         >
           <Typography
             variant="bodySecondary"

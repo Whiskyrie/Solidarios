@@ -257,7 +257,7 @@ const ItemDetailScreen: React.FC = () => {
 
   // Editar item
   const handleEditItem = () => {
-    // Redirecionar para a tela de edição (poderia ser a mesma tela de criação com parâmetros)
+    // Corrigimos para passar um objeto com os parâmetros corretos
     navigation.navigate("CreateItem", {
       id: item?.id,
       isEditing: true,

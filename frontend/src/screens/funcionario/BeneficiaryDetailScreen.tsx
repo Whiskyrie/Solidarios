@@ -106,7 +106,8 @@ const BeneficiaryDetailScreen: React.FC = () => {
 
   // Criar nova distribuição para este beneficiário
   const handleCreateDistribution = () => {
-    navigation.navigate("Distributions" as any, {
+    // Usando um tipo mais específico para a navegação entre stacks
+    (navigation as any).navigate("Distributions", {
       screen: "CreateDistribution",
       params: { preselectedBeneficiaryId: id },
     });
@@ -284,7 +285,7 @@ const BeneficiaryDetailScreen: React.FC = () => {
                 <DistributionCard
                   distribution={item}
                   onPress={() =>
-                    navigation.navigate("Distributions" as any, {
+                    (navigation as any).navigate("Distributions", {
                       screen: "DistributionDetail",
                       params: { id: item.id },
                     })
