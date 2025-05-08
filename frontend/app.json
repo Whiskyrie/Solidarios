@@ -4,16 +4,24 @@
     "slug": "solidarios",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/favicon.svg",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.solidarios.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/favicon.svg"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#173F5F"
       },
+      "package": "com.solidarios.app",
       "edgeToEdgeEnabled": true
     },
     "web": {

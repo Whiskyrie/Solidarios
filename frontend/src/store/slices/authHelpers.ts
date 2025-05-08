@@ -2,19 +2,24 @@
  * Funções auxiliares para manipulação de autenticação
  * Refatorado para evitar ciclo de dependências
  */
-import { store } from "..";
 import { logout as logoutAction, updateTokens } from "./authSlice";
-import { refreshTokens, clearTokens } from "../../utils/tokenUtils";
-import { Dispatch } from "@reduxjs/toolkit";
+import {
+  refreshTokens as refreshTokensUtil,
+  clearTokens,
+} from "../../utils/tokenUtils";
+import { AnyAction, ThunkDispatch } from "@reduxjs/toolkit";
+
+// Tipo correto para o dispatch que pode lidar com thunks
+type AppThunkDispatch = ThunkDispatch<unknown, unknown, AnyAction>;
 
 // Armazena a referência global do dispatch para uso em funções que não têm acesso direto ao store
-let dispatchRef: Dispatch | null = null;
+let dispatchRef: AppThunkDispatch | null = null;
 
 /**
  * Configura a referência global do dispatch
  * @param dispatch - O dispatch do store Redux
  */
-export const setDispatchReference = (dispatch: Dispatch) => {
+export const setDispatchReference = (dispatch: AppThunkDispatch) => {
   dispatchRef = dispatch;
 };
 
@@ -23,7 +28,7 @@ export const setDispatchReference = (dispatch: Dispatch) => {
  * @returns O dispatch do store Redux
  * @throws Error se o dispatch não foi configurado
  */
-export const getDispatch = (): Dispatch => {
+export const getDispatch = (): AppThunkDispatch => {
   if (!dispatchRef) {
     throw new Error(
       "Dispatch reference not set. Call setDispatchReference first."
@@ -46,10 +51,12 @@ export const clearDispatchReference = () => {
 export const handleRefreshTokens = async (refreshToken: string) => {
   try {
     // Usa a função utilitária tokenUtils em vez de auth.ts
-    const tokens = await refreshTokens(refreshToken);
+    const tokens = await refreshTokensUtil(refreshToken);
 
-    // Atualiza o estado Redux
-    store.dispatch(updateTokens(tokens));
+    // Atualiza o estado Redux usando a referência do dispatch
+    if (dispatchRef) {
+      dispatchRef(updateTokens(tokens));
+    }
 
     return tokens;
   } catch (error) {
@@ -66,6 +73,8 @@ export const handleLogout = async () => {
   // Limpa os tokens com a função utilitária
   await clearTokens();
 
-  // Despacha a ação de logout para o Redux
-  store.dispatch(logoutAction());
+  // Despacha a ação de logout para o Redux usando a referência do dispatch
+  if (dispatchRef) {
+    dispatchRef(logoutAction());
+  }
 };
