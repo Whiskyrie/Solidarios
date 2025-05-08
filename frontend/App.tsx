@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
+import { Provider } from "react-redux";
+import { store } from "./src/store";
 
 // Provedores de contexto
 import { AuthProvider, useAuth } from "./src/hooks/useAuth";
@@ -85,27 +87,29 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="auto" />
-      <AuthProvider>
-        <NotificationContext.Provider
-          value={{ showNotification, hideNotification }}
-        >
-          <NavigationContainer>
-            <RoleNavigator />
-            <NotificationBanner
-              visible={notification.visible}
-              type={notification.type}
-              message={notification.message}
-              description={notification.description}
-              onClose={hideNotification}
-              position="top"
-              autoClose
-              duration={3000}
-            />
-          </NavigationContainer>
-        </NotificationContext.Provider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <AuthProvider>
+          <NotificationContext.Provider
+            value={{ showNotification, hideNotification }}
+          >
+            <NavigationContainer>
+              <RoleNavigator />
+              <NotificationBanner
+                visible={notification.visible}
+                type={notification.type}
+                message={notification.message}
+                description={notification.description}
+                onClose={hideNotification}
+                position="top"
+                autoClose
+                duration={3000}
+              />
+            </NavigationContainer>
+          </NotificationContext.Provider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </Provider>
   );
 }

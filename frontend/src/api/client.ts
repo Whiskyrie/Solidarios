@@ -9,8 +9,7 @@ import axios, {
   AxiosResponse,
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { store } from "../store";
-import { logout, refreshTokens } from "../store/slices/authSlice";
+import { handleRefreshTokens, handleLogout } from "../store/slices/authHelpers";
 
 // Criando uma instância do Axios com configurações padrão
 const apiClient: AxiosInstance = axios.create({
@@ -80,18 +79,15 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Tentar atualizar o token
-        const state = store.getState();
-        const refreshToken = state.auth.refreshToken;
+        // Obter o refreshToken do AsyncStorage para evitar dependência do store
+        const refreshToken = await AsyncStorage.getItem("@refresh_token");
 
         if (refreshToken) {
-          // Disparar a ação de refresh token
-          // @ts-ignore - tipagem do thunk
-          await store.dispatch(refreshTokens(refreshToken));
+          // Usar o helper para atualizar o token
+          await handleRefreshTokens(refreshToken);
 
           // Obter o novo token
-          const newState = store.getState();
-          const newToken = newState.auth.accessToken;
+          const newToken = await AsyncStorage.getItem("@auth_token");
 
           if (newToken && originalRequest.headers) {
             // Atualizar o token na requisição original
@@ -103,8 +99,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         console.error("Erro ao atualizar token:", refreshError);
         // Se falhar o refresh, fazer logout
-        // @ts-ignore - tipagem do thunk
-        store.dispatch(logout());
+        await handleLogout();
       }
     }
 
