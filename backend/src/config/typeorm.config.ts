@@ -7,12 +7,12 @@ import { join } from 'path';
 dotenv.config();
 
 // Configuração para as entidades
-const entitiesPath = join(__dirname, 'src', '**', '*.entity{.ts,.js}');
+const entitiesPath = join(__dirname, '..', '**', '*.entity{.ts,.js}');
 
 // Configuração para as migrações
 const migrationsPath = join(
   __dirname,
-  'src',
+  '..',
   'database',
   'migrations',
   '*{.ts,.js}',
@@ -24,10 +24,9 @@ export const AppDataSource = new DataSource({
     ? {
         type: 'postgres',
         url: process.env.DATABASE_URL,
-        ssl:
-          process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false'
-            ? { rejectUnauthorized: false } // Aceita certificados auto-assinados
-            : true, // Mantém a validação de certificados
+        ssl: {
+          rejectUnauthorized: false, // Força aceitar certificados auto-assinados
+        },
       }
     : {
         type: 'postgres',
@@ -36,17 +35,14 @@ export const AppDataSource = new DataSource({
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || '811920',
         database: process.env.DB_DATABASE || 'solidarios',
-        ...(process.env.DB_SSL === 'true' && {
-          ssl: {
-            rejectUnauthorized:
-              process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
-          },
-        }),
+        ssl: {
+          rejectUnauthorized: false, // Força aceitar certificados auto-assinados
+        },
       }),
   entities: [entitiesPath],
   migrations: [migrationsPath],
   // Usar a variável de ambiente DB_SYNCHRONIZE em vez de baseado no ambiente
-  synchronize: process.env.DB_SYNCHRONIZE === 'false',
+  synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging: process.env.DB_LOGGING === 'true',
   migrationsRun: false, // Impede a execução automática de migrações
   migrationsTableName: 'migrations',
