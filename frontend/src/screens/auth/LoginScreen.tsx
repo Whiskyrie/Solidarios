@@ -46,8 +46,16 @@ const LoginScreen: React.FC = () => {
 
   // Função para lidar com o login
   const handleLogin = async (values: { email: string; password: string }) => {
+    console.log("[LoginScreen] Tentando fazer login com:", {
+      email: values.email,
+    });
     const success = await login(values);
+    console.log("[LoginScreen] Resultado do login:", success);
     if (!success) {
+      console.log(
+        "[LoginScreen] Login falhou, mostrando notificação. Erro:",
+        error
+      );
       setShowNotification(true);
     }
   };

@@ -71,8 +71,19 @@ const RegisterScreen: React.FC = () => {
     // Remover confirmPassword do objeto antes de enviar para a API
     const { confirmPassword, ...registerData } = values;
 
+    console.log("[RegisterScreen] Tentando registrar usuário:", {
+      ...registerData,
+      password: "***ESCONDIDO***",
+    });
+
     const success = await register(registerData);
+    console.log("[RegisterScreen] Resultado do registro:", success);
+
     if (!success) {
+      console.log(
+        "[RegisterScreen] Registro falhou, mostrando notificação. Erro:",
+        error
+      );
       setShowNotification(true);
     }
   };

@@ -1,6 +1,7 @@
 // src/common/config/cors.config.ts
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ConfigService } from '@nestjs/config';
+import { Request, Response, NextFunction } from 'express';
 
 export function createCorsConfig(configService: ConfigService): CorsOptions {
   const allowedOrigins = configService
@@ -39,12 +40,11 @@ export function createCorsConfig(configService: ConfigService): CorsOptions {
  * Middleware para adicionar cabeçalhos de segurança relacionados ao CORS
  */
 export function corsSecurityHeaders(
-  res: { setHeader: (arg0: string, arg1: string) => void },
-  next: () => void,
+  req: Request,
+  res: Response,
+  next: NextFunction,
 ) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-
   next();
 }

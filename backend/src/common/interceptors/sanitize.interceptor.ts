@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import * as sanitizeHtml from 'sanitize-html';
+import { Request } from 'express';
 
 /**
  * Função para sanitizar strings, removendo conteúdo potencialmente malicioso
@@ -59,25 +61,61 @@ export function sanitizeData(data: any): any {
  */
 @Injectable()
 export class SanitizeInputInterceptor implements NestInterceptor {
+  private readonly sanitizeOptions: sanitizeHtml.IOptions = {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard', // Isso está corretamente tipado agora
+  };
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
+    const ctx = context.switchToHttp();
+    const request = ctx.getRequest<Request>();
 
-    // Sanitiza o corpo da requisição
-    if (request.body) {
-      request.body = sanitizeData(request.body);
-    }
-
-    // Sanitiza parâmetros da query
-    if (request.query) {
-      request.query = sanitizeData(request.query);
-    }
-
-    // Sanitiza parâmetros da URL
-    if (request.params) {
-      request.params = sanitizeData(request.params);
-    }
+    this.sanitizeRequest(request);
 
     return next.handle();
+  }
+
+  private sanitizeRequest(request: Request): void {
+    if (request.body) {
+      request.body = this.sanitizeObject(request.body);
+    }
+
+    // Não tente sobrescrever request.query, pois é somente leitura
+    if (request.query) {
+      // Em vez disso, sanitize cada propriedade individualmente
+      Object.keys(request.query).forEach((key) => {
+        if (typeof request.query[key] === 'string') {
+          request.query[key] = this.sanitizeValue(request.query[key]);
+        } else if (Array.isArray(request.query[key])) {
+          // Se for um array, sanitize cada item
+          request.query[key] = (request.query[key] as string[]).map((item) =>
+            typeof item === 'string' ? this.sanitizeValue(item) : item,
+          );
+        }
+      });
+    }
+
+    if (request.params) {
+      request.params = this.sanitizeObject(request.params);
+    }
+  }
+
+  private sanitizeObject(obj: Record<string, any>): Record<string, any> {
+    const sanitized = { ...obj };
+    Object.keys(sanitized).forEach((key) => {
+      const value = sanitized[key];
+      if (typeof value === 'string') {
+        sanitized[key] = this.sanitizeValue(value);
+      } else if (typeof value === 'object' && value !== null) {
+        sanitized[key] = this.sanitizeObject(value);
+      }
+    });
+    return sanitized;
+  }
+
+  private sanitizeValue(value: string): string {
+    return sanitizeHtml(value, this.sanitizeOptions);
   }
 }
 
