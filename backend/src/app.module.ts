@@ -48,7 +48,7 @@ import helmet from 'helmet';
         database: configService.get('DB_DATABASE', 'solidarios'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: configService.get('DB_SYNCHRONIZE', false),
-        logging: configService.get('DB_LOGGING', false),
+        logging: configService.get('DB_LOGGING', true),
       }),
     }),
 
