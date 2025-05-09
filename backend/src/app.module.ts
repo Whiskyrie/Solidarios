@@ -4,9 +4,10 @@ import {
   NestModule,
   MiddlewareConsumer,
   RequestMethod,
+  Logger,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './modules/users/users.module';
@@ -28,6 +29,10 @@ import {
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
+// Habilita a opção para aceitar certificados auto-assinados globalmente
+// NOTA: Isso deve ser feito antes de qualquer conexão SSL
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 @Module({
   imports: [
     // Configuração do ambiente
@@ -39,43 +44,50 @@ import helmet from 'helmet';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
+      useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
+        const logger = new Logger('TypeOrmModule');
         // Verificar se existe uma DATABASE_URL definida
         const databaseUrl = configService.get<string>('DATABASE_URL');
 
-        if (databaseUrl) {
-          // Configuração com string de conexão completa
-          return {
-            type: 'postgres' as const,
-            url: databaseUrl,
-            entities: [__dirname + '/**/*.entity{.ts,.js}'],
-            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
-            logging: configService.get<boolean>('DB_LOGGING', false),
-            ssl: {
-              rejectUnauthorized: false, // Força aceitar certificados auto-assinados
-            },
-          };
-        }
-
-        // Configuração com parâmetros individuais (fallback)
-        const dbConfig = {
-          type: 'postgres' as const,
-          host: configService.get('DB_HOST', 'localhost'),
-          port: configService.get<number>('DB_PORT', 5432),
-          username: configService.get('DB_USERNAME', 'postgres'),
-          password: configService.get('DB_PASSWORD', 'postgres'),
-          database: configService.get('DB_DATABASE', 'solidarios'),
-          entities: [__dirname + '/**/*.entity{.ts,.js}'],
-          synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
-          logging: configService.get<boolean>('DB_LOGGING', false),
+        // Configuração SSL personalizada para DigitalOcean
+        const sslConfig = {
+          ssl: true,
           extra: {
             ssl: {
-              rejectUnauthorized: false, // Força aceitar certificados auto-assinados
+              rejectUnauthorized: false,
             },
           },
         };
 
-        return dbConfig;
+        logger.log(`Usando configuração SSL: ${JSON.stringify(sslConfig)}`);
+
+        if (databaseUrl) {
+          // Configuração com string de conexão completa
+          logger.log(`Conectando usando DATABASE_URL`);
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            entities: [__dirname + '/**/*.entity{.ts,.js}'],
+            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+            logging: configService.get<boolean>('DB_LOGGING', false),
+            ...sslConfig,
+          };
+        }
+
+        // Configuração com parâmetros individuais (fallback)
+        logger.log(`Conectando usando parâmetros individuais`);
+        return {
+          type: 'postgres',
+          host: configService.get<string>('DB_HOST', 'localhost'),
+          port: configService.get<number>('DB_PORT', 5432),
+          username: configService.get<string>('DB_USERNAME', 'postgres'),
+          password: configService.get<string>('DB_PASSWORD', 'postgres'),
+          database: configService.get<string>('DB_DATABASE', 'solidarios'),
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+          logging: configService.get<boolean>('DB_LOGGING', false),
+          ...sslConfig,
+        };
       },
     }),
 
