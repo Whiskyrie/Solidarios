@@ -13,7 +13,7 @@ import { handleLogout, handleRefreshTokens } from "../utils/authUtils";
 // Criando uma instância do Axios com configurações padrão
 const apiClient: AxiosInstance = axios.create({
   // A URL base deve ser ajustada para a URL do backend em produção
-  baseURL: "http://localhost:3000", // Para desenvolvimento local
+  baseURL: "https://solidarios-app-dwus7.ondigitalocean.app", // Para desenvolvimento local
   timeout: 15000, // Timeout de 15 segundos
   headers: {
     "Content-Type": "application/json",
