@@ -120,7 +120,10 @@ export class AppModule implements NestModule {
       .apply(
         helmet(),
         cookieParser(
-          this.configService.get('COOKIE_SECRET', 'your-cookie-secret'),
+          this.configService.get(
+            'COOKIE_SECRET',
+            '3vWNwOy3kTQc7Xicg4xZKs8xdDxj4pu4',
+          ),
         ),
         SecurityHeadersLoggerMiddleware,
         SecurityHeadersMiddleware,

@@ -14,8 +14,8 @@ const getBaseURL = () => {
     // No Android Emulator, usamos 10.0.2.2 para acessar o localhost da máquina host
     // No iOS Simulator, usamos localhost
     // Em dispositivos físicos, poderia usar o IP da máquina na rede local
-    const androidUrl = "http://10.0.2.2:3000";
-    const iosUrl = "http://localhost:3000";
+    const androidUrl = "https://solidarios-app-dwus7.ondigitalocean.app/api";
+    const iosUrl = "https://solidarios-app-dwus7.ondigitalocean.app/api";
 
     const baseUrl = Platform.OS === "android" ? androidUrl : iosUrl;
     console.log("[API Config] URL base selecionada:", baseUrl);
