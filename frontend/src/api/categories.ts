@@ -1,7 +1,7 @@
 /**
  * Serviço de categorias - comunicação com as rotas de categorias do backend
  */
-import apiClient from "./client";
+import api from "./api";
 import {
   Category,
   CreateCategoryDto,
@@ -18,7 +18,7 @@ const CategoriesService = {
    * @returns Lista paginada de categorias
    */
   getAll: async (pageOptions?: PageOptionsDto): Promise<CategoriesPage> => {
-    const response = await apiClient.get<CategoriesPage>("/categories", {
+    const response = await api.get<CategoriesPage>("/categories", {
       params: pageOptions,
     });
     return response.data;
@@ -30,7 +30,7 @@ const CategoriesService = {
    * @returns Categoria encontrada
    */
   getById: async (id: string): Promise<Category> => {
-    const response = await apiClient.get<Category>(`/categories/${id}`);
+    const response = await api.get<Category>(`/categories/${id}`);
     return response.data;
   },
 
@@ -40,10 +40,7 @@ const CategoriesService = {
    * @returns Categoria criada
    */
   create: async (categoryData: CreateCategoryDto): Promise<Category> => {
-    const response = await apiClient.post<Category>(
-      "/categories",
-      categoryData
-    );
+    const response = await api.post<Category>("/categories", categoryData);
     return response.data;
   },
 
@@ -57,7 +54,7 @@ const CategoriesService = {
     id: string,
     categoryData: UpdateCategoryDto
   ): Promise<Category> => {
-    const response = await apiClient.patch<Category>(
+    const response = await api.patch<Category>(
       `/categories/${id}`,
       categoryData
     );
@@ -70,7 +67,7 @@ const CategoriesService = {
    * @returns void
    */
   remove: async (id: string): Promise<void> => {
-    await apiClient.delete(`/categories/${id}`);
+    await api.delete(`/categories/${id}`);
   },
 };
 

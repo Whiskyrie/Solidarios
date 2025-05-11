@@ -4,10 +4,10 @@
  */
 
 export enum UserRole {
-  ADMIN = "admin",
-  FUNCIONARIO = "funcionario",
-  DOADOR = "doador",
-  BENEFICIARIO = "beneficiario",
+  ADMIN = "ADMIN",
+  FUNCIONARIO = "FUNCIONARIO",
+  DOADOR = "DOADOR",
+  BENEFICIARIO = "BENEFICIARIO",
 }
 
 export interface User {

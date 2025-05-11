@@ -31,6 +31,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
+import api from "../../api/api";
 
 // Validação do formulário
 const RegisterSchema = Yup.object().shape({
@@ -59,6 +60,7 @@ const RegisterScreen: React.FC = () => {
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { register, isLoading, error, clearErrors } = useAuth();
   const [showNotification, setShowNotification] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Função para lidar com o registro
   const handleRegister = async (values: {
@@ -74,15 +76,39 @@ const RegisterScreen: React.FC = () => {
     console.log("[RegisterScreen] Tentando registrar usuário:", {
       ...registerData,
       password: "***ESCONDIDO***",
+      baseURL: api.defaults.baseURL, // Log da URL base atual
     });
 
-    const success = await register(registerData);
-    console.log("[RegisterScreen] Resultado do registro:", success);
+    try {
+      const success = await register(registerData);
+      console.log("[RegisterScreen] Resultado do registro:", success);
 
-    if (!success) {
-      console.log(
-        "[RegisterScreen] Registro falhou, mostrando notificação. Erro:",
-        error
+      if (!success) {
+        // Mapear mensagens de erro para mensagens mais amigáveis
+        let friendlyError = error;
+
+        if (error?.includes("Bad Request")) {
+          friendlyError =
+            "Os dados fornecidos são inválidos. Verifique o formato dos campos.";
+        } else if (
+          error?.includes("duplicate") ||
+          error?.includes("already exists")
+        ) {
+          friendlyError =
+            "Este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.";
+        } else if (!friendlyError) {
+          friendlyError =
+            "Não foi possível completar seu cadastro. Tente novamente.";
+        }
+
+        console.log("[RegisterScreen] Erro formatado:", friendlyError);
+        setErrorMessage(friendlyError);
+        setShowNotification(true);
+      }
+    } catch (err) {
+      console.error("[RegisterScreen] Erro não tratado:", err);
+      setErrorMessage(
+        "Ocorreu um erro inesperado. Tente novamente mais tarde."
       );
       setShowNotification(true);
     }
@@ -106,7 +132,9 @@ const RegisterScreen: React.FC = () => {
         type="error"
         message="Erro no cadastro"
         description={
-          error || "Não foi possível completar seu cadastro. Tente novamente."
+          errorMessage ||
+          error ||
+          "Não foi possível completar seu cadastro. Tente novamente."
         }
         onClose={handleCloseNotification}
         position="top"

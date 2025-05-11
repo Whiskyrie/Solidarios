@@ -57,18 +57,29 @@ const AuthService = {
    */
   register: async (registerDto: RegisterDto): Promise<LoginResponse> => {
     console.log("[AuthService] Enviando requisição de registro para a API");
+
     try {
-      console.log("[AuthService] Tentando conexão com a API...");
       const response = await api.post<LoginResponse>(
         "/auth/register",
         registerDto
       );
+
       console.log("[AuthService] Resposta do registro recebida:", {
         status: response.status,
         success: true,
         hasUser: !!response.data.user,
         hasToken: !!response.data.accessToken,
       });
+
+      // Verificar se os dados retornados contêm os valores necessários
+      if (!response.data.accessToken || !response.data.refreshToken) {
+        console.error(
+          "[AuthService] Resposta incompleta da API:",
+          response.data
+        );
+        throw new Error("Resposta de registro incompleta do servidor");
+      }
+
       return response.data;
     } catch (error: any) {
       console.error(
@@ -76,20 +87,15 @@ const AuthService = {
         error.response?.status
       );
       console.error("[AuthService] Detalhes do erro:", error.message);
+      console.error(
+        "[AuthService] URL completa:",
+        api.defaults.baseURL + "/auth/register"
+      );
       if (error.response) {
         console.error(
           "[AuthService] Resposta do servidor:",
           error.response.data
         );
-      } else {
-        console.error(
-          "[AuthService] Não foi possível conectar ao servidor. Verifique se:"
-        );
-        console.error(
-          "- O backend está rodando (npm run start:dev na pasta backend)"
-        );
-        console.error("- A URL base está correta para sua plataforma");
-        console.error("- Não há bloqueio de firewall ou rede");
       }
       throw error;
     }

@@ -1,7 +1,7 @@
 /**
  * Serviço de usuários - comunicação com as rotas de usuários do backend
  */
-import apiClient from "./client";
+import api from "./api";
 import {
   User,
   CreateUserDto,
@@ -18,7 +18,7 @@ const UsersService = {
    * @returns Lista paginada de usuários
    */
   getAll: async (pageOptions?: PageOptionsDto): Promise<UsersPage> => {
-    const response = await apiClient.get<UsersPage>("/users", {
+    const response = await api.get<UsersPage>("/users", {
       params: pageOptions,
     });
     return response.data;
@@ -30,7 +30,7 @@ const UsersService = {
    * @returns Usuário encontrado
    */
   getById: async (id: string): Promise<User> => {
-    const response = await apiClient.get<User>(`/users/${id}`);
+    const response = await api.get<User>(`/users/${id}`);
     return response.data;
   },
 
@@ -40,7 +40,7 @@ const UsersService = {
    * @returns Usuário criado
    */
   create: async (userData: CreateUserDto): Promise<User> => {
-    const response = await apiClient.post<User>("/users", userData);
+    const response = await api.post<User>("/users", userData);
     return response.data;
   },
 
@@ -51,7 +51,7 @@ const UsersService = {
    * @returns Usuário atualizado
    */
   update: async (id: string, userData: UpdateUserDto): Promise<User> => {
-    const response = await apiClient.patch<User>(`/users/${id}`, userData);
+    const response = await api.patch<User>(`/users/${id}`, userData);
     return response.data;
   },
 
@@ -61,7 +61,7 @@ const UsersService = {
    * @returns void
    */
   remove: async (id: string): Promise<void> => {
-    await apiClient.delete(`/users/${id}`);
+    await api.delete(`/users/${id}`);
   },
 
   /**
@@ -74,7 +74,7 @@ const UsersService = {
     role: string,
     pageOptions?: PageOptionsDto
   ): Promise<UsersPage> => {
-    const response = await apiClient.get<UsersPage>(`/users/role/${role}`, {
+    const response = await api.get<UsersPage>(`/users/role/${role}`, {
       params: pageOptions,
     });
     return response.data;
@@ -87,7 +87,7 @@ const UsersService = {
    * @returns Usuário atualizado
    */
   toggleActive: async (id: string, isActive: boolean): Promise<User> => {
-    const response = await apiClient.patch<User>(`/users/${id}/status`, {
+    const response = await api.patch<User>(`/users/${id}/status`, {
       isActive,
     });
     return response.data;

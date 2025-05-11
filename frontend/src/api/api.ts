@@ -1,33 +1,14 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
 
-// Determinar a URL base com base no ambiente e plataforma
-const getBaseURL = () => {
-  console.log(
-    "[API Config] Ambiente:",
-    __DEV__ ? "Desenvolvimento" : "Produção"
-  );
-  console.log("[API Config] Plataforma:", Platform.OS);
+// URL base consistente para todos os ambientes
+const API_BASE_URL = "https://solidarios-app-dwus7.ondigitalocean.app/api";
 
-  if (__DEV__) {
-    // No Android Emulator, usamos 10.0.2.2 para acessar o localhost da máquina host
-    // No iOS Simulator, usamos localhost
-    // Em dispositivos físicos, poderia usar o IP da máquina na rede local
-    const androidUrl = "https://solidarios-app-dwus7.ondigitalocean.app/api";
-    const iosUrl = "https://solidarios-app-dwus7.ondigitalocean.app/api";
-
-    const baseUrl = Platform.OS === "android" ? androidUrl : iosUrl;
-    console.log("[API Config] URL base selecionada:", baseUrl);
-    return baseUrl;
-  }
-
-  return "https://api-solidarios.com"; // URL de produção
-};
+console.log("[API Config] URL base configurada:", API_BASE_URL);
 
 const api = axios.create({
-  baseURL: getBaseURL(),
-  timeout: 15000, // Aumentado para 15s para dar mais tempo em desenvolvimento
+  baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -38,9 +19,8 @@ api.interceptors.request.use(
   (config) => {
     console.log("[API] Requisição:", {
       method: config.method?.toUpperCase(),
-      url: `${config.baseURL}${config.url}`, // URL completa para debug
-      data: config.data ? "(dados presentes)" : "(sem dados)",
-      headers: config.headers,
+      url: `${config.url}`,
+      params: config.params,
     });
     return config;
   },
@@ -56,7 +36,6 @@ api.interceptors.response.use(
     console.log("[API] Resposta:", {
       status: response.status,
       url: response.config.url,
-      data: response.data ? "(dados presentes)" : "(sem dados)",
     });
     return response;
   },

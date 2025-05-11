@@ -1,7 +1,7 @@
 /**
  * Serviço de distribuições - comunicação com as rotas de distribuições do backend
  */
-import apiClient from "./client";
+import api from "./api";
 import {
   Distribution,
   CreateDistributionDto,
@@ -18,7 +18,7 @@ const DistributionsService = {
    * @returns Lista paginada de distribuições
    */
   getAll: async (pageOptions?: PageOptionsDto): Promise<DistributionsPage> => {
-    const response = await apiClient.get<DistributionsPage>("/distributions", {
+    const response = await api.get<DistributionsPage>("/distributions", {
       params: pageOptions,
     });
     return response.data;
@@ -30,7 +30,7 @@ const DistributionsService = {
    * @returns Distribuição encontrada
    */
   getById: async (id: string): Promise<Distribution> => {
-    const response = await apiClient.get<Distribution>(`/distributions/${id}`);
+    const response = await api.get<Distribution>(`/distributions/${id}`);
     return response.data;
   },
 
@@ -44,7 +44,7 @@ const DistributionsService = {
     beneficiaryId: string,
     pageOptions?: PageOptionsDto
   ): Promise<DistributionsPage> => {
-    const response = await apiClient.get<DistributionsPage>(
+    const response = await api.get<DistributionsPage>(
       `/distributions/beneficiary/${beneficiaryId}`,
       {
         params: pageOptions,
@@ -61,7 +61,7 @@ const DistributionsService = {
   create: async (
     distributionData: CreateDistributionDto
   ): Promise<Distribution> => {
-    const response = await apiClient.post<Distribution>(
+    const response = await api.post<Distribution>(
       "/distributions",
       distributionData
     );
@@ -78,7 +78,7 @@ const DistributionsService = {
     id: string,
     distributionData: UpdateDistributionDto
   ): Promise<Distribution> => {
-    const response = await apiClient.patch<Distribution>(
+    const response = await api.patch<Distribution>(
       `/distributions/${id}`,
       distributionData
     );
@@ -91,7 +91,7 @@ const DistributionsService = {
    * @returns void
    */
   remove: async (id: string): Promise<void> => {
-    await apiClient.delete(`/distributions/${id}`);
+    await api.delete(`/distributions/${id}`);
   },
 
   /**
@@ -108,7 +108,7 @@ const DistributionsService = {
     byMonth: { month: string; count: number }[];
     byCategory: { category: string; count: number }[];
   }> => {
-    const response = await apiClient.get<{
+    const response = await api.get<{
       total: number;
       byMonth: { month: string; count: number }[];
       byCategory: { category: string; count: number }[];
@@ -133,7 +133,7 @@ const DistributionsService = {
     endDate: string,
     pageOptions?: PageOptionsDto
   ): Promise<DistributionsPage> => {
-    const response = await apiClient.get<DistributionsPage>(
+    const response = await api.get<DistributionsPage>(
       "/distributions/date-range",
       {
         params: {
