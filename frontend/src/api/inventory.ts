@@ -1,7 +1,7 @@
 /**
  * Serviço de inventário - comunicação com as rotas de inventário do backend
  */
-import apiClient from "./client";
+import api from "./api";
 import {
   Inventory,
   CreateInventoryDto,
@@ -18,7 +18,7 @@ const InventoryService = {
    * @returns Lista paginada de registros de inventário
    */
   getAll: async (pageOptions?: PageOptionsDto): Promise<InventoryPage> => {
-    const response = await apiClient.get<InventoryPage>("/inventory", {
+    const response = await api.get<InventoryPage>("/inventory", {
       params: pageOptions,
     });
     return response.data;
@@ -30,7 +30,7 @@ const InventoryService = {
    * @returns Registro de inventário encontrado
    */
   getById: async (id: string): Promise<Inventory> => {
-    const response = await apiClient.get<Inventory>(`/inventory/${id}`);
+    const response = await api.get<Inventory>(`/inventory/${id}`);
     return response.data;
   },
 
@@ -40,9 +40,7 @@ const InventoryService = {
    * @returns Registro de inventário encontrado
    */
   getByItemId: async (itemId: string): Promise<Inventory> => {
-    const response = await apiClient.get<Inventory>(
-      `/inventory/item/${itemId}`
-    );
+    const response = await api.get<Inventory>(`/inventory/item/${itemId}`);
     return response.data;
   },
 
@@ -52,10 +50,7 @@ const InventoryService = {
    * @returns Registro de inventário criado
    */
   create: async (inventoryData: CreateInventoryDto): Promise<Inventory> => {
-    const response = await apiClient.post<Inventory>(
-      "/inventory",
-      inventoryData
-    );
+    const response = await api.post<Inventory>("/inventory", inventoryData);
     return response.data;
   },
 
@@ -69,7 +64,7 @@ const InventoryService = {
     id: string,
     inventoryData: UpdateInventoryDto
   ): Promise<Inventory> => {
-    const response = await apiClient.patch<Inventory>(
+    const response = await api.patch<Inventory>(
       `/inventory/${id}`,
       inventoryData
     );
@@ -82,7 +77,7 @@ const InventoryService = {
    * @returns void
    */
   remove: async (id: string): Promise<void> => {
-    await apiClient.delete(`/inventory/${id}`);
+    await api.delete(`/inventory/${id}`);
   },
 
   /**
@@ -97,7 +92,7 @@ const InventoryService = {
     quantity: number,
     isAbsolute: boolean = false
   ): Promise<Inventory> => {
-    const response = await apiClient.patch<Inventory>(
+    const response = await api.patch<Inventory>(
       `/inventory/item/${itemId}/quantity`,
       {
         quantity,
@@ -113,12 +108,9 @@ const InventoryService = {
    * @returns Lista paginada de registros de inventário com estoque baixo
    */
   getLowStock: async (pageOptions?: PageOptionsDto): Promise<InventoryPage> => {
-    const response = await apiClient.get<InventoryPage>(
-      "/inventory/low-stock",
-      {
-        params: pageOptions,
-      }
-    );
+    const response = await api.get<InventoryPage>("/inventory/low-stock", {
+      params: pageOptions,
+    });
     return response.data;
   },
 
@@ -132,7 +124,7 @@ const InventoryService = {
     itemId: string,
     quantity: number = 1
   ): Promise<boolean> => {
-    const response = await apiClient.get<{ available: boolean }>(
+    const response = await api.get<{ available: boolean }>(
       `/inventory/check-availability/${itemId}`,
       {
         params: { quantity },

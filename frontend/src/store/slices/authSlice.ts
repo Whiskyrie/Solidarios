@@ -204,6 +204,23 @@ export const restoreAuthState = createAsyncThunk(
   }
 );
 
+// Função auxiliar para formatação de erros
+const formatErrorMessage = (error: any): string => {
+  if (!error) return "Ocorreu um erro desconhecido";
+
+  if (typeof error === "string") return error;
+
+  // Tratamento de estruturas aninhadas de erro
+  if (error.message) {
+    if (typeof error.message === "object" && error.message.message) {
+      return error.message.message;
+    }
+    return error.message;
+  }
+
+  return "Falha na comunicação com o servidor";
+};
+
 // Slice
 const authSlice = createSlice({
   name: "auth",
@@ -246,7 +263,7 @@ const authSlice = createSlice({
         console.log("[authSlice] Login rejeitado, erro:", action.payload);
         state.isLoading = false;
         state.isAuthenticated = false;
-        state.error = action.payload as string;
+        state.error = formatErrorMessage(action.payload);
       });
 
     // Register
@@ -274,7 +291,7 @@ const authSlice = createSlice({
         console.log("[authSlice] Registro rejeitado, erro:", action.payload);
         state.isLoading = false;
         state.isAuthenticated = false;
-        state.error = action.payload as string;
+        state.error = formatErrorMessage(action.payload);
       });
 
     // Logout
@@ -324,7 +341,7 @@ const authSlice = createSlice({
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = formatErrorMessage(action.payload);
       });
 
     // Restore auth state

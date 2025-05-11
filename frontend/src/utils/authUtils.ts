@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
+import api from "../api/api"; // Use a mesma instância do axios
 
 // URL base da API - deve corresponder à mesma URL usada em apiClient
-const API_BASE_URL = "http://10.0.2.2:3000"; // Ajustar conforme necessário
+const API_BASE_URL = "https://solidarios-app-dwus7.ondigitalocean.app/api"; // Ajustar conforme necessário
 
 export const handleLoginSuccess = async (
   accessToken: string,
@@ -19,8 +19,8 @@ export const handleLogout = async () => {
 
 export const handleRefreshTokens = async (refreshToken: string) => {
   try {
-    // Chamada direta à API sem depender de apiClient para evitar ciclos
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+    // Use a instância api em vez de axios diretamente
+    const response = await api.post("/auth/refresh", {
       refreshToken,
     });
 
@@ -32,7 +32,6 @@ export const handleRefreshTokens = async (refreshToken: string) => {
 
     return { accessToken, refreshToken: newRefreshToken };
   } catch (error) {
-    // Remover tokens em caso de erro
     await handleLogout();
     throw error;
   }

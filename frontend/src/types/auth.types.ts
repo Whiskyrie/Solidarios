@@ -2,7 +2,7 @@
  * Definição de tipos para autenticação
  * Baseado nas entidades e DTOs do backend
  */
-import { User } from "./users.types";
+import { User, UserRole } from "./users.types";
 
 export interface LoginDto {
   email: string;
@@ -13,6 +13,7 @@ export interface RegisterDto {
   name: string;
   email: string;
   password: string;
+  role: UserRole;
 }
 
 export interface TokensResponse {
