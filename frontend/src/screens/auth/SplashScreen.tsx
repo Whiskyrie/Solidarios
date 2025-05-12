@@ -57,11 +57,7 @@ const SplashScreen: React.FC = () => {
         />
 
         <Typography variant="h2" style={styles.appName}>
-          deeps
-        </Typography>
-
-        <Typography variant="h3" style={styles.subtitle}>
-          BEERCAFE
+          Solidarios
         </Typography>
 
         <ActivityIndicator
