@@ -30,7 +30,7 @@ api.interceptors.request.use(
   }
 );
 
-// Log de respostas
+// Log de respostas e handling de refresh token
 api.interceptors.response.use(
   (response) => {
     console.log("[API] Resposta:", {
@@ -49,9 +49,17 @@ api.interceptors.response.use(
   }
 );
 
-// Adicionar token de autenticação
+// Adicionar token de autenticação em cada requisição
 api.interceptors.request.use(
   async (config) => {
+    // Não adicionar token para rotas de autenticação
+    if (
+      config.url?.includes("/auth/login") ||
+      config.url?.includes("/auth/refresh")
+    ) {
+      return config;
+    }
+
     const token = await AsyncStorage.getItem("@auth_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

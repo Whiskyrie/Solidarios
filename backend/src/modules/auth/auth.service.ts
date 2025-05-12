@@ -64,7 +64,7 @@ export class AuthService {
 
     return {
       user: userWithoutPassword,
-      ...tokens,
+      ...tokens, // Isso deveria expandir para { accessToken, refreshToken }
     };
   }
 

@@ -13,33 +13,18 @@ import {
   DoadorProfileStackParamList,
 } from "./types";
 
-// Ícones (pseudo-implementação - você precisará importar os ícones reais)
-const DonationsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.secondary,
-    }}
-  />
+// Substitua as implementações pseudo-ícones por estas:
+import Icon from "react-native-vector-icons/Ionicons";
+
+// Ícones reais usando react-native-vector-icons
+const DonationsIcon = ({ color }: { color: string }) => (
+  <Icon name="gift" size={24} color={color} />
 );
-const NewDonationIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.status.success,
-    }}
-  />
+const NewDonationIcon = ({ color }: { color: string }) => (
+  <Icon name="add-circle" size={24} color={color} />
 );
-const ProfileIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.main,
-    }}
-  />
+const ProfileIcon = ({ color }: { color: string }) => (
+  <Icon name="person" size={24} color={color} />
 );
 
 // Telas
@@ -153,7 +138,7 @@ const DoadorNavigator: React.FC = () => {
         name="MyDonations"
         component={DonationsNavigator}
         options={({ route }) => ({
-          tabBarIcon: ({ color }) => <DonationsIcon />,
+          tabBarIcon: ({ color }) => <DonationsIcon color={color} />,
           tabBarLabel: "Minhas Doações",
           tabBarStyle: getTabBarVisibility(route)
             ? undefined
@@ -164,7 +149,7 @@ const DoadorNavigator: React.FC = () => {
         name="NewDonation"
         component={NewDonationNavigator}
         options={{
-          tabBarIcon: ({ color }) => <NewDonationIcon />,
+          tabBarIcon: ({ color }) => <NewDonationIcon color={color} />,
           tabBarLabel: "Nova Doação",
         }}
       />
@@ -172,7 +157,7 @@ const DoadorNavigator: React.FC = () => {
         name="Profile"
         component={ProfileNavigator}
         options={({ route }) => ({
-          tabBarIcon: ({ color }) => <ProfileIcon />,
+          tabBarIcon: ({ color }) => <ProfileIcon color={color} />,
           tabBarLabel: "Perfil",
           tabBarStyle: getTabBarVisibility(route)
             ? undefined

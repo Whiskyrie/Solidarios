@@ -62,6 +62,12 @@ export const register = createAsyncThunk(
       const response = await AuthService.register(userData);
       console.log("[authSlice] Registro bem-sucedido, tokens recebidos");
 
+      // Verificação adicional para garantir que os tokens existem
+      if (!response.accessToken || !response.refreshToken) {
+        console.error("[authSlice] Tokens ausentes na resposta:", response);
+        return rejectWithValue("Resposta de autenticação inválida do servidor");
+      }
+
       // Salvar tokens no armazenamento persistente
       await AsyncStorage.setItem("@auth_token", response.accessToken);
       await AsyncStorage.setItem("@refresh_token", response.refreshToken);
@@ -74,7 +80,13 @@ export const register = createAsyncThunk(
         error.response?.data || error.message || error
       );
 
-      // Mensagem de erro mais descritiva para problemas de conexão
+      // Mensagem de erro mais descritiva para problemas específicos
+      if (error.message === "Resposta de registro incompleta do servidor") {
+        return rejectWithValue(
+          "O servidor não retornou os dados de autenticação necessários. Contate o administrador."
+        );
+      }
+
       if (error.message === "Network Error") {
         console.error(
           "[authSlice] Erro de conexão com o servidor. Verifique se o backend está rodando."

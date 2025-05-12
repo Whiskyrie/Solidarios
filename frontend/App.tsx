@@ -6,44 +6,13 @@ import { Provider } from "react-redux";
 import { store } from "./src/store";
 
 // Provedores de contexto
-import { AuthProvider, useAuth } from "./src/hooks/useAuth";
+import { AuthProvider } from "./src/hooks/useAuth";
 
-// Navegadores
-import AuthNavigator from "./src/navigation/AuthNavigator";
-import AdminNavigator from "./src/navigation/AdminNavigator";
-import FuncionarioNavigator from "./src/navigation/FuncionarioNavigator";
-import DoadorNavigator from "./src/navigation/DoadorNavigator";
-import BeneficiarioNavigator from "./src/navigation/BeneficiarioNavigator";
+// Navegadores - Importando o MainNavigator
+import MainNavigator from "./src/navigation/MainNavigator";
 
 // Componentes globais
 import { NotificationBanner } from "./src/components/feedback/barrelFeedback";
-import { Loading } from "./src/components/common/barrelCommon";
-
-// Navegador baseado no papel do usuário
-const RoleNavigator = () => {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <Loading visible={true} message="Carregando..." overlay />;
-  }
-
-  if (!user) {
-    return <AuthNavigator />;
-  }
-
-  switch (user.role) {
-    case "admin":
-      return <AdminNavigator />;
-    case "funcionario":
-      return <FuncionarioNavigator />;
-    case "doador":
-      return <DoadorNavigator />;
-    case "beneficiario":
-      return <BeneficiarioNavigator />;
-    default:
-      return <AuthNavigator />;
-  }
-};
 
 // Sistema de notificações global
 export const NotificationContext = React.createContext({
@@ -95,7 +64,7 @@ export default function App() {
             value={{ showNotification, hideNotification }}
           >
             <NavigationContainer>
-              <RoleNavigator />
+              <MainNavigator />
               <NotificationBanner
                 visible={notification.visible}
                 type={notification.type}

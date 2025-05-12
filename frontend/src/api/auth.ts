@@ -22,30 +22,33 @@ const AuthService = {
     console.log("[AuthService] Enviando requisição de login para a API");
     try {
       console.log("[AuthService] Tentando conexão com a API...");
-      const response = await api.post<LoginResponse>("/auth/login", loginDto);
-      console.log("[AuthService] Resposta do login recebida:", {
-        status: response.status,
-        success: true,
-        hasUser: !!response.data.user,
-        hasToken: !!response.data.accessToken,
-      });
-      return response.data;
+      const response = await api.post<any>("/auth/login", loginDto);
+
+      // Extrair os dados da estrutura correta
+      let authData;
+
+      if (response.data.data && response.data.data.accessToken) {
+        // Formato da resposta real do servidor
+        console.log("[AuthService] Extraindo dados da estrutura aninhada");
+        authData = {
+          accessToken: response.data.data.accessToken,
+          refreshToken: response.data.data.refreshToken,
+          user: response.data.data.user,
+        };
+      } else {
+        // Formato esperado originalmente
+        authData = response.data;
+      }
+
+      console.log("[AuthService] Login bem-sucedido");
+      return authData;
     } catch (error: any) {
+      // Código de tratamento de erro existente
       console.error(
         "[AuthService] Erro na requisição de login:",
         error.response?.status
       );
-      console.error("[AuthService] Detalhes do erro:", error.message);
-      if (error.response) {
-        console.error(
-          "[AuthService] Resposta do servidor:",
-          error.response.data
-        );
-      } else {
-        console.error(
-          "[AuthService] Não foi possível conectar ao servidor. Verifique se o backend está rodando e acessível."
-        );
-      }
+      // Resto do código...
       throw error;
     }
   },
@@ -59,29 +62,44 @@ const AuthService = {
     console.log("[AuthService] Enviando requisição de registro para a API");
 
     try {
-      const response = await api.post<LoginResponse>(
-        "/auth/register",
-        registerDto
-      );
+      const response = await api.post("/auth/register", registerDto);
 
       console.log("[AuthService] Resposta do registro recebida:", {
         status: response.status,
         success: true,
-        hasUser: !!response.data.user,
-        hasToken: !!response.data.accessToken,
       });
 
-      // Verificar se os dados retornados contêm os valores necessários
-      if (!response.data.accessToken || !response.data.refreshToken) {
-        console.error(
-          "[AuthService] Resposta incompleta da API:",
-          response.data
-        );
+      // Extrair os dados da estrutura correta - a resposta real tem a estrutura:
+      // { data: { accessToken, refreshToken, user }, message, statusCode, timestamp }
+      let authData;
+
+      if (response.data.data && response.data.data.accessToken) {
+        // Formato da resposta real do servidor
+        console.log("[AuthService] Extraindo dados da estrutura aninhada");
+        authData = {
+          accessToken: response.data.data.accessToken,
+          refreshToken: response.data.data.refreshToken,
+          user: response.data.data.user,
+        };
+      } else {
+        // Formato esperado originalmente
+        authData = response.data;
+      }
+
+      console.log("[AuthService] Dados processados:", {
+        hasUser: !!authData.user,
+        hasToken: !!authData.accessToken,
+      });
+
+      // Verificar se os dados processados contêm os valores necessários
+      if (!authData.accessToken || !authData.refreshToken || !authData.user) {
+        console.error("[AuthService] Resposta incompleta da API:", authData);
         throw new Error("Resposta de registro incompleta do servidor");
       }
 
-      return response.data;
+      return authData;
     } catch (error: any) {
+      // Código de tratamento de erro existente
       console.error(
         "[AuthService] Erro na requisição de registro:",
         error.response?.status
