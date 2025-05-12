@@ -76,15 +76,36 @@ const RegisterScreen: React.FC = () => {
     console.log("[RegisterScreen] Tentando registrar usuário:", {
       ...registerData,
       password: "***ESCONDIDO***",
-      baseURL: api.defaults.baseURL, // Log da URL base atual
+      baseURL: api.defaults.baseURL,
     });
 
     try {
       const success = await register(registerData);
       console.log("[RegisterScreen] Resultado do registro:", success);
 
-      if (!success) {
-        // Mapear mensagens de erro para mensagens mais amigáveis
+      if (success) {
+        // Adicionando navegação para tela principal após registro bem-sucedido
+        console.log("[RegisterScreen] Redirecionando para tela principal");
+
+        // Navegar para a tela principal baseado na role do usuário
+        // Usando um timeout para garantir que o estado foi atualizado corretamente
+        setTimeout(() => {
+          if (registerData.role === UserRole.DOADOR) {
+            // Navegar para a tela principal de doador
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "DoadorApp" as never }],
+            });
+          } else if (registerData.role === UserRole.BENEFICIARIO) {
+            // Navegar para a tela principal de beneficiário
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "BeneficiarioApp" as never }],
+            });
+          }
+        }, 500);
+      } else {
+        // Código existente para tratamento de erro
         let friendlyError = error;
 
         if (error?.includes("Bad Request")) {

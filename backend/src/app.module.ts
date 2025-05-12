@@ -130,39 +130,59 @@ export class AppModule implements NestModule {
       )
       .forRoutes('*');
 
-    // Middleware para verificação de origem
-    consumer
-      .apply(SameOriginMiddleware)
-      .exclude(
-        { path: 'auth/login', method: RequestMethod.POST },
-        { path: 'auth/register', method: RequestMethod.POST },
-        { path: 'auth/refresh', method: RequestMethod.POST },
-      )
-      .forRoutes(
-        { path: '*', method: RequestMethod.POST },
-        { path: '*', method: RequestMethod.PUT },
-        { path: '*', method: RequestMethod.PATCH },
-        { path: '*', method: RequestMethod.DELETE },
-      );
+    // Desabilitar verificação de origem para todas as rotas da API mobile
+    // Habilitar apenas em produção para rotas web específicas
+    const shouldCheckOrigin = this.configService.get('CHECK_ORIGIN') === 'true';
+    if (shouldCheckOrigin) {
+      consumer
+        .apply(SameOriginMiddleware)
+        .exclude(
+          { path: 'auth/login', method: RequestMethod.POST },
+          { path: 'auth/register', method: RequestMethod.POST },
+          { path: 'auth/refresh', method: RequestMethod.POST },
+          { path: 'auth/profile', method: RequestMethod.GET },
+        )
+        .forRoutes(
+          { path: '*', method: RequestMethod.POST },
+          { path: '*', method: RequestMethod.PUT },
+          { path: '*', method: RequestMethod.PATCH },
+          { path: '*', method: RequestMethod.DELETE },
+        );
+    }
 
-    // Middleware para geração de tokens CSRF em todas as respostas GET
-    consumer
-      .apply(CsrfTokenMiddleware)
-      .forRoutes({ path: '*', method: RequestMethod.GET });
+    // Desabilitar CSRF para API mobile
+    // Geração de token CSRF opcional apenas para web
+    const shouldGenerateCsrf =
+      this.configService.get('GENERATE_CSRF') === 'true';
+    if (shouldGenerateCsrf) {
+      consumer
+        .apply(CsrfTokenMiddleware)
+        .forRoutes({ path: '*', method: RequestMethod.GET });
+    }
 
-    // Middleware para validação de tokens CSRF em todas as requisições que modificam dados
-    consumer
-      .apply(CsrfProtectionMiddleware)
-      .exclude(
-        { path: 'auth/login', method: RequestMethod.POST },
-        { path: 'auth/register', method: RequestMethod.POST },
-        { path: 'auth/refresh', method: RequestMethod.POST },
-      )
-      .forRoutes(
-        { path: '*', method: RequestMethod.POST },
-        { path: '*', method: RequestMethod.PUT },
-        { path: '*', method: RequestMethod.PATCH },
-        { path: '*', method: RequestMethod.DELETE },
-      );
+    // Validação de CSRF também opcional
+    const shouldValidateCsrf =
+      this.configService.get('VALIDATE_CSRF') === 'true';
+    if (shouldValidateCsrf) {
+      consumer
+        .apply(CsrfProtectionMiddleware)
+        .exclude(
+          { path: 'auth/login', method: RequestMethod.POST },
+          { path: 'auth/register', method: RequestMethod.POST },
+          { path: 'auth/refresh', method: RequestMethod.POST },
+          { path: 'auth/profile', method: RequestMethod.GET },
+          // Excluir rotas de API mobile da verificação CSRF
+          { path: 'api/*', method: RequestMethod.POST },
+          { path: 'api/*', method: RequestMethod.PUT },
+          { path: 'api/*', method: RequestMethod.PATCH },
+          { path: 'api/*', method: RequestMethod.DELETE },
+        )
+        .forRoutes(
+          { path: '*', method: RequestMethod.POST },
+          { path: '*', method: RequestMethod.PUT },
+          { path: '*', method: RequestMethod.PATCH },
+          { path: '*', method: RequestMethod.DELETE },
+        );
+    }
   }
 }

@@ -2,7 +2,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View } from "react-native";
+import Icon from "react-native-vector-icons/Ionicons";
 import theme from "../theme";
 import MyReceiptsScreen from "../screens/beneficiario/MyReceiptsScreen";
 import ReceiptDetailScreen from "../screens/beneficiario/ReceiptDetailScreen";
@@ -13,33 +13,15 @@ import EditProfileScreen from "../screens/beneficiario/EditProfileScreen";
 import ReceiptHistoryScreen from "../screens/beneficiario/ReceiptHistoryScreen";
 import NeedsAssessmentScreen from "../screens/beneficiario/NeedsAssessmentScreen";
 
-// Ícones (pseudo-implementação - você precisará importar os ícones reais)
-const ReceiptsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.secondary,
-    }}
-  />
+// Ícones reais usando react-native-vector-icons
+const ReceiptsIcon = ({ color }: { color: string }) => (
+  <Icon name="receipt" size={24} color={color} />
 );
-const AvailableItemsIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.status.success,
-    }}
-  />
+const AvailableItemsIcon = ({ color }: { color: string }) => (
+  <Icon name="list" size={24} color={color} />
 );
-const ProfileIcon = () => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      backgroundColor: theme.colors.primary.main,
-    }}
-  />
+const ProfileIcon = ({ color }: { color: string }) => (
+  <Icon name="person" size={24} color={color} />
 );
 
 // Stack Navigators para cada tab
@@ -122,7 +104,7 @@ const BeneficiarioNavigator: React.FC = () => {
         name="MyReceipts"
         component={ReceiptsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <ReceiptsIcon />,
+          tabBarIcon: ({ color }) => <ReceiptsIcon color={color} />,
           tabBarLabel: "Meus Recebimentos",
         }}
       />
@@ -130,7 +112,7 @@ const BeneficiarioNavigator: React.FC = () => {
         name="AvailableItems"
         component={AvailableItemsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <AvailableItemsIcon />,
+          tabBarIcon: ({ color }) => <AvailableItemsIcon color={color} />,
           tabBarLabel: "Itens Disponíveis",
         }}
       />
@@ -138,7 +120,7 @@ const BeneficiarioNavigator: React.FC = () => {
         name="Profile"
         component={ProfileNavigator}
         options={{
-          tabBarIcon: ({ color }) => <ProfileIcon />,
+          tabBarIcon: ({ color }) => <ProfileIcon color={color} />,
           tabBarLabel: "Perfil",
         }}
       />
