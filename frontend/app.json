@@ -10,21 +10,27 @@
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#64748B"
     },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solidarios.app",
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#64748B"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#64748B"
       },
       "package": "com.solidarios.app",
       "edgeToEdgeEnabled": true,
@@ -40,6 +46,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.svg"
-    }
+    },
+    "primaryColor": "#64748B"
   }
 }
