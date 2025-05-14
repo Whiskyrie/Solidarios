@@ -12,6 +12,7 @@ import {
   Dimensions,
   StatusBar,
   Image,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -19,24 +20,22 @@ import { Formik } from "formik";
 import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 
-// Validação do formulário
+// Esquema de validação do formulário
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email("Email inválido").required("Email é obrigatório"),
   password: Yup.string()
-    .min(8, "Senha deve ter pelo menos 8 caracteres")
-    .matches(/[A-Z]/, "Deve conter pelo menos uma letra maiúscula")
-    .matches(/[0-9]/, "Deve conter pelo menos um número")
-    .matches(/[^A-Za-z0-9]/, "Deve conter pelo menos um caractere especial")
+    .min(6, "A senha deve ter pelo menos 6 caracteres")
     .required("Senha é obrigatória"),
 });
 
-Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 const LoginScreen: React.FC = () => {
   const navigation =
@@ -132,10 +131,11 @@ const LoginScreen: React.FC = () => {
       />
 
       <LinearGradient
-        colors={["#E0F2FF", "#F8FCFF"]}
-        style={styles.gradientBackground}
+        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+        locations={[0, 0.6, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+        style={styles.gradientBackground}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -339,11 +339,26 @@ const LoginScreen: React.FC = () => {
               },
             ]}
           >
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <View style={styles.socialButtonInner}>
-                <MaterialIcons name="mail" size={20} color="#DB4437" />
-                <Text style={styles.socialButtonText}>Google</Text>
-              </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.googleButtonWrapper}
+            >
+              <LinearGradient
+                colors={["#7b0000", "#d61c1c", "#fb2727"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.googleButtonGradient}
+              >
+                <Ionicons
+                  name="logo-google"
+                  size={24}
+                  color="#fff"
+                  style={styles.googleIcon}
+                />
+                <Text style={styles.socialButtonText}>
+                  Continuar com Google
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
 
@@ -523,27 +538,34 @@ const styles = StyleSheet.create({
   socialButtonsContainer: {
     alignItems: "center",
     marginBottom: 30,
+    width: "100%",
   },
-  socialButton: {
+  googleButtonWrapper: {
     width: "100%",
     height: 56,
     borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginBottom: 12,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  socialButtonInner: {
+  googleButtonGradient: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  googleIcon: {
+    marginRight: 12,
   },
   socialButtonText: {
     fontFamily: theme.fontFamily.primary,
     fontSize: 16,
-    color: "#333",
-    marginLeft: 12,
+    fontWeight: "600",
+    color: "#fff",
   },
   registerContainer: {
     flexDirection: "row",
