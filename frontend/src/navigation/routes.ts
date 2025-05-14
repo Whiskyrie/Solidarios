@@ -2,6 +2,7 @@
 
 // Rotas para o navegador de autenticação
 export const AUTH_ROUTES = {
+  WELCOME: "Welcome",
   LOGIN: "Login",
   REGISTER: "Register",
   FORGOT_PASSWORD: "ForgotPassword",
