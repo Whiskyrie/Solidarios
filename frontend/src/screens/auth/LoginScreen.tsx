@@ -8,6 +8,7 @@ import {
   Platform,
   Animated,
   StatusBar,
+  TextInput,
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -20,11 +21,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import {
   Typography,
   TextField,
-  Button,
   NotificationBanner,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
-import colors from "../../theme/colors";
 import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
@@ -103,18 +102,7 @@ const LoginScreen: React.FC = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
       >
-        {/* Curvas onduladas melhoradas - Posicionadas primeiro para ficar atrás do conteúdo */}
-        <View style={styles.waveContainer}>
-          <LinearGradient
-            colors={[colors.primary.main, "rgba(23, 63, 95, 0)"]}
-            style={styles.waveGradient}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-          <View style={[styles.wave, styles.wave1]} />
-          <View style={[styles.wave, styles.wave2]} />
-          <View style={[styles.wave, styles.wave3]} />
-        </View>
+        {/* Substituindo o design de arcos pelo novo componente de curvas animadas */}
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -166,47 +154,80 @@ const LoginScreen: React.FC = () => {
                 touched,
               }) => (
                 <View style={styles.form}>
-                  <View style={styles.inputContainer}>
-                    <TextField
-                      value={values.email}
-                      onChangeText={handleChange("email")}
-                      onBlur={handleBlur("email")}
-                      error={touched.email ? errors.email : undefined}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      placeholder="Email"
-                      placeholderTextColor="#999999"
-                      rightIcon={
-                        <MaterialIcons name="email" size={20} color="#999999" />
-                      }
-                      style={styles.inputField}
-                      inputStyle={styles.input}
-                    />
+                  {/* Campo de Email com ícone ao lado do label */}
+                  <View style={styles.fieldContainer}>
+                    <View style={styles.labelContainer}>
+                      <MaterialIcons name="email" size={20} color="#484848" />
+                      <Typography
+                        variant="body"
+                        color="#484848"
+                        style={styles.fieldLabel}
+                      >
+                        Email
+                      </Typography>
+                    </View>
+                    <View style={styles.inputContainer}>
+                      <TextField
+                        value={values.email}
+                        onChangeText={handleChange("email")}
+                        onBlur={handleBlur("email")}
+                        error={touched.email ? errors.email : undefined}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        placeholder="Enter Email"
+                        placeholderTextColor="#484848"
+                        style={styles.inputField}
+                        inputStyle={styles.input}
+                      />
+                    </View>
                   </View>
 
-                  <View style={styles.inputContainer}>
-                    <TextField
-                      value={values.password}
-                      onChangeText={handleChange("password")}
-                      onBlur={handleBlur("password")}
-                      error={touched.password ? errors.password : undefined}
-                      secureTextEntry={!passwordVisible}
-                      placeholder="Senha"
-                      placeholderTextColor="#999999"
-                      rightIcon={
-                        <TouchableOpacity onPress={togglePasswordVisibility}>
-                          <MaterialIcons
-                            name={
-                              passwordVisible ? "visibility" : "visibility-off"
-                            }
-                            size={20}
-                            color="#999999"
-                          />
-                        </TouchableOpacity>
-                      }
-                      style={styles.inputField}
-                      inputStyle={styles.input}
-                    />
+                  {/* Campo de Senha com ícone ao lado do label e botão de visibilidade corretamente posicionado */}
+                  <View style={styles.fieldContainer}>
+                    <View style={styles.labelContainer}>
+                      <MaterialIcons name="lock" size={20} color="#484848" />
+                      <Typography
+                        variant="body"
+                        color="#484848"
+                        style={styles.fieldLabel}
+                      >
+                        Senha
+                      </Typography>
+                    </View>
+
+                    {/* Implementação personalizada do campo de senha com botão fixo */}
+                    <View style={styles.customPasswordContainer}>
+                      <TextInput
+                        value={values.password}
+                        onChangeText={handleChange("password")}
+                        onBlur={handleBlur("password")}
+                        secureTextEntry={!passwordVisible}
+                        placeholder="Password"
+                        placeholderTextColor="#484848"
+                        style={styles.customPasswordInput}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeIconButton}
+                        onPress={togglePasswordVisibility}
+                      >
+                        <MaterialIcons
+                          name={
+                            passwordVisible ? "visibility" : "visibility-off"
+                          }
+                          size={22}
+                          color="#484848"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {touched.password && errors.password && (
+                      <Typography
+                        variant="body"
+                        style={styles.errorText}
+                        color="#FF3B30"
+                      >
+                        {errors.password}
+                      </Typography>
+                    )}
                   </View>
 
                   <TouchableOpacity
@@ -218,7 +239,7 @@ const LoginScreen: React.FC = () => {
                     <Typography
                       variant="body"
                       color="#666666"
-                      style={{ fontSize: 14 }}
+                      style={{ fontSize: 12 }}
                     >
                       Esqueceu sua senha?
                     </Typography>
@@ -230,7 +251,7 @@ const LoginScreen: React.FC = () => {
                     style={styles.loginButtonContainer}
                   >
                     <LinearGradient
-                      colors={[colors.primary.main, colors.primary.secondary]}
+                      colors={["#1E88E5", "#0D47A1"]} // Cores azuis em vez de vermelho/laranja
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.loginButton}
@@ -238,7 +259,7 @@ const LoginScreen: React.FC = () => {
                       <Typography
                         variant="body"
                         color="#FFFFFF"
-                        style={{ fontWeight: "bold", fontSize: 16 }}
+                        style={{ fontWeight: "bold" }}
                       >
                         {isLoading ? "Carregando..." : "Login"}
                       </Typography>
@@ -249,35 +270,34 @@ const LoginScreen: React.FC = () => {
             </Formik>
 
             <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
               <Typography
                 variant="body"
                 color="#666666"
-                style={{ paddingHorizontal: 10 }}
+                style={{ fontSize: 12 }}
               >
-                ou
+                Sign-Up Using
               </Typography>
-              <View style={styles.dividerLine} />
             </View>
 
-            {/* Botão Google com gradiente vermelho */}
-            <TouchableOpacity style={styles.googleButtonContainer}>
-              <LinearGradient
-                colors={["#EA4335", "#C62828"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.googleButton}
-              >
-                <FontAwesome name="google" size={20} color="#FFFFFF" />
-                <Typography
-                  variant="body"
-                  color="#FFFFFF"
-                  style={{ marginLeft: 10, fontWeight: "500" }}
+            <View style={styles.socialContainer}>
+              <TouchableOpacity style={styles.googleButton}>
+                <LinearGradient
+                  colors={["#d72e2e", "#690000"]} // Gradiente vermelho para o botão do Google
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.googleButtonGradient}
                 >
-                  Continuar com Google
-                </Typography>
-              </LinearGradient>
-            </TouchableOpacity>
+                  <FontAwesome name="google" size={18} color="#FFFFFF" />
+                  <Typography
+                    variant="body"
+                    style={styles.socialText}
+                    color="#FFFFFF"
+                  >
+                    Continuar com Google
+                  </Typography>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
 
             {/* Adiciona botão de redirecionamento para a tela de registro */}
             <View style={styles.registerContainer}>
@@ -293,7 +313,7 @@ const LoginScreen: React.FC = () => {
               >
                 <Typography
                   variant="body"
-                  color={colors.primary.main}
+                  color="#FF5C3B"
                   style={{ fontSize: 14, fontWeight: "bold", marginLeft: 5 }}
                 >
                   Registre-se
@@ -316,90 +336,50 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: theme.spacing.m,
-    paddingTop: 90, // Aumentado para dar mais espaço para as ondas
+    alignItems: "center", // Centraliza o conteúdo horizontalmente
   },
-  waveContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200, // Aumentado para melhor visualização
-    overflow: "hidden", // Alterado de "visible" para "hidden"
-    zIndex: 0, // Alterado de -1 para 0
-  },
-  waveGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    opacity: 0.25, // Aumentado para melhor visibilidade
-  },
-  wave: {
-    position: "absolute",
-    height: 40,
-    left: 0,
-    right: 0,
-    backgroundColor: "transparent",
-    borderBottomLeftRadius: 150,
-    borderBottomRightRadius: 150,
-  },
-  wave1: {
-    top: 0,
-    height: 90,
-    backgroundColor: `${colors.primary.main}40`, // Aumentei a opacidade de 20 para 40
-    transform: [{ scaleX: 1.5 }],
-  },
-  wave2: {
-    top: 40,
-    height: 60,
-    backgroundColor: `${colors.primary.secondary}40`, // Aumentei a opacidade
-    borderBottomLeftRadius: 70,
-    borderBottomRightRadius: 110,
-    transform: [{ scaleX: 1.3 }],
-  },
-  wave3: {
-    top: 80,
-    height: 50,
-    backgroundColor: `${colors.status.success}40`, // Aumentei a opacidade
-    borderBottomLeftRadius: 110,
-    borderBottomRightRadius: 70,
-    transform: [{ scaleX: 1.4 }],
+  decorativeGraphics: {
+    width: "100%",
+    height: 300,
   },
   formContainer: {
     width: "100%",
-    maxWidth: 380,
-    alignSelf: "center",
-    paddingHorizontal: theme.spacing.l,
-    backgroundColor: "#FFFFFF",
-    borderRadius: theme.borderRadius.large,
-    paddingVertical: theme.spacing.l,
-    // Adicionando uma sombra sutil para destacar o formulário
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    maxWidth: 380, // Limitando a largura para garantir que fique centralizado
+    alignSelf: "center", // Centraliza o container
+    paddingHorizontal: theme.spacing.m,
+    alignItems: "center", // Centraliza os conteúdos internos
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "bold",
-    marginBottom: theme.spacing.m, // Aumentado o espaçamento
-    textAlign: "center",
-    paddingVertical: 5, // Adicionado padding vertical
-    includeFontPadding: true, // Garante que o padding da fonte seja incluído
+    marginBottom: theme.spacing.xs,
+    textAlign: "center", // Centraliza o texto
   },
   welcomeText: {
-    fontSize: 16,
-    marginBottom: theme.spacing.xl,
-    lineHeight: 22,
-    textAlign: "center",
+    fontSize: 14,
+    marginBottom: theme.spacing.l,
+    lineHeight: 20,
+    textAlign: "center", // Centraliza o texto
   },
   form: {
     width: "100%",
   },
-  inputContainer: {
+  // Estilos para os campos com labels e ícones separados
+  fieldContainer: {
     marginBottom: theme.spacing.m,
+    width: "100%",
+  },
+  labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8, // Espaço entre o label e o input
+  },
+  fieldLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  inputContainer: {
     borderRadius: theme.borderRadius.medium,
     backgroundColor: "#F5F5F5",
     overflow: "hidden",
@@ -413,7 +393,36 @@ const styles = StyleSheet.create({
   },
   input: {
     color: "#333333",
+  },
+  // Novos estilos para o campo de senha personalizado
+  customPasswordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: "#EEEEEE",
+    height: 52, // Altura específica para garantir alinhamento
+    position: "relative",
+  },
+  customPasswordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: "#333333",
     fontSize: 16,
+  },
+  eyeIconButton: {
+    width: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 2,
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   forgotPassword: {
     alignSelf: "flex-end",
@@ -423,45 +432,49 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.m,
     borderRadius: theme.borderRadius.large,
     overflow: "hidden",
+    width: "100%", // Garante que ocupe toda a largura disponível
   },
   loginButton: {
     paddingVertical: 16,
-    paddingHorizontal: 20, // Adicionado padding horizontal
     alignItems: "center",
     justifyContent: "center",
     borderRadius: theme.borderRadius.large,
-    minHeight: 55, // Definida uma altura mínima para o botão
   },
   dividerContainer: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginVertical: theme.spacing.l,
+    marginVertical: theme.spacing.m,
+    width: "100%",
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#EEEEEE",
+  socialContainer: {
+    width: "100%", // Faz o container ocupar toda a largura disponível
+    marginTop: theme.spacing.s,
   },
-  googleButtonContainer: {
+  googleButton: {
+    width: "100%", // Faz o botão do Google ocupar toda a largura
     borderRadius: theme.borderRadius.large,
     overflow: "hidden",
     marginTop: theme.spacing.s,
   },
-  googleButton: {
+  googleButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 20,
-    minHeight: 55, // Altura mínima consistente com o botão de login
+    minHeight: 50, // Garante uma altura mínima para o botão
+  },
+  socialText: {
+    marginLeft: theme.spacing.m,
+    fontWeight: "500",
+    fontSize: 14,
   },
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
+    width: "100%", // Garante que ocupe toda a largura disponível
   },
 });
 
