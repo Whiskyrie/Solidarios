@@ -10,6 +10,7 @@ const borderRadius = {
   small: 4,
   medium: 8,
   large: 12,
+  extraLarge: 18,
   round: 9999, // Para botões circulares ou arredondados
 };
 

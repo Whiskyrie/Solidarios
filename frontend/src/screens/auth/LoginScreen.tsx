@@ -8,7 +8,9 @@ import {
   Platform,
   Animated,
   StatusBar,
+  Image,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -20,7 +22,6 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import {
   Typography,
-  TextField,
   NotificationBanner,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
@@ -32,7 +33,10 @@ import { AUTH_ROUTES } from "../../navigation/routes";
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email("Email inválido").required("Email é obrigatório"),
   password: Yup.string()
-    .min(6, "Senha deve ter pelo menos 6 caracteres")
+    .min(8, "Senha deve ter pelo menos 8 caracteres")
+    .matches(/[A-Z]/, "Deve conter pelo menos uma letra maiúscula")
+    .matches(/[0-9]/, "Deve conter pelo menos um número")
+    .matches(/[^A-Za-z0-9]/, "Deve conter pelo menos um caractere especial")
     .required("Senha é obrigatória"),
 });
 
@@ -97,65 +101,71 @@ const LoginScreen: React.FC = () => {
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
+      <LinearGradient
+        colors={["#c3f6f8", "#d2def5"]}
+        style={styles.gradientBackground}
       >
-        {/* Substituindo o design de arcos pelo novo componente de curvas animadas */}
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
         >
-          <NotificationBanner
-            visible={showNotification}
-            type="error"
-            message="Erro de autenticação"
-            description={
-              errorMessage ||
-              error ||
-              "Verifique suas credenciais e tente novamente."
-            }
-            onClose={handleCloseNotification}
-            position="top"
-          />
-
-          <Animated.View
-            style={[
-              styles.formContainer,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
           >
-            <Typography variant="h2" style={styles.title} color="#333333">
-              Login
-            </Typography>
+            <NotificationBanner
+              visible={showNotification}
+              type="error"
+              message="Erro de autenticação"
+              description={
+                errorMessage ||
+                error ||
+                "Verifique suas credenciais e tente novamente."
+              }
+              onClose={handleCloseNotification}
+              position="top"
+            />
 
-            {/* Adiciona mensagem de boas-vindas */}
-            <Typography
-              variant="bodySecondary"
-              style={styles.welcomeText}
-              color="#666666"
+            <Animated.View
+              style={[
+                styles.formContainer,
+                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+              ]}
             >
-              Bem-vindo de volta! Sentimos sua falta.
-            </Typography>
+              <Image
+                source={require("../../../assets/icon.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
 
-            <Formik
-              initialValues={{ email: "", password: "" }}
-              validationSchema={LoginSchema}
-              onSubmit={handleLogin}
-            >
-              {({
-                handleChange,
-                handleBlur,
-                handleSubmit,
-                values,
-                errors,
-                touched,
-              }) => (
-                <View style={styles.form}>
-                  {/* Campo de Email com ícone ao lado do label */}
-                  <View style={styles.fieldContainer}>
+              <Typography variant="h2" style={styles.title} color="#333333">
+                Login
+              </Typography>
+
+              <Typography
+                variant="bodySecondary"
+                style={styles.welcomeText}
+                color="#666666"
+              >
+                Bem-vindo de volta! Sentimos sua falta.
+              </Typography>
+
+              <Formik
+                initialValues={{ email: "", password: "" }}
+                validationSchema={LoginSchema}
+                onSubmit={handleLogin}
+              >
+                {({
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                  values,
+                  errors,
+                  touched,
+                }) => (
+                  <View style={styles.form}>
+                    {/* Campo de Email */}
                     <View style={styles.labelContainer}>
                       <MaterialIcons name="email" size={20} color="#484848" />
                       <Typography
@@ -166,213 +176,250 @@ const LoginScreen: React.FC = () => {
                         Email
                       </Typography>
                     </View>
-                    <View style={styles.inputContainer}>
-                      <TextField
+                    <View style={styles.customPasswordContainer}>
+                      <TextInput
                         value={values.email}
                         onChangeText={handleChange("email")}
                         onBlur={handleBlur("email")}
-                        error={touched.email ? errors.email : undefined}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
                         placeholder="Enter Email"
                         placeholderTextColor="#484848"
-                        style={styles.inputField}
-                        inputStyle={styles.input}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Campo de Senha com ícone ao lado do label e botão de visibilidade corretamente posicionado */}
-                  <View style={styles.fieldContainer}>
-                    <View style={styles.labelContainer}>
-                      <MaterialIcons name="lock" size={20} color="#484848" />
-                      <Typography
-                        variant="body"
-                        color="#484848"
-                        style={styles.fieldLabel}
-                      >
-                        Senha
-                      </Typography>
-                    </View>
-
-                    {/* Implementação personalizada do campo de senha com botão fixo */}
-                    <View style={styles.customPasswordContainer}>
-                      <TextInput
-                        value={values.password}
-                        onChangeText={handleChange("password")}
-                        onBlur={handleBlur("password")}
-                        secureTextEntry={!passwordVisible}
-                        placeholder="Password"
-                        placeholderTextColor="#484848"
                         style={styles.customPasswordInput}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
                       />
-                      <TouchableOpacity
-                        style={styles.eyeIconButton}
-                        onPress={togglePasswordVisibility}
-                      >
-                        <MaterialIcons
-                          name={
-                            passwordVisible ? "visibility" : "visibility-off"
-                          }
-                          size={22}
-                          color="#484848"
-                        />
-                      </TouchableOpacity>
+                      {values.email.length > 0 && (
+                        <TouchableOpacity
+                          style={styles.eyeIconButton}
+                          onPress={() => handleChange("email")("")}
+                        >
+                          <MaterialIcons
+                            name="cancel"
+                            size={20}
+                            color="#9E9E9E"
+                          />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {touched.password && errors.password && (
+                    {touched.email && errors.email && (
                       <Typography
                         variant="body"
                         style={styles.errorText}
                         color="#FF3B30"
                       >
-                        {errors.password}
+                        {errors.email}
                       </Typography>
                     )}
-                  </View>
 
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD as any)
-                    }
-                    style={styles.forgotPassword}
-                  >
-                    <Typography
-                      variant="body"
-                      color="#666666"
-                      style={{ fontSize: 12 }}
-                    >
-                      Esqueceu sua senha?
-                    </Typography>
-                  </TouchableOpacity>
+                    {/* Campo de Senha */}
+                    <View style={styles.fieldContainer}>
+                      <View style={styles.labelContainer}>
+                        <MaterialIcons name="lock" size={20} color="#484848" />
+                        <Typography
+                          variant="body"
+                          color="#484848"
+                          style={styles.fieldLabel}
+                        >
+                          Senha
+                        </Typography>
+                      </View>
 
-                  <TouchableOpacity
-                    onPress={() => handleSubmit()}
-                    disabled={isLoading}
-                    style={styles.loginButtonContainer}
-                  >
-                    <LinearGradient
-                      colors={["#1E88E5", "#0D47A1"]} // Cores azuis em vez de vermelho/laranja
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.loginButton}
+                      <View style={styles.customPasswordContainer}>
+                        <TextInput
+                          value={values.password}
+                          onChangeText={handleChange("password")}
+                          onBlur={handleBlur("password")}
+                          secureTextEntry={!passwordVisible}
+                          placeholder="Password"
+                          placeholderTextColor="#484848"
+                          style={styles.customPasswordInput}
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeIconButton}
+                          onPress={togglePasswordVisibility}
+                        >
+                          <MaterialIcons
+                            name={
+                              passwordVisible ? "visibility" : "visibility-off"
+                            }
+                            size={22}
+                            color="#484848"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {touched.password && errors.password && (
+                        <Typography
+                          variant="body"
+                          style={styles.errorText}
+                          color="#FF3B30"
+                        >
+                          {errors.password}
+                        </Typography>
+                      )}
+                    </View>
+
+                    {/* Link Esqueceu Senha */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD as any)
+                      }
+                      style={styles.forgotPassword}
                     >
                       <Typography
                         variant="body"
-                        color="#FFFFFF"
-                        style={{ fontWeight: "bold" }}
+                        color="#666666"
+                        style={{ fontSize: 12 }}
                       >
-                        {isLoading ? "Carregando..." : "Login"}
+                        Esqueceu sua senha?
                       </Typography>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </Formik>
+                    </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-              <Typography
-                variant="body"
-                color="#666666"
-                style={{ fontSize: 12 }}
-              >
-                Sign-Up Using
-              </Typography>
-            </View>
+                    {/* Botão de Login */}
+                    <TouchableOpacity
+                      onPress={() => handleSubmit()}
+                      disabled={isLoading}
+                      style={styles.loginButtonContainer}
+                    >
+                      <LinearGradient
+                        colors={["#1E88E5", "#0D47A1"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.loginButton}
+                      >
+                        {isLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Typography
+                            variant="body"
+                            color="#FFFFFF"
+                            style={styles.socialText}
+                          >
+                            Login
+                          </Typography>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </Formik>
 
-            <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.googleButton}>
-                <LinearGradient
-                  colors={["#d72e2e", "#690000"]} // Gradiente vermelho para o botão do Google
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.googleButtonGradient}
-                >
-                  <FontAwesome name="google" size={18} color="#FFFFFF" />
-                  <Typography
-                    variant="body"
-                    style={styles.socialText}
-                    color="#FFFFFF"
-                  >
-                    Continuar com Google
-                  </Typography>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            {/* Adiciona botão de redirecionamento para a tela de registro */}
-            <View style={styles.registerContainer}>
-              <Typography
-                variant="body"
-                color="#666666"
-                style={{ fontSize: 14 }}
-              >
-                Não tem uma conta?
-              </Typography>
-              <TouchableOpacity
-                onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER as any)}
-              >
+              <View style={styles.dividerContainer}>
                 <Typography
                   variant="body"
-                  color="#FF5C3B"
-                  style={{ fontSize: 14, fontWeight: "bold", marginLeft: 5 }}
+                  color="#666666"
+                  style={{ fontSize: 12 }}
                 >
-                  Registre-se
+                  Sign-Up Using
                 </Typography>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              </View>
+
+              <View style={styles.socialContainer}>
+                <TouchableOpacity style={styles.googleButton}>
+                  <LinearGradient
+                    colors={["#d72e2e", "#690000"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.googleButtonGradient}
+                  >
+                    <FontAwesome name="google" size={18} color="#FFFFFF" />
+                    <Typography
+                      variant="body"
+                      style={styles.socialText}
+                      color="#FFFFFF"
+                    >
+                      Continuar com Google
+                    </Typography>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              {/* Redirecionamento para Registro */}
+              <View style={styles.registerContainer}>
+                <Typography
+                  variant="body"
+                  color="#666666"
+                  style={{ fontSize: 14 }}
+                >
+                  Não tem uma conta?
+                </Typography>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate(AUTH_ROUTES.REGISTER as any)
+                  }
+                >
+                  <Typography
+                    variant="body"
+                    color="#0f5cd0"
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "bold",
+                      marginLeft: 5,
+                    }}
+                  >
+                    Registre-se
+                  </Typography>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  gradientBackground: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
     padding: theme.spacing.m,
-    alignItems: "center", // Centraliza o conteúdo horizontalmente
-  },
-  decorativeGraphics: {
-    width: "100%",
-    height: 300,
+    alignItems: "center",
   },
   formContainer: {
     width: "100%",
-    maxWidth: 380, // Limitando a largura para garantir que fique centralizado
-    alignSelf: "center", // Centraliza o container
-    paddingHorizontal: theme.spacing.m,
-    alignItems: "center", // Centraliza os conteúdos internos
+    maxWidth: 360,
+    alignSelf: "center",
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.s,
+    alignItems: "center",
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: theme.spacing.m,
+    alignSelf: "center",
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     marginBottom: theme.spacing.xs,
-    textAlign: "center", // Centraliza o texto
+    textAlign: "center",
   },
   welcomeText: {
     fontSize: 14,
     marginBottom: theme.spacing.l,
     lineHeight: 20,
-    textAlign: "center", // Centraliza o texto
+    textAlign: "center",
+    maxWidth: 280,
+    alignSelf: "center",
   },
   form: {
     width: "100%",
   },
-  // Estilos para os campos com labels e ícones separados
   fieldContainer: {
     marginBottom: theme.spacing.m,
+    marginTop: theme.spacing.m,
     width: "100%",
   },
   labelContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8, // Espaço entre o label e o input
+    marginBottom: 8,
   },
   fieldLabel: {
     marginLeft: 8,
@@ -394,7 +441,6 @@ const styles = StyleSheet.create({
   input: {
     color: "#333333",
   },
-  // Novos estilos para o campo de senha personalizado
   customPasswordContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -402,7 +448,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
     borderWidth: 1,
     borderColor: "#EEEEEE",
-    height: 52, // Altura específica para garantir alinhamento
+    height: 52,
     position: "relative",
   },
   customPasswordInput: {
@@ -432,13 +478,13 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.m,
     borderRadius: theme.borderRadius.large,
     overflow: "hidden",
-    width: "100%", // Garante que ocupe toda a largura disponível
+    width: "100%",
   },
   loginButton: {
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: theme.borderRadius.large,
+    borderRadius: theme.borderRadius.extraLarge,
   },
   dividerContainer: {
     alignItems: "center",
@@ -446,12 +492,12 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   socialContainer: {
-    width: "100%", // Faz o container ocupar toda a largura disponível
+    width: "100%",
     marginTop: theme.spacing.s,
   },
   googleButton: {
-    width: "100%", // Faz o botão do Google ocupar toda a largura
-    borderRadius: theme.borderRadius.large,
+    width: "100%",
+    borderRadius: theme.borderRadius.extraLarge,
     overflow: "hidden",
     marginTop: theme.spacing.s,
   },
@@ -461,12 +507,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 20,
-    minHeight: 50, // Garante uma altura mínima para o botão
+    minHeight: 50,
   },
   socialText: {
     marginLeft: theme.spacing.m,
-    fontWeight: "500",
-    fontSize: 14,
+    fontWeight: "700",
+    fontSize: 16,
+    fontFamily: theme.fontFamily.monospace,
   },
   registerContainer: {
     flexDirection: "row",
@@ -474,7 +521,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.m,
-    width: "100%", // Garante que ocupe toda a largura disponível
+    width: "100%",
   },
 });
 
