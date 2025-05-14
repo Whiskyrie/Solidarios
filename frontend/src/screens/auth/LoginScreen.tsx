@@ -1,29 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
-  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
+  StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Dimensions,
   StatusBar,
   Image,
-  TextInput,
-  ActivityIndicator,
 } from "react-native";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
-import {
-  Typography,
-  NotificationBanner,
-} from "../../components/barrelComponents";
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
@@ -40,488 +36,531 @@ const LoginSchema = Yup.object().shape({
     .required("Senha é obrigatória"),
 });
 
+Dimensions.get("window");
+
 const LoginScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { login, isLoading, error, clearErrors } = useAuth();
-  const [showNotification, setShowNotification] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const slideAnim = useState(new Animated.Value(50))[0];
+  // Refs para animações
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
+  // Efeito de animação ao carregar a tela
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 700,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 700,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim]);
+  }, []);
+
+  // Efeito para mostrar erro
+  useEffect(() => {
+    if (error) {
+      setErrorMessage(error);
+      // Animação de shake quando houver erro
+      Animated.sequence([
+        Animated.timing(shakeAnim, {
+          toValue: 10,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -10,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 10,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 0,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [error]);
 
   const handleLogin = async (values: { email: string; password: string }) => {
+    clearErrors();
+    setErrorMessage(null);
+
     try {
       const success = await login(values);
-      if (!success) {
+      if (!success && error) {
         let friendlyError = error;
-        if (error?.includes("Unauthorized") || error?.includes("credentials")) {
+        if (error.includes("Unauthorized") || error.includes("credentials")) {
           friendlyError = "Email ou senha incorretos. Tente novamente.";
-        } else if (error?.includes("not found")) {
+        } else if (error.includes("not found")) {
           friendlyError = "Usuário não encontrado. Verifique seu email.";
         } else if (!friendlyError) {
           friendlyError = "Não foi possível fazer login. Tente novamente.";
         }
         setErrorMessage(friendlyError);
-        setShowNotification(true);
       }
     } catch (err) {
       setErrorMessage(
         "Ocorreu um erro inesperado. Tente novamente mais tarde."
       );
-      setShowNotification(true);
     }
   };
 
-  const handleCloseNotification = () => {
-    setShowNotification(false);
-    clearErrors();
-  };
-
-  const togglePasswordVisibility = () => {
-    setPasswordVisible(!passwordVisible);
-  };
-
   return (
-    <>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
       <LinearGradient
-        colors={["#c3f6f8", "#d2def5"]}
+        colors={["#E0F2FF", "#F8FCFF"]}
         style={styles.gradientBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <KeyboardAvoidingView
-          style={styles.container}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+          {/* Botão de voltar */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
           >
-            <NotificationBanner
-              visible={showNotification}
-              type="error"
-              message="Erro de autenticação"
-              description={
-                errorMessage ||
-                error ||
-                "Verifique suas credenciais e tente novamente."
-              }
-              onClose={handleCloseNotification}
-              position="top"
+            <MaterialIcons
+              name="arrow-back-ios"
+              size={22}
+              color={theme.colors.primary.main}
             />
+          </TouchableOpacity>
 
-            <Animated.View
-              style={[
-                styles.formContainer,
-                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-              ]}
+          {/* Logo animada */}
+          <Animated.View
+            style={[
+              styles.logoContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Image
+              source={require("../../../assets/icon.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          {/* Título e subtítulo animados */}
+          <Animated.View
+            style={[
+              styles.headerTextContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
+            <Text style={styles.subtitle}>Faça login para continuar</Text>
+          </Animated.View>
+
+          {/* Formulário de login animado */}
+          <Animated.View
+            style={[
+              styles.formContainer,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim },
+                  { translateX: shakeAnim },
+                ],
+              },
+            ]}
+          >
+            {errorMessage && (
+              <View style={styles.errorContainer}>
+                <MaterialIcons name="error-outline" size={20} color="#FF3B30" />
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+
+            <Formik
+              initialValues={{ email: "", password: "" }}
+              validationSchema={LoginSchema}
+              onSubmit={handleLogin}
             >
-              <Image
-                source={require("../../../assets/icon.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              {({
+                handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+              }) => (
+                <>
+                  {/* Campo de email */}
+                  <View style={styles.inputContainer}>
+                    <MaterialIcons
+                      name="email"
+                      size={22}
+                      color="#666"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email"
+                      placeholderTextColor="#999"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={values.email}
+                      onChangeText={handleChange("email")}
+                      onBlur={handleBlur("email")}
+                    />
+                  </View>
+                  {touched.email && errors.email && (
+                    <Text style={styles.validationError}>{errors.email}</Text>
+                  )}
 
-              <Typography variant="h2" style={styles.title} color="#333333">
-                Login
-              </Typography>
-
-              <Typography
-                variant="bodySecondary"
-                style={styles.welcomeText}
-                color="#666666"
-              >
-                Bem-vindo de volta! Sentimos sua falta.
-              </Typography>
-
-              <Formik
-                initialValues={{ email: "", password: "" }}
-                validationSchema={LoginSchema}
-                onSubmit={handleLogin}
-              >
-                {({
-                  handleChange,
-                  handleBlur,
-                  handleSubmit,
-                  values,
-                  errors,
-                  touched,
-                }) => (
-                  <View style={styles.form}>
-                    {/* Campo de Email */}
-                    <View style={styles.labelContainer}>
-                      <MaterialIcons name="email" size={20} color="#484848" />
-                      <Typography
-                        variant="body"
-                        color="#484848"
-                        style={styles.fieldLabel}
-                      >
-                        Email
-                      </Typography>
-                    </View>
-                    <View style={styles.customPasswordContainer}>
-                      <TextInput
-                        value={values.email}
-                        onChangeText={handleChange("email")}
-                        onBlur={handleBlur("email")}
-                        placeholder="Enter Email"
-                        placeholderTextColor="#484848"
-                        style={styles.customPasswordInput}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
+                  {/* Campo de senha */}
+                  <View style={styles.inputContainer}>
+                    <MaterialIcons
+                      name="lock"
+                      size={22}
+                      color="#666"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Senha"
+                      placeholderTextColor="#999"
+                      secureTextEntry={!passwordVisible}
+                      value={values.password}
+                      onChangeText={handleChange("password")}
+                      onBlur={handleBlur("password")}
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordToggle}
+                      onPress={() => setPasswordVisible(!passwordVisible)}
+                    >
+                      <MaterialIcons
+                        name={passwordVisible ? "visibility" : "visibility-off"}
+                        size={22}
+                        color="#666"
                       />
-                      {values.email.length > 0 && (
-                        <TouchableOpacity
-                          style={styles.eyeIconButton}
-                          onPress={() => handleChange("email")("")}
-                        >
-                          <MaterialIcons
-                            name="cancel"
-                            size={20}
-                            color="#9E9E9E"
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {touched.email && errors.email && (
-                      <Typography
-                        variant="body"
-                        style={styles.errorText}
-                        color="#FF3B30"
-                      >
-                        {errors.email}
-                      </Typography>
-                    )}
-
-                    {/* Campo de Senha */}
-                    <View style={styles.fieldContainer}>
-                      <View style={styles.labelContainer}>
-                        <MaterialIcons name="lock" size={20} color="#484848" />
-                        <Typography
-                          variant="body"
-                          color="#484848"
-                          style={styles.fieldLabel}
-                        >
-                          Senha
-                        </Typography>
-                      </View>
-
-                      <View style={styles.customPasswordContainer}>
-                        <TextInput
-                          value={values.password}
-                          onChangeText={handleChange("password")}
-                          onBlur={handleBlur("password")}
-                          secureTextEntry={!passwordVisible}
-                          placeholder="Password"
-                          placeholderTextColor="#484848"
-                          style={styles.customPasswordInput}
-                        />
-                        <TouchableOpacity
-                          style={styles.eyeIconButton}
-                          onPress={togglePasswordVisibility}
-                        >
-                          <MaterialIcons
-                            name={
-                              passwordVisible ? "visibility" : "visibility-off"
-                            }
-                            size={22}
-                            color="#484848"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                      {touched.password && errors.password && (
-                        <Typography
-                          variant="body"
-                          style={styles.errorText}
-                          color="#FF3B30"
-                        >
-                          {errors.password}
-                        </Typography>
-                      )}
-                    </View>
-
-                    {/* Link Esqueceu Senha */}
-                    <TouchableOpacity
-                      onPress={() =>
-                        navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD as any)
-                      }
-                      style={styles.forgotPassword}
-                    >
-                      <Typography
-                        variant="body"
-                        color="#666666"
-                        style={{ fontSize: 12 }}
-                      >
-                        Esqueceu sua senha?
-                      </Typography>
-                    </TouchableOpacity>
-
-                    {/* Botão de Login */}
-                    <TouchableOpacity
-                      onPress={() => handleSubmit()}
-                      disabled={isLoading}
-                      style={styles.loginButtonContainer}
-                    >
-                      <LinearGradient
-                        colors={["#1E88E5", "#0D47A1"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.loginButton}
-                      >
-                        {isLoading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Typography
-                            variant="body"
-                            color="#FFFFFF"
-                            style={styles.socialText}
-                          >
-                            Login
-                          </Typography>
-                        )}
-                      </LinearGradient>
                     </TouchableOpacity>
                   </View>
-                )}
-              </Formik>
+                  {touched.password && errors.password && (
+                    <Text style={styles.validationError}>
+                      {errors.password}
+                    </Text>
+                  )}
 
-              <View style={styles.dividerContainer}>
-                <Typography
-                  variant="body"
-                  color="#666666"
-                  style={{ fontSize: 12 }}
-                >
-                  Sign-Up Using
-                </Typography>
-              </View>
-
-              <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.googleButton}>
-                  <LinearGradient
-                    colors={["#d72e2e", "#690000"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.googleButtonGradient}
+                  {/* Link para esqueci a senha */}
+                  <TouchableOpacity
+                    style={styles.forgotPasswordLink}
+                    onPress={() =>
+                      navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD as any)
+                    }
                   >
-                    <FontAwesome name="google" size={18} color="#FFFFFF" />
-                    <Typography
-                      variant="body"
-                      style={styles.socialText}
-                      color="#FFFFFF"
+                    <Text style={styles.forgotPasswordText}>
+                      Esqueceu a senha?
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Botão de login */}
+                  <TouchableOpacity
+                    style={styles.loginButtonContainer}
+                    onPress={() => handleSubmit()}
+                    activeOpacity={0.8}
+                    disabled={isLoading}
+                  >
+                    <LinearGradient
+                      colors={["#173F5F", "#006E58"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.loginButton}
                     >
-                      Continuar com Google
-                    </Typography>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+                      {isLoading ? (
+                        <View style={styles.loadingIndicator} />
+                      ) : (
+                        <Text style={styles.loginButtonText}>Login</Text>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              )}
+            </Formik>
+          </Animated.View>
 
-              {/* Redirecionamento para Registro */}
-              <View style={styles.registerContainer}>
-                <Typography
-                  variant="body"
-                  color="#666666"
-                  style={{ fontSize: 14 }}
-                >
-                  Não tem uma conta?
-                </Typography>
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate(AUTH_ROUTES.REGISTER as any)
-                  }
-                >
-                  <Typography
-                    variant="body"
-                    color="#0f5cd0"
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "bold",
-                      marginLeft: 5,
-                    }}
-                  >
-                    Registre-se
-                  </Typography>
-                </TouchableOpacity>
+          {/* Ou continue com */}
+          <Animated.View
+            style={[
+              styles.dividerContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </Animated.View>
+
+          {/* Botões de redes sociais */}
+          <Animated.View
+            style={[
+              styles.socialButtonsContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+              <View style={styles.socialButtonInner}>
+                <MaterialIcons name="mail" size={20} color="#DB4437" />
+                <Text style={styles.socialButtonText}>Google</Text>
               </View>
-            </Animated.View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Link para registro */}
+          <Animated.View
+            style={[
+              styles.registerContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Text style={styles.registerText}>Não tem uma conta?</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER as any)}
+            >
+              <Text style={styles.registerLink}>Registre-se</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
       </LinearGradient>
-    </>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  gradientBackground: {
+  container: {
     flex: 1,
   },
-  container: {
+  gradientBackground: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "ios" ? 60 : 80,
+    paddingBottom: 40,
+  },
+  backButton: {
+    position: "absolute",
+    top: 50,
+    left: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
     justifyContent: "center",
-    padding: theme.spacing.m,
     alignItems: "center",
   },
-  formContainer: {
-    width: "100%",
-    maxWidth: 360,
-    alignSelf: "center",
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
+  logoContainer: {
     alignItems: "center",
+    marginBottom: 30,
   },
   logo: {
     width: 100,
     height: 100,
-    marginBottom: theme.spacing.m,
-    alignSelf: "center",
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: theme.spacing.xs,
-    textAlign: "center",
+  headerTextContainer: {
+    alignItems: "center",
+    marginBottom: 30,
   },
   welcomeText: {
-    fontSize: 14,
-    marginBottom: theme.spacing.l,
-    lineHeight: 20,
-    textAlign: "center",
-    maxWidth: 280,
-    alignSelf: "center",
+    fontFamily: theme.fontFamily.primary,
+    fontSize: 28,
+    fontWeight: "bold",
+    color: theme.colors.primary.main,
+    marginBottom: 10,
   },
-  form: {
-    width: "100%",
-  },
-  fieldContainer: {
-    marginBottom: theme.spacing.m,
-    marginTop: theme.spacing.m,
-    width: "100%",
-  },
-  labelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  fieldLabel: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  inputContainer: {
-    borderRadius: theme.borderRadius.medium,
-    backgroundColor: "#F5F5F5",
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#EEEEEE",
-  },
-  inputField: {
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-  },
-  input: {
-    color: "#333333",
-  },
-  customPasswordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: theme.borderRadius.medium,
-    borderWidth: 1,
-    borderColor: "#EEEEEE",
-    height: 52,
-    position: "relative",
-  },
-  customPasswordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: "#333333",
+  subtitle: {
+    fontFamily: theme.fontFamily.primary,
     fontSize: 16,
+    color: theme.colors.neutral.darkGray,
   },
-  eyeIconButton: {
-    width: 48,
-    height: 48,
-    justifyContent: "center",
+  formContainer: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  errorContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 2,
+    backgroundColor: "#FFEBEE",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   errorText: {
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
+    color: "#FF3B30",
+    marginLeft: 8,
+    flex: 1,
+    fontSize: 14,
   },
-  forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: theme.spacing.l,
-  },
-  loginButtonContainer: {
-    marginVertical: theme.spacing.m,
-    borderRadius: theme.borderRadius.large,
-    overflow: "hidden",
-    width: "100%",
-  },
-  loginButton: {
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: theme.borderRadius.extraLarge,
-  },
-  dividerContainer: {
-    alignItems: "center",
-    marginVertical: theme.spacing.m,
-    width: "100%",
-  },
-  socialContainer: {
-    width: "100%",
-    marginTop: theme.spacing.s,
-  },
-  googleButton: {
-    width: "100%",
-    borderRadius: theme.borderRadius.extraLarge,
-    overflow: "hidden",
-    marginTop: theme.spacing.s,
-  },
-  googleButtonGradient: {
+  inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    minHeight: 50,
+    backgroundColor: "#F5F8FF",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    height: 56,
+    borderWidth: 1,
+    borderColor: "#E0E7FF",
   },
-  socialText: {
-    marginLeft: theme.spacing.m,
-    fontWeight: "700",
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontFamily: theme.fontFamily.primary,
     fontSize: 16,
-    fontFamily: theme.fontFamily.monospace,
+    color: "#333",
+  },
+  passwordToggle: {
+    padding: 8,
+  },
+  validationError: {
+    color: "#FF3B30",
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 2,
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    fontFamily: theme.fontFamily.primary,
+    color: theme.colors.primary.secondary,
+    fontSize: 14,
+  },
+  loginButtonContainer: {
+    width: "100%",
+    height: 56,
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  loginButton: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loginButtonText: {
+    fontFamily: theme.fontFamily.primary,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  loadingIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
+    borderTopColor: "transparent",
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  dividerText: {
+    fontFamily: theme.fontFamily.primary,
+    color: "#9E9E9E",
+    paddingHorizontal: 10,
+    fontSize: 14,
+  },
+  socialButtonsContainer: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  socialButton: {
+    width: "100%",
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginBottom: 12,
+  },
+  socialButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  socialButtonText: {
+    fontFamily: theme.fontFamily.primary,
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 12,
   },
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.m,
-    width: "100%",
+  },
+  registerText: {
+    fontFamily: theme.fontFamily.primary,
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+  },
+  registerLink: {
+    fontFamily: theme.fontFamily.primary,
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.primary.secondary,
+    marginLeft: 5,
   },
 });
 
