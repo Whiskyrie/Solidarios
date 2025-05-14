@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  Dimensions,
   StatusBar,
   Image,
 } from "react-native";
@@ -19,7 +18,6 @@ import { Formik } from "formik";
 import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import Ionicons from "react-native-vector-icons/Ionicons";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -27,7 +25,7 @@ import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
 
-// Esquema de validação atualizado
+// Esquema de validação
 const RegisterSchema = Yup.object().shape({
   name: Yup.string()
     .min(3, "Nome deve ter pelo menos 3 caracteres")
@@ -53,7 +51,19 @@ const RegisterSchema = Yup.object().shape({
     .required("Perfil é obrigatório"),
 });
 
-Dimensions.get("window");
+// Definição dos papéis com ícones
+const roles = [
+  {
+    value: UserRole.DOADOR,
+    label: "Quero doar",
+    icon: "volunteer-activism",
+  },
+  {
+    value: UserRole.BENEFICIARIO,
+    label: "Preciso de doações",
+    icon: "redeem",
+  },
+];
 
 const RegisterScreen: React.FC = () => {
   const navigation =
@@ -67,6 +77,7 @@ const RegisterScreen: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Efeito de animação ao carregar a tela
   useEffect(() => {
@@ -84,11 +95,26 @@ const RegisterScreen: React.FC = () => {
     ]).start();
   }, []);
 
+  // Animação de seleção
+  const animateSelection = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.03,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   // Efeito para mostrar erro
   useEffect(() => {
     if (error) {
       setErrorMessage(error);
-      // Animação de shake quando houver erro
       Animated.sequence([
         Animated.timing(shakeAnim, {
           toValue: 10,
@@ -133,16 +159,13 @@ const RegisterScreen: React.FC = () => {
       const success = await register(registerData);
 
       if (success) {
-        // Adicionando navegação para tela principal após registro bem-sucedido
         setTimeout(() => {
           if (registerData.role === UserRole.DOADOR) {
-            // Navegar para a tela principal de doador
             navigation.reset({
               index: 0,
               routes: [{ name: "DoadorApp" as never }],
             });
           } else if (registerData.role === UserRole.BENEFICIARIO) {
-            // Navegar para a tela principal de beneficiário
             navigation.reset({
               index: 0,
               routes: [{ name: "BeneficiarioApp" as never }],
@@ -150,7 +173,6 @@ const RegisterScreen: React.FC = () => {
           }
         }, 500);
       } else {
-        // Tratamento de erro
         let friendlyError = error;
 
         if (error?.includes("Bad Request")) {
@@ -202,11 +224,7 @@ const RegisterScreen: React.FC = () => {
           {/* Botão de voltar */}
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() =>
-              navigation.navigate(
-                AUTH_ROUTES.WELCOME as keyof AuthStackParamList
-              )
-            }
+            onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
             <MaterialIcons
@@ -249,7 +267,7 @@ const RegisterScreen: React.FC = () => {
             </Text>
           </Animated.View>
 
-          {/* Formulário de registro animado */}
+          {/* Formulário de registro */}
           <Animated.View
             style={[
               styles.formContainer,
@@ -453,58 +471,54 @@ const RegisterScreen: React.FC = () => {
                     </Text>
                   )}
 
-                  {/* Opções de perfil */}
+                  {/* Seleção de papel com cards */}
                   <View style={styles.roleContainer}>
                     <Text style={styles.roleLabel}>Você quer:</Text>
 
-                    <View style={styles.radioGroup}>
-                      <TouchableOpacity
-                        style={[
-                          styles.radioOption,
-                          values.role === UserRole.DOADOR &&
-                            styles.radioOptionSelected,
-                        ]}
-                        onPress={() => setFieldValue("role", UserRole.DOADOR)}
-                      >
-                        <View
-                          style={[
-                            styles.radioCircle,
-                            values.role === UserRole.DOADOR &&
-                              styles.radioCircleSelected,
-                          ]}
-                        >
-                          {values.role === UserRole.DOADOR && (
-                            <View style={styles.radioInner} />
-                          )}
-                        </View>
-                        <Text style={styles.radioLabel}>Quero doar</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.radioOption,
-                          values.role === UserRole.BENEFICIARIO &&
-                            styles.radioOptionSelected,
-                        ]}
-                        onPress={() =>
-                          setFieldValue("role", UserRole.BENEFICIARIO)
-                        }
-                      >
-                        <View
-                          style={[
-                            styles.radioCircle,
-                            values.role === UserRole.BENEFICIARIO &&
-                              styles.radioCircleSelected,
-                          ]}
-                        >
-                          {values.role === UserRole.BENEFICIARIO && (
-                            <View style={styles.radioInner} />
-                          )}
-                        </View>
-                        <Text style={styles.radioLabel}>
-                          Preciso de doações
-                        </Text>
-                      </TouchableOpacity>
+                    <View style={styles.roleRow}>
+                      {roles.map((role) => {
+                        const isSelected = values.role === role.value;
+                        return (
+                          <Animated.View
+                            key={role.value}
+                            style={{
+                              transform: [
+                                { scale: isSelected ? scaleAnim : 1 },
+                              ],
+                              flex: 1,
+                              maxWidth: "48%",
+                            }}
+                          >
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              style={[
+                                styles.roleCard,
+                                isSelected && styles.roleCardSelected,
+                              ]}
+                              onPress={() => {
+                                setFieldValue("role", role.value);
+                                animateSelection();
+                              }}
+                            >
+                              <View style={styles.roleIconContainer}>
+                                <MaterialIcons
+                                  name={role.icon}
+                                  size={24}
+                                  color={isSelected ? "#006E58" : "#666"}
+                                />
+                              </View>
+                              <Text
+                                style={[
+                                  styles.roleText,
+                                  isSelected && styles.roleTextSelected,
+                                ]}
+                              >
+                                {role.label}
+                              </Text>
+                            </TouchableOpacity>
+                          </Animated.View>
+                        );
+                      })}
                     </View>
 
                     {touched.role && errors.role && (
@@ -660,55 +674,57 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   roleContainer: {
-    marginVertical: 12,
+    marginVertical: 16,
   },
   roleLabel: {
     fontFamily: theme.fontFamily.primary,
     fontSize: 16,
+    fontWeight: "500",
     color: "#333",
     marginBottom: 12,
   },
-  radioGroup: {
-    marginBottom: 8,
-  },
-  radioOption: {
+  roleRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  roleCard: {
+    marginHorizontal: 4,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E0E7FF",
-    backgroundColor: "#F5F8FF",
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 130,
   },
-  radioOptionSelected: {
-    borderColor: theme.colors.primary.secondary,
-    backgroundColor: `${theme.colors.primary.secondary}10`,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  roleCardSelected: {
+    borderColor: "#006E58",
     borderWidth: 2,
-    borderColor: "#666",
-    marginRight: 10,
+    backgroundColor: "rgba(0,110,88,0.05)",
+  },
+  roleIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E0E7FF",
   },
-  radioCircleSelected: {
-    borderColor: theme.colors.primary.secondary,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.primary.secondary,
-  },
-  radioLabel: {
+  roleText: {
     fontFamily: theme.fontFamily.primary,
-    fontSize: 16,
+    fontSize: 14,
     color: "#333",
+    textAlign: "center",
+  },
+  roleTextSelected: {
+    color: "#006E58",
+    fontWeight: "500",
   },
   registerButtonContainer: {
     width: "100%",
