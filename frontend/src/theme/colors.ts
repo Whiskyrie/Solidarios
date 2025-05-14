@@ -7,8 +7,8 @@ export const colors = {
   // Cores Primárias
   primary: {
     main: "#173F5F", // Azul Marinho - cor principal
-    secondary: "#3CAEA3", // Verde Turquesa - cor secundária
-    accent: "#F6D55C", // Amarelo - cor de destaque
+    secondary: "#006E58", // Verde Turquesa - cor secundária
+    accent: "#B89700", // Amarelo - cor de destaque
   },
 
   // Cores Neutras
