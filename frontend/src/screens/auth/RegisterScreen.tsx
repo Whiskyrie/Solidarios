@@ -202,7 +202,11 @@ const RegisterScreen: React.FC = () => {
           {/* Botão de voltar */}
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() =>
+              navigation.navigate(
+                AUTH_ROUTES.WELCOME as keyof AuthStackParamList
+              )
+            }
             activeOpacity={0.7}
           >
             <MaterialIcons

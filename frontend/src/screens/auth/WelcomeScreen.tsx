@@ -62,10 +62,11 @@ const WelcomeScreen: React.FC = () => {
       />
 
       <LinearGradient
-        colors={["#D9EFFC", "#ffffff"]}
-        style={styles.gradient}
+        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+        locations={[0, 0.6, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+        style={styles.gradientBackground}
       >
         {/* Logo Animado */}
         <Animated.View
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradient: {
+  gradientBackground: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
