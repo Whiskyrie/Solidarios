@@ -18,6 +18,7 @@ import { Formik } from "formik";
 import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -227,8 +228,8 @@ const RegisterScreen: React.FC = () => {
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <MaterialIcons
-              name="arrow-back-ios"
+            <Ionicons
+              name="arrow-undo"
               size={22}
               color={theme.colors.primary.main}
             />
@@ -698,7 +699,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    height: 130,
+    height: 120,
   },
   roleCardSelected: {
     borderColor: "#006E58",
