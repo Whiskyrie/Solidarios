@@ -148,8 +148,8 @@ const LoginScreen: React.FC = () => {
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <MaterialIcons
-              name="arrow-back-ios"
+            <Ionicons
+              name="arrow-undo"
               size={22}
               color={theme.colors.primary.main}
             />
