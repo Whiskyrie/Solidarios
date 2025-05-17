@@ -42,11 +42,14 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+deploy-backend.ps1
+Deploy-DockerApp.ps1
+Docker-Manager.ps1
 docker-compose.yml
 docker-manager.sh
 Dockerfile.dev
-deploy-backend.sh
 .dockerignore
+Dockerfile
 docker-compose.override.yml
 docker-compose.prod.yml
 
