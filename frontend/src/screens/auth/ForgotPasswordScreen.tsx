@@ -279,28 +279,6 @@ const ForgotPasswordScreen: React.FC = () => {
               )}
             </Formik>
           </Animated.View>
-
-          {/* Link para login */}
-          <Animated.View
-            style={[
-              styles.loginContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.loginText}>Lembrou sua senha?</Text>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate(
-                  AUTH_ROUTES.LOGIN as keyof AuthStackParamList
-                )
-              }
-            >
-              <Text style={styles.loginLink}>Faça login</Text>
-            </TouchableOpacity>
-          </Animated.View>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -319,6 +297,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: Platform.OS === "ios" ? 60 : 80,
     paddingBottom: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
   backButton: {
     position: "absolute",
@@ -335,8 +315,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 85,
+    height: 85,
   },
   headerTextContainer: {
     alignItems: "center",
