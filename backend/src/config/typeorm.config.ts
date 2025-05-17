@@ -1,4 +1,4 @@
-// data-source.ts
+// src/config/typeorm.config.ts (modificado)
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { join } from 'path';
@@ -18,15 +18,25 @@ const migrationsPath = join(
   '*{.ts,.js}',
 );
 
+// Verifica se o SSL deve ser usado
+const useSSL = process.env.DB_SSL === 'true';
+
+// Configuração SSL condicional
+const sslConfig = useSSL
+  ? {
+      ssl: {
+        rejectUnauthorized: false, // Força aceitar certificados auto-assinados
+      },
+    }
+  : {};
+
 // Exporta o DataSource para ser usado pela CLI do TypeORM e pelo aplicativo
 export const AppDataSource = new DataSource({
   ...(process.env.DATABASE_URL
     ? {
         type: 'postgres',
         url: process.env.DATABASE_URL,
-        ssl: {
-          rejectUnauthorized: false, // Força aceitar certificados auto-assinados
-        },
+        ...sslConfig,
       }
     : {
         type: 'postgres',
@@ -35,9 +45,7 @@ export const AppDataSource = new DataSource({
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || '811920',
         database: process.env.DB_DATABASE || 'solidarios',
-        ssl: {
-          rejectUnauthorized: false, // Força aceitar certificados auto-assinados
-        },
+        ...sslConfig,
       }),
   entities: [entitiesPath],
   migrations: [migrationsPath],

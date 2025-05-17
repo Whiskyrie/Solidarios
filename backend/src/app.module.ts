@@ -1,4 +1,4 @@
-// src/app.module.ts
+// src/app.module.ts (modificado)
 import {
   Module,
   NestModule,
@@ -49,17 +49,25 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         // Verificar se existe uma DATABASE_URL definida
         const databaseUrl = configService.get<string>('DATABASE_URL');
 
-        // Configuração SSL personalizada para DigitalOcean
-        const sslConfig = {
-          ssl: true,
-          extra: {
-            ssl: {
-              rejectUnauthorized: false,
-            },
-          },
-        };
+        // Verificar se o SSL deve ser usado
+        const useSSL = configService.get<string>('DB_SSL', 'true') === 'true';
 
-        logger.log(`Usando configuração SSL: ${JSON.stringify(sslConfig)}`);
+        // Configuração SSL condicional baseada na variável de ambiente
+        const sslConfig = useSSL
+          ? {
+              ssl: true,
+              extra: {
+                ssl: {
+                  rejectUnauthorized: false,
+                },
+              },
+            }
+          : {};
+
+        logger.log(`Usando SSL: ${useSSL}`);
+        if (useSSL) {
+          logger.log(`Configuração SSL: ${JSON.stringify(sslConfig)}`);
+        }
 
         if (databaseUrl) {
           // Configuração com string de conexão completa
