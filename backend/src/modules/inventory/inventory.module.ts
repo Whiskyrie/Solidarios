@@ -3,15 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryService } from './inventory.service';
 import { InventoryController } from './inventory.controller';
 import { Inventory } from './entities/inventory.entity';
-import { ItemsModule } from '../items/items.module'; // Importa ItemsModule
+import { ItemsModule } from '../items/items.module';
+import { LoggingModule } from '../../common/logging/logging.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Inventory]), // Importa a entidade Inventory
-    ItemsModule, // Importa ItemsModule para usar ItemsService
-  ],
+  imports: [TypeOrmModule.forFeature([Inventory]), ItemsModule, LoggingModule],
   controllers: [InventoryController],
   providers: [InventoryService],
-  exports: [InventoryService], // Exporta InventoryService para uso em outros módulos
+  exports: [InventoryService],
 })
 export class InventoryModule {}

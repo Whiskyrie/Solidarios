@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { LoggingService } from './logging.service';
 import { LoggingInterceptor } from './logging.interceptor';
 import { RequestLoggingMiddleware } from '../middleware/request-logging.middleware';
+import { TypeOrmLoggerService } from './typeorm-logger'; // Certifique-se de importar
 
 /**
  * Módulo global para logging na aplicação
@@ -36,11 +37,12 @@ import { RequestLoggingMiddleware } from '../middleware/request-logging.middlewa
   providers: [
     LoggingService,
     RequestLoggingMiddleware,
+    TypeOrmLoggerService, // Adicione aqui
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
   ],
-  exports: [LoggingService, RequestLoggingMiddleware],
+  exports: [LoggingService, RequestLoggingMiddleware, TypeOrmLoggerService], // Adicione aqui também
 })
 export class LoggingModule {}

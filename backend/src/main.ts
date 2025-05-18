@@ -12,6 +12,7 @@ import {
 } from './common/config/cors.config';
 import { ConfigService } from '@nestjs/config';
 import { useContainer } from 'class-validator';
+import { LoggingService } from './common/logging/logging.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -39,8 +40,11 @@ async function bootstrap() {
     }),
   );
 
+  // Usar resolve() em vez de get() para LoggingService
+  const loggingService = await app.resolve(LoggingService);
+
   // Aplicar filtros e interceptores globais
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(loggingService));
   app.useGlobalInterceptors(
     new TransformResponseInterceptor(),
     new SanitizeInputInterceptor(),
@@ -64,6 +68,12 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   await app.listen(configService.get('PORT', 3000));
+
+  // Usuário optional: Logar informação de inicialização do servidor
+  loggingService.log(
+    `Aplicação iniciada na porta ${configService.get('PORT', 3000)}`,
+    'Bootstrap',
+  );
 }
 
 bootstrap().catch((err) => {
