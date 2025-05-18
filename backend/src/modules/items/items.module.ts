@@ -3,15 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ItemsService } from './items.service';
 import { ItemsController } from './items.controller';
 import { Item } from './entities/item.entity';
-import { UsersModule } from '../users/users.module'; // Importa UsersModule
+import { UsersModule } from '../users/users.module';
+import { LoggingModule } from '../../common/logging/logging.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Item]), // Importa a entidade Item
-    UsersModule, // Importa UsersModule para usar UsersService
-  ],
+  imports: [TypeOrmModule.forFeature([Item]), UsersModule, LoggingModule],
   controllers: [ItemsController],
   providers: [ItemsService],
-  exports: [ItemsService], // Exporta ItemsService se necessário para outros módulos
+  exports: [ItemsService],
 })
 export class ItemsModule {}

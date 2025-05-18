@@ -7,12 +7,10 @@ import { LoggingService } from './logging.service';
  * com o nome da classe definido automaticamente como contexto
  */
 export const Logger = createParamDecorator(
-  (data: string | undefined, ctx: ExecutionContext) => {
-    // Obter o provedor LoggingService do container
-    const loggingService = ctx
-      .switchToHttp()
-      .getRequest()
-      .app.get(LoggingService);
+  async (data: string | undefined, ctx: ExecutionContext) => {
+    // Obter o provedor LoggingService do container usando resolve
+    const request = ctx.switchToHttp().getRequest();
+    const loggingService = await request.app.resolve(LoggingService);
 
     // Se não houver contexto definido explicitamente, usar o nome da classe
     if (!data) {

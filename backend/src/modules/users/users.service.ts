@@ -13,25 +13,41 @@ import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 import * as bcrypt from 'bcrypt';
+import { LoggingService } from '../../common/logging/logging.service';
+import { LogMethod } from '../../common/logging/logger.decorator';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-  ) {}
+    private readonly logger: LoggingService,
+  ) {
+    this.logger.setContext('UsersService');
+  }
 
+  @LogMethod()
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: createUserDto.email },
-    });
+    this.logger.log(`Criando novo usuário com email: ${createUserDto.email}`);
 
-    if (existingUser) {
-      throw new ConflictException('Email já está em uso');
+    try {
+      const existingUser = await this.usersRepository.findOne({
+        where: { email: createUserDto.email },
+      });
+
+      if (existingUser) {
+        throw new ConflictException('Email já está em uso');
+      }
+
+      const user = this.usersRepository.create(createUserDto);
+      const savedUser = await this.usersRepository.save(user);
+
+      this.logger.log(`Usuário criado com sucesso: ${savedUser.id}`);
+      return savedUser;
+    } catch (error) {
+      this.logger.error(`Erro ao criar usuário: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const user = this.usersRepository.create(createUserDto);
-    return this.usersRepository.save(user);
   }
 
   // Método antigo sem paginação, mantido para compatibilidade
@@ -39,74 +55,157 @@ export class UsersService {
     return await this.usersRepository.find();
   }
 
-  // Novo método com paginação
+  @LogMethod()
   async findAllPaginated(
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<User>> {
-    const queryBuilder = this.usersRepository
-      .createQueryBuilder('user')
-      .orderBy('user.createdAt', pageOptionsDto.order)
-      .skip(pageOptionsDto.skip)
-      .take(pageOptionsDto.take);
+    try {
+      const queryBuilder = this.usersRepository.createQueryBuilder('user');
 
-    const itemCount = await queryBuilder.getCount();
-    const users = await queryBuilder.getMany();
+      queryBuilder
+        .orderBy('user.createdAt', pageOptionsDto.order)
+        .skip(pageOptionsDto.skip)
+        .take(pageOptionsDto.take);
 
-    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-    return new PageDto(users, pageMetaDto);
+      const itemCount = await queryBuilder.getCount();
+      const users = await queryBuilder.getMany();
+
+      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+
+      this.logger.debug(
+        `Retornando ${users.length} usuários (página ${pageOptionsDto.page})`,
+      );
+
+      return new PageDto(users, pageMetaDto);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar usuários paginados: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
+  @LogMethod()
   async findOne(id: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new NotFoundException(`Usuário com ID ${id} não encontrado`);
+    try {
+      const user = await this.usersRepository.findOne({ where: { id } });
+
+      if (!user) {
+        this.logger.warn(`Usuário não encontrado com ID: ${id}`);
+        throw new NotFoundException(`Usuário com ID ${id} não encontrado`);
+      } else {
+        this.logger.debug(`Usuário encontrado: ${id}`);
+      }
+
+      return user;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar usuário por ID: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-    return user;
   }
 
+  @LogMethod()
   async findByEmail(email: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { email } });
-    if (!user) {
-      throw new NotFoundException(`Usuário com email ${email} não encontrado`);
+    try {
+      const user = await this.usersRepository.findOne({ where: { email } });
+
+      if (!user) {
+        this.logger.debug(`Nenhum usuário encontrado com email: ${email}`);
+        throw new NotFoundException(
+          `Usuário com email ${email} não encontrado`,
+        );
+      } else {
+        this.logger.debug(`Usuário encontrado por email: ${email}`);
+      }
+
+      return user;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar usuário por email: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-    return user;
   }
 
+  @LogMethod()
   async findByResetToken(token: string): Promise<User> {
-    const users = await this.usersRepository.find();
-    for (const user of users) {
-      if (
-        user.resetPasswordToken &&
-        (await bcrypt.compare(token, user.resetPasswordToken))
-      ) {
-        return user;
+    try {
+      const users = await this.usersRepository.find();
+      for (const user of users) {
+        if (
+          user.resetPasswordToken &&
+          (await bcrypt.compare(token, user.resetPasswordToken))
+        ) {
+          this.logger.debug(
+            `Usuário encontrado por token de redefinição: ${user.id}`,
+          );
+          return user;
+        }
       }
+      this.logger.debug('Token de redefinição de senha inválido');
+      throw new NotFoundException('Token de redefinição não encontrado');
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar usuário por token de redefinição: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-    throw new NotFoundException('Token de redefinição não encontrado');
   }
 
+  @LogMethod()
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+    this.logger.log(`Atualizando usuário: ${id}`);
 
-    // Se estiver atualizando o email, verificar se já existe
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.usersRepository.findOne({
-        where: { email: updateUserDto.email },
-      });
+    try {
+      const user = await this.findOne(id);
 
-      if (existingUser) {
-        throw new ConflictException('Email já está em uso');
+      // Se estiver atualizando o email, verificar se já existe
+      if (updateUserDto.email && updateUserDto.email !== user.email) {
+        const existingUser = await this.usersRepository.findOne({
+          where: { email: updateUserDto.email },
+        });
+
+        if (existingUser) {
+          throw new ConflictException('Email já está em uso');
+        }
       }
+
+      // Atualizar os campos
+      Object.assign(user, updateUserDto);
+
+      const updatedUser = await this.usersRepository.save(user);
+
+      this.logger.debug(`Usuário atualizado com sucesso: ${id}`);
+      return updatedUser;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao atualizar usuário: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // Atualizar os campos
-    Object.assign(user, updateUserDto);
-
-    return this.usersRepository.save(user);
   }
 
+  @LogMethod()
   async remove(id: string): Promise<void> {
-    const user = await this.findOne(id);
-    await this.usersRepository.remove(user);
+    this.logger.log(`Removendo usuário: ${id}`);
+
+    try {
+      const user = await this.findOne(id);
+      await this.usersRepository.remove(user);
+      this.logger.log(`Usuário removido com sucesso: ${id}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao remover usuário: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }
