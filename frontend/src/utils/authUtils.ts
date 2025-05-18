@@ -1,9 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../api/api"; // Use a mesma instância do axios
-import { ApiResponse } from "../types/common.types";
 
 // URL base da API - deve corresponder à mesma URL usada em apiClient
-const API_BASE_URL = "https://solidarios-app-dwus7.ondigitalocean.app/api"; // Ajustar conforme necessário
 
 export const handleLoginSuccess = async (
   accessToken: string,

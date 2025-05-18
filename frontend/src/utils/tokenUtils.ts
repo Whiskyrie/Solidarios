@@ -4,9 +4,7 @@
  */
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// URL base da API
-const API_BASE_URL = "http://10.0.2.2:3000"; // Ajustar conforme necessário
+import { getApiBaseUrl } from "../api/api"; // Importe a função
 
 /**
  * Atualiza tokens usando o refresh token sem depender do módulo auth.ts
@@ -15,7 +13,7 @@ const API_BASE_URL = "http://10.0.2.2:3000"; // Ajustar conforme necessário
  */
 export const refreshTokens = async (refreshToken: string) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+    const response = await axios.post(`${getApiBaseUrl()}/auth/refresh`, {
       refreshToken,
     });
 
