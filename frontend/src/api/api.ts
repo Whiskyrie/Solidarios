@@ -12,7 +12,7 @@ const API_URLS = {
 // Define o tipo para o ambiente
 type ApiEnvironment = keyof typeof API_URLS;
 
-// Obter o ambiente padrão do arquivo .env ou usar CLOUD como fallback
+//  Obter o ambiente padrão do arquivo .env ou usar CLOUD como fallback
 const getDefaultEnvironment = (): ApiEnvironment => {
   const envValue = API_ENVIRONMENT?.toUpperCase();
   return envValue && envValue in API_URLS
