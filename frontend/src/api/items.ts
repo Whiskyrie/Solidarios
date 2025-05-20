@@ -74,10 +74,15 @@ const ItemsService = {
     donorId: string,
     pageOptions?: PageOptionsDto
   ): Promise<ItemsPage> => {
-    const response = await api.get<ItemsPage>(`/items/donor/${donorId}`, {
-      params: pageOptions,
-    });
-    return response.data;
+    try {
+      const response = await api.get(`/items/donor/${donorId}`, {
+        params: pageOptions,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar itens por doador:", error);
+      throw error;
+    }
   },
 
   /**

@@ -7,8 +7,6 @@ import {
   Item,
   CreateItemDto,
   UpdateItemDto,
-  ItemsPage,
-  ItemType,
   ItemStatus,
 } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
@@ -143,12 +141,13 @@ export const useItems = () => {
 
       try {
         const response = await ItemsService.getByDonor(donorId, pageOptions);
-        setItems(response.data);
+        setItems((prevItems) => [...prevItems, ...response.data]);
         setPagination({
           page: response.meta.page,
           totalPages: response.meta.pageCount,
           totalItems: response.meta.itemCount,
         });
+        setError(null);
         return response;
       } catch (err: any) {
         setError(err.message || "Erro ao buscar itens do doador");

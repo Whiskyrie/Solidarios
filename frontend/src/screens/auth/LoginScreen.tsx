@@ -35,7 +35,7 @@ const LoginSchema = Yup.object().shape({
     .required("Senha é obrigatória"),
 });
 
-const { width, height } = Dimensions.get("window");
+Dimensions.get("window");
 
 const LoginScreen: React.FC = () => {
   const navigation =

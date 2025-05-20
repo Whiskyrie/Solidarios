@@ -68,6 +68,26 @@ export class ItemsController {
     return this.itemsService.findAllPaginated(pageOptionsDto);
   }
 
+  @Get('donor/:donorId')
+  @ApiOperation({ summary: 'Listar itens por doador com paginação' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de itens do doador retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  getByDonor(
+    @Param('donorId', ParseUUIDPipe) donorId: string,
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Item>> {
+    return this.itemsService.findByDonorPaginated(donorId, pageOptionsDto);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar um item/doação pelo ID' })
   @ApiResponse({ status: 200, description: 'Item encontrado.' })
