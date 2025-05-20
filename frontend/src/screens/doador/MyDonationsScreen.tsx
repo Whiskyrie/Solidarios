@@ -1,26 +1,30 @@
 // src/screens/doador/MyDonationsScreen.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  ScrollView,
+  Animated,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { DoadorStackParamList } from "../../navigation/types";
+import { LinearGradient } from "expo-linear-gradient";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 // Componentes
 import {
   Typography,
-  Header,
   ItemCard,
   SearchBar,
   EmptyState,
   Loading,
   ErrorState,
-  Badge,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
@@ -52,6 +56,10 @@ const MyDonationsScreen: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [filteredItems, setFilteredItems] = useState<Item[]>([]);
 
+  // Refs para animações
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   // Carregar doações do usuário
   const loadDonations = useCallback(
     async (page = 1) => {
@@ -62,9 +70,22 @@ const MyDonationsScreen: React.FC = () => {
     [user, fetchItemsByDonor]
   );
 
-  // Carregar ao focar na tela
+  // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
       loadDonations();
     }, [loadDonations])
   );
@@ -141,122 +162,191 @@ const MyDonationsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
-      <Header
-        title="Minhas Doações"
-        subtitle={`Olá, ${user?.name?.split(" ")[0] || "Doador"}`}
-        backgroundColor={theme.colors.primary.secondary}
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
       />
+
+      <LinearGradient
+        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+        locations={[0, 0.3, 0.6]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        {/* Cabeçalho personalizado */}
+        <View style={styles.header}>
+          <Animated.View
+            style={[
+              styles.welcomeContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Typography
+              variant="h1"
+              style={styles.welcomeText}
+              color={theme.colors.primary.main}
+            >
+              Minhas Doações
+            </Typography>
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.neutral.darkGray}
+            >
+              Olá, {user?.name?.split(" ")[0] || "Doador"}
+            </Typography>
+          </Animated.View>
+        </View>
+      </LinearGradient>
 
       {/* Conteúdo */}
       <View style={styles.content}>
-        {/* Barra de pesquisa */}
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Buscar doações..."
-          containerStyle={styles.searchBar}
-        />
-
-        {/* Filtros */}
-        <View style={styles.filtersContainer}>
-          <ScrollableFilters
-            filters={STATUS_FILTERS}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
+        {/* Barra de pesquisa animada */}
+        <Animated.View
+          style={[
+            styles.searchContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Buscar doações..."
+            containerStyle={styles.searchBar}
           />
-        </View>
+        </Animated.View>
 
-        {/* Lista de doações */}
-        <FlatList
-          data={filteredItems}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ItemCard
-              item={item}
-              onPress={() =>
-                navigation.navigate(DOADOR_ROUTES.DONATION_DETAIL, {
-                  id: item.id,
-                })
-              }
-              showDonor={false}
-            />
-          )}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={
-            <EmptyState
-              title="Nenhuma doação encontrada"
-              description={
-                searchQuery
-                  ? "Tente ajustar sua busca ou filtros"
-                  : "Você ainda não tem doações registradas"
-              }
-              actionLabel="Fazer uma doação"
-              onAction={navigateToNewDonation}
-            />
-          }
-        />
+        {/* Filtros com animação */}
+        <Animated.View
+          style={[
+            styles.filtersContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersScrollContent}
+          >
+            {STATUS_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter.value}
+                onPress={() => setActiveFilter(filter.value)}
+                activeOpacity={0.7}
+              >
+                {activeFilter === filter.value ? (
+                  <LinearGradient
+                    colors={["#173F5F", "#006E58"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.activeFilterItem}
+                  >
+                    <Typography
+                      variant="bodySecondary"
+                      color={theme.colors.neutral.white}
+                    >
+                      {filter.label}
+                    </Typography>
+                  </LinearGradient>
+                ) : (
+                  <View style={styles.filterItem}>
+                    <Typography
+                      variant="bodySecondary"
+                      color={theme.colors.neutral.darkGray}
+                    >
+                      {filter.label}
+                    </Typography>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
+
+        {/* Lista de doações com animação */}
+        <Animated.View
+          style={[
+            styles.listContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <FlatList
+            data={filteredItems}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ItemCard
+                item={item}
+                onPress={() =>
+                  navigation.navigate(DOADOR_ROUTES.DONATION_DETAIL, {
+                    id: item.id,
+                  })
+                }
+                showDonor={false}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[theme.colors.primary.secondary]}
+                tintColor={theme.colors.primary.secondary}
+              />
+            }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={
+              <EmptyState
+                title="Nenhuma doação encontrada"
+                description={
+                  searchQuery
+                    ? "Tente ajustar sua busca ou filtros"
+                    : "Você ainda não tem doações registradas"
+                }
+                actionLabel="Fazer uma doação"
+                onAction={navigateToNewDonation}
+              />
+            }
+          />
+        </Animated.View>
 
         {/* Botão flutuante para nova doação */}
         <TouchableOpacity
-          style={styles.floatingButton}
+          style={styles.floatingButtonContainer}
           onPress={navigateToNewDonation}
+          activeOpacity={0.8}
         >
-          <Typography
-            variant="bodySecondary"
-            color={theme.colors.neutral.white}
+          <LinearGradient
+            colors={["#173F5F", "#006E58"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.floatingButton}
           >
-            + Nova Doação
-          </Typography>
+            <MaterialIcons name="add" size={20} color="#fff" />
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.neutral.white}
+              style={styles.buttonText}
+            >
+              Nova Doação
+            </Typography>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </View>
-  );
-};
-
-// Componente de filtros horizontais com scroll
-const ScrollableFilters = ({
-  filters,
-  activeFilter,
-  onFilterChange,
-}: {
-  filters: { label: string; value: string }[];
-  activeFilter: string;
-  onFilterChange: (value: string) => void;
-}) => {
-  return (
-    <FlatList
-      data={filters}
-      keyExtractor={(item) => item.value}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[
-            styles.filterItem,
-            activeFilter === item.value && styles.activeFilterItem,
-          ]}
-          onPress={() => onFilterChange(item.value)}
-        >
-          <Typography
-            variant="bodySecondary"
-            color={
-              activeFilter === item.value
-                ? theme.colors.primary.secondary
-                : theme.colors.neutral.darkGray
-            }
-          >
-            {item.label}
-          </Typography>
-        </TouchableOpacity>
-      )}
-      contentContainerStyle={styles.filtersScrollContent}
-    />
   );
 };
 
@@ -265,42 +355,93 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.neutral.white,
   },
+  headerGradient: {
+    paddingTop:
+      Platform.OS === "ios" ? 60 : 40 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    ...theme.shadows.medium,
+  },
+  header: {
+    paddingHorizontal: theme.spacing.m,
+  },
+  welcomeContainer: {
+    marginBottom: theme.spacing.s,
+  },
+  welcomeText: {
+    fontWeight: "bold",
+    fontSize: 28,
+    marginBottom: 5,
+  },
   content: {
     flex: 1,
+    marginTop: -20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingHorizontal: theme.spacing.s,
+  },
+  searchContainer: {
+    marginTop: theme.spacing.s,
   },
   searchBar: {
     marginVertical: theme.spacing.s,
+    borderRadius: 12,
+    ...theme.shadows.small,
   },
   filtersContainer: {
     marginBottom: theme.spacing.xs,
   },
   filtersScrollContent: {
     paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.xxs,
   },
   filterItem: {
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xxs,
+    paddingVertical: theme.spacing.xs,
     marginRight: theme.spacing.xs,
-    borderRadius: theme.borderRadius.medium,
-    backgroundColor: theme.colors.neutral.lightGray,
+    borderRadius: 12,
+    backgroundColor: "#F5F8FF",
+    borderWidth: 1,
+    borderColor: "#E0E7FF",
+    ...theme.shadows.small,
   },
   activeFilterItem: {
-    backgroundColor: theme.colors.notifications.info.background,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    marginRight: theme.spacing.xs,
+    borderRadius: 12,
+    ...theme.shadows.small,
+  },
+  listContainer: {
+    flex: 1,
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: theme.spacing.xl + 60, // Espaço extra para o botão flutuante
+    paddingBottom: theme.spacing.xl + 60,
   },
-  floatingButton: {
+  floatingButtonContainer: {
     position: "absolute",
     right: theme.spacing.m,
     bottom: theme.spacing.m,
-    backgroundColor: theme.colors.primary.secondary,
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  floatingButton: {
+    flexDirection: "row",
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.round,
-    ...theme.shadows.medium,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    marginLeft: 5,
+    fontWeight: "600",
   },
 });
 

@@ -118,6 +118,38 @@ export class ItemsService {
   }
 
   @LogMethod()
+  async findByDonorPaginated(
+    donorId: string,
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Item>> {
+    this.logger.debug(`Buscando itens do doador ${donorId}`);
+
+    try {
+      const queryBuilder = this.itemsRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.donor', 'donor')
+        .leftJoinAndSelect('item.category', 'category')
+        .where('item.donorId = :donorId', { donorId })
+        .orderBy('item.receivedDate', pageOptionsDto.order)
+        .skip(pageOptionsDto.skip)
+        .take(pageOptionsDto.take);
+
+      const itemCount = await queryBuilder.getCount();
+      const items = await queryBuilder.getMany();
+
+      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+
+      return new PageDto(items, pageMetaDto);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  @LogMethod()
   async findOne(id: string): Promise<Item> {
     this.logger.debug(`Buscando item com ID: ${id}`);
 
