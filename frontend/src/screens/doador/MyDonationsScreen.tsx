@@ -103,11 +103,14 @@ const MyDonationsScreen: React.FC = () => {
     }, [loadDonations, fadeAnim, slideAnim])
   );
 
-  // Aplicar filtros e busca aos itens
   useEffect(() => {
-    if (!items) return;
+    // Se items não existir ou não for um array, não prosseguir
+    if (!items || !Array.isArray(items)) {
+      setFilteredItems([]);
+      return;
+    }
 
-    let result = [...items];
+    let result = Array.isArray(items) ? [...items] : [];
 
     // Aplicar filtro de status
     if (activeFilter !== "all") {
@@ -120,8 +123,10 @@ const MyDonationsScreen: React.FC = () => {
       result = result.filter(
         (item) =>
           item.description.toLowerCase().includes(query) ||
-          item.category?.name.toLowerCase().includes(query) ||
-          item.conservationState?.toLowerCase().includes(query)
+          (item.category?.name &&
+            item.category.name.toLowerCase().includes(query)) ||
+          (item.conservationState &&
+            item.conservationState.toLowerCase().includes(query))
       );
     }
 
