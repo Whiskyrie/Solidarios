@@ -7,6 +7,7 @@ import {
   CreateItemDto,
   UpdateItemDto,
   ItemsPage,
+  ItemsApiResponse,
 } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
 
@@ -73,11 +74,13 @@ const ItemsService = {
   getByDonor: async (
     donorId: string,
     pageOptions?: PageOptionsDto
-  ): Promise<ItemsPage> => {
+  ): Promise<ItemsApiResponse> => {
     try {
-      const response = await api.get(`/items/donor/${donorId}`, {
+      const response = await api.get<any>(`/items/donor/${donorId}`, {
         params: pageOptions,
       });
+
+      // Retornar os dados brutos para serem processados pelo hook
       return response.data;
     } catch (error) {
       console.error("Erro ao buscar itens por doador:", error);

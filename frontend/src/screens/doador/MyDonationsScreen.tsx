@@ -67,20 +67,30 @@ const MyDonationsScreen: React.FC = () => {
     async (page = 1) => {
       if (user) {
         try {
+          console.log(
+            `Carregando doações para o usuário ${user.id}, página ${page}`
+          );
+
           // Definir um número razoável de itens por página
-          await fetchItemsByDonor(user.id, {
+          const response = await fetchItemsByDonor(user.id, {
             page,
             take: 10,
             order: Order.DESC, // Mostrar mais recentes primeiro
           });
+
+          console.log("Resposta do fetchItemsByDonor:", response);
+          console.log("Estado atual de items após carregar:", items);
+          console.log(
+            "Estado atual de filteredItems após carregar:",
+            filteredItems
+          );
         } catch (error) {
           console.error("Erro ao carregar doações:", error);
         }
       }
     },
-    [user, fetchItemsByDonor]
+    [user, fetchItemsByDonor] // Adicionar items e filteredItems como dependências
   );
-
   // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
@@ -104,17 +114,25 @@ const MyDonationsScreen: React.FC = () => {
   );
 
   useEffect(() => {
+    console.log("useEffect de filtro - items:", items);
+    console.log("useEffect de filtro - filteredItems atual:", filteredItems);
+
     // Se items não existir ou não for um array, não prosseguir
     if (!items || !Array.isArray(items)) {
+      console.log(
+        "items não é um array válido, definindo filteredItems como []"
+      );
       setFilteredItems([]);
       return;
     }
 
-    let result = Array.isArray(items) ? [...items] : [];
+    let result = [...items];
+    console.log("Resultado inicial:", result);
 
     // Aplicar filtro de status
     if (activeFilter !== "all") {
       result = result.filter((item) => item.status === activeFilter);
+      console.log("Após filtro de status:", result);
     }
 
     // Aplicar busca
@@ -128,8 +146,10 @@ const MyDonationsScreen: React.FC = () => {
           (item.conservationState &&
             item.conservationState.toLowerCase().includes(query))
       );
+      console.log("Após filtro de busca:", result);
     }
 
+    console.log("Definindo filteredItems como:", result);
     setFilteredItems(result);
   }, [items, activeFilter, searchQuery]);
 
@@ -167,7 +187,12 @@ const MyDonationsScreen: React.FC = () => {
   };
 
   // Se estiver carregando inicialmente, mostrar loading
-  if (isLoading && !refreshing && !items.length) {
+  if (
+    isLoading &&
+    !refreshing &&
+    (!items || !Array.isArray(items) || items.length === 0) &&
+    !filteredItems.length
+  ) {
     return (
       <View style={styles.container}>
         <StatusBar
@@ -402,7 +427,12 @@ const MyDonationsScreen: React.FC = () => {
                 showDonor={false}
               />
             )}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={
+              (styles.listContent,
+              filteredItems.length === 0
+                ? { flex: 1, justifyContent: "center" }
+                : {})
+            }
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -594,8 +624,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
   },
   emptyState: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xl,
+    flex: 1,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.m,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
