@@ -10,6 +10,7 @@ import {
   ItemStatus,
 } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
+import { extractItemsData, extractItemsMeta } from "../utils/typeGuards";
 
 // Hook para gerenciamento de itens
 export const useItems = () => {
@@ -146,40 +147,44 @@ export const useItems = () => {
       setError(null);
 
       try {
+        console.log(
+          `Buscando itens do doador ${donorId} com opções:`,
+          pageOptions
+        );
         const response = await ItemsService.getByDonor(donorId, pageOptions);
+        console.log("Resposta da API:", response);
 
-        // Verificar se a resposta possui dados válidos
-        if (!response || !response.data) {
-          throw new Error("Resposta inválida do servidor");
-        }
+        // Usar os type guards para extrair os dados com segurança
+        const items = extractItemsData(response);
+        console.log("Itens extraídos:", items);
 
-        // Garantir que response.data seja um array
-        const responseData = Array.isArray(response.data) ? response.data : [];
+        const meta = extractItemsMeta(response);
+        console.log("Metadados extraídos:", meta);
 
         // Se for a primeira página, substituir os itens
-        // Se for página subsequente, acumular os itens
         if (pageOptions?.page === 1 || !pageOptions?.page) {
-          setItems(responseData);
+          setItems(items);
         } else {
-          // Garantir que os items atuais são um array antes de concatenar
+          // Concatenar com itens existentes
           setItems((prevItems) =>
-            Array.isArray(prevItems)
-              ? [...prevItems, ...responseData]
-              : responseData
+            Array.isArray(prevItems) ? [...prevItems, ...items] : items
           );
         }
 
-        // Atualizar dados de paginação se existirem
-        if (response.meta) {
-          setPagination({
-            page: response.meta.page || 1,
-            totalPages: response.meta.pageCount || 1,
-            totalItems: response.meta.itemCount || 0,
-          });
-        }
+        // Atualizar a paginação
+        setPagination({
+          page: meta.page,
+          totalPages: meta.pageCount,
+          totalItems: meta.itemCount,
+        });
 
-        return response;
+        // Retornar formato consistente
+        return {
+          data: items,
+          meta: meta,
+        };
       } catch (err: any) {
+        console.error("Erro ao buscar itens do doador:", err);
         const errorMessage =
           err.response?.data?.message ||
           err.message ||
