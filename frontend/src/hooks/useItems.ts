@@ -40,18 +40,24 @@ export const useItems = () => {
 
     try {
       const response = await ItemsService.getAll(pageOptions);
-      setItems(response.data);
+
+      // Garantir que response.data seja um array
+      const responseData = Array.isArray(response.data) ? response.data : [];
+      setItems(responseData);
+
+      // Verificar se meta existe antes de acessar suas propriedades
       setPagination({
-        page: response.meta.page,
-        totalPages: response.meta.pageCount,
-        totalItems: response.meta.itemCount,
+        page: response.meta?.page || 1,
+        totalPages: response.meta?.pageCount || 1,
+        totalItems: response.meta?.itemCount || 0,
       });
+
       return response;
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message || err.message || "Erro ao buscar itens";
       setError(errorMessage);
-      throw new Error(errorMessage); // Lançar erro para ser capturado pelo componente
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +139,7 @@ export const useItems = () => {
     }
   }, []);
 
-  // Função para obter itens por doador - CORRIGIDA
+  // Função para obter itens por doador
   const fetchItemsByDonor = useCallback(
     async (donorId: string, pageOptions?: PageOptionsDto) => {
       setIsLoading(true);
@@ -147,20 +153,30 @@ export const useItems = () => {
           throw new Error("Resposta inválida do servidor");
         }
 
+        // Garantir que response.data seja um array
+        const responseData = Array.isArray(response.data) ? response.data : [];
+
         // Se for a primeira página, substituir os itens
         // Se for página subsequente, acumular os itens
         if (pageOptions?.page === 1 || !pageOptions?.page) {
-          setItems(response.data);
+          setItems(responseData);
         } else {
-          setItems((prevItems) => [...prevItems, ...response.data]);
+          // Garantir que os items atuais são um array antes de concatenar
+          setItems((prevItems) =>
+            Array.isArray(prevItems)
+              ? [...prevItems, ...responseData]
+              : responseData
+          );
         }
 
-        // Atualizar dados de paginação
-        setPagination({
-          page: response.meta.page,
-          totalPages: response.meta.pageCount,
-          totalItems: response.meta.itemCount,
-        });
+        // Atualizar dados de paginação se existirem
+        if (response.meta) {
+          setPagination({
+            page: response.meta.page || 1,
+            totalPages: response.meta.pageCount || 1,
+            totalItems: response.meta.itemCount || 0,
+          });
+        }
 
         return response;
       } catch (err: any) {
