@@ -1,5 +1,5 @@
 // MyDonationsScreen.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Animated,
   StatusBar,
   Platform,
+  Text,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -57,6 +58,7 @@ const MyDonationsScreen: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [filteredItems, setFilteredItems] = useState<Item[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -72,25 +74,24 @@ const MyDonationsScreen: React.FC = () => {
           );
 
           // Definir um número razoável de itens por página
-          const response = await fetchItemsByDonor(user.id, {
+          await fetchItemsByDonor(user.id, {
             page,
             take: 10,
             order: Order.DESC, // Mostrar mais recentes primeiro
           });
 
-          console.log("Resposta do fetchItemsByDonor:", response);
-          console.log("Estado atual de items após carregar:", items);
-          console.log(
-            "Estado atual de filteredItems após carregar:",
-            filteredItems
-          );
+          // Marcar que os dados foram carregados (independente do resultado)
+          setDataLoaded(true);
         } catch (error) {
           console.error("Erro ao carregar doações:", error);
+          // Mesmo em caso de erro, consideramos que os dados foram "carregados"
+          setDataLoaded(true);
         }
       }
     },
-    [user, fetchItemsByDonor] // Adicionar items e filteredItems como dependências
+    [user, fetchItemsByDonor]
   );
+
   // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
@@ -113,26 +114,19 @@ const MyDonationsScreen: React.FC = () => {
     }, [loadDonations, fadeAnim, slideAnim])
   );
 
+  // Filtragem de itens
   useEffect(() => {
-    console.log("useEffect de filtro - items:", items);
-    console.log("useEffect de filtro - filteredItems atual:", filteredItems);
-
     // Se items não existir ou não for um array, não prosseguir
     if (!items || !Array.isArray(items)) {
-      console.log(
-        "items não é um array válido, definindo filteredItems como []"
-      );
       setFilteredItems([]);
       return;
     }
 
     let result = [...items];
-    console.log("Resultado inicial:", result);
 
     // Aplicar filtro de status
     if (activeFilter !== "all") {
       result = result.filter((item) => item.status === activeFilter);
-      console.log("Após filtro de status:", result);
     }
 
     // Aplicar busca
@@ -146,10 +140,8 @@ const MyDonationsScreen: React.FC = () => {
           (item.conservationState &&
             item.conservationState.toLowerCase().includes(query))
       );
-      console.log("Após filtro de busca:", result);
     }
 
-    console.log("Definindo filteredItems como:", result);
     setFilteredItems(result);
   }, [items, activeFilter, searchQuery]);
 
@@ -186,45 +178,47 @@ const MyDonationsScreen: React.FC = () => {
     }
   };
 
-  // Se estiver carregando inicialmente, mostrar loading
-  if (
-    isLoading &&
-    !refreshing &&
-    (!items || !Array.isArray(items) || items.length === 0) &&
-    !filteredItems.length
-  ) {
+  // Componente de cabeçalho comum
+  const Header = () => (
+    <>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
+      <LinearGradient
+        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+        locations={[0, 0.3, 0.6]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <View style={styles.welcomeContainer}>
+            <Typography
+              variant="h1"
+              style={styles.welcomeText}
+              color={theme.colors.primary.main}
+            >
+              Minhas Doações
+            </Typography>
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.neutral.darkGray}
+            >
+              Olá, {user?.name?.split(" ")[0] || "Doador"}
+            </Typography>
+          </View>
+        </View>
+      </LinearGradient>
+    </>
+  );
+
+  // Estado de carregamento inicial
+  if (isLoading && !dataLoaded && !refreshing) {
     return (
       <View style={styles.container}>
-        <StatusBar
-          barStyle="dark-content"
-          backgroundColor="transparent"
-          translucent
-        />
-        <LinearGradient
-          colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-          locations={[0, 0.3, 0.6]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.header}>
-            <View style={styles.welcomeContainer}>
-              <Typography
-                variant="h1"
-                style={styles.welcomeText}
-                color={theme.colors.primary.main}
-              >
-                Minhas Doações
-              </Typography>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Olá, {user?.name?.split(" ")[0] || "Doador"}
-              </Typography>
-            </View>
-          </View>
-        </LinearGradient>
+        <Header />
         <View style={styles.loadingContainer}>
           <Loading visible={true} message="Buscando suas doações..." />
         </View>
@@ -232,40 +226,11 @@ const MyDonationsScreen: React.FC = () => {
     );
   }
 
-  // Se houver erro, mostrar tela de erro
+  // Estado de erro
   if (error) {
     return (
       <View style={styles.container}>
-        <StatusBar
-          barStyle="dark-content"
-          backgroundColor="transparent"
-          translucent
-        />
-        <LinearGradient
-          colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-          locations={[0, 0.3, 0.6]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.header}>
-            <View style={styles.welcomeContainer}>
-              <Typography
-                variant="h1"
-                style={styles.welcomeText}
-                color={theme.colors.primary.main}
-              >
-                Minhas Doações
-              </Typography>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Olá, {user?.name?.split(" ")[0] || "Doador"}
-              </Typography>
-            </View>
-          </View>
-        </LinearGradient>
+        <Header />
         <View style={styles.content}>
           <ErrorState
             title="Erro ao carregar doações"
@@ -290,79 +255,50 @@ const MyDonationsScreen: React.FC = () => {
     );
   }
 
+  // Renderiza EmptyState
+  const NoItemsView = () => (
+    <View style={styles.emptyStateContainer}>
+      <EmptyState
+        title="Nenhuma doação encontrada"
+        description={
+          searchQuery
+            ? "Tente ajustar sua busca ou filtros"
+            : "Você ainda não tem doações registradas. Que tal começar agora?"
+        }
+        icon={
+          <View style={styles.emptyStateIconContainer}>
+            <MaterialIcons
+              name={searchQuery ? "search-off" : "volunteer-activism"}
+              size={80}
+              color={theme.colors.primary.secondary}
+            />
+          </View>
+        }
+        actionLabel="Fazer uma doação"
+        onAction={navigateToNewDonation}
+      />
+    </View>
+  );
+
+  // UI principal
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="transparent"
-        translucent
-      />
-
-      <LinearGradient
-        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-        locations={[0, 0.3, 0.6]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        {/* Cabeçalho personalizado */}
-        <View style={styles.header}>
-          <Animated.View
-            style={[
-              styles.welcomeContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Typography
-              variant="h1"
-              style={styles.welcomeText}
-              color={theme.colors.primary.main}
-            >
-              Minhas Doações
-            </Typography>
-            <Typography
-              variant="bodySecondary"
-              color={theme.colors.neutral.darkGray}
-            >
-              Olá, {user?.name?.split(" ")[0] || "Doador"}
-            </Typography>
-          </Animated.View>
-        </View>
-      </LinearGradient>
+      <Header />
 
       {/* Conteúdo */}
       <View style={styles.content}>
-        {/* Barra de pesquisa animada */}
-        <Animated.View
-          style={[
-            styles.searchContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        {/* Barra de pesquisa */}
+        <View style={styles.searchContainer}>
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Buscar doações..."
             containerStyle={styles.searchBar}
           />
-        </Animated.View>
+        </View>
 
-        {/* Filtros com animação */}
-        <Animated.View
-          style={[
-            styles.filtersContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        {/* Filtros */}
+        <View style={styles.filtersContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -401,18 +337,12 @@ const MyDonationsScreen: React.FC = () => {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </Animated.View>
+        </View>
 
-        {/* Lista de doações com animação */}
-        <Animated.View
-          style={[
-            styles.listContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        {/* Visualização do estado vazio com verificação simplificada */}
+        {dataLoaded && filteredItems.length === 0 ? (
+          <NoItemsView />
+        ) : (
           <FlatList
             data={filteredItems}
             keyExtractor={(item) => item.id}
@@ -427,12 +357,10 @@ const MyDonationsScreen: React.FC = () => {
                 showDonor={false}
               />
             )}
-            contentContainerStyle={
-              (styles.listContent,
-              filteredItems.length === 0
-                ? { flex: 1, justifyContent: "center" }
-                : {})
-            }
+            contentContainerStyle={[
+              styles.listContent,
+              filteredItems.length === 0 && styles.emptyListContent,
+            ]}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -450,30 +378,9 @@ const MyDonationsScreen: React.FC = () => {
                 </View>
               ) : null
             }
-            ListEmptyComponent={
-              <EmptyState
-                title="Nenhuma doação encontrada"
-                description={
-                  searchQuery
-                    ? "Tente ajustar sua busca ou filtros"
-                    : "Você ainda não tem doações registradas. Que tal começar agora?"
-                }
-                icon={
-                  <View style={styles.emptyStateIconContainer}>
-                    <MaterialIcons
-                      name={searchQuery ? "search-off" : "volunteer-activism"}
-                      size={80}
-                      color={theme.colors.primary.secondary}
-                    />
-                  </View>
-                }
-                actionLabel="Fazer uma doação"
-                onAction={navigateToNewDonation}
-                style={styles.emptyState}
-              />
-            }
+            ListEmptyComponent={NoItemsView}
           />
-        </Animated.View>
+        )}
 
         {/* Botão flutuante para nova doação */}
         <TouchableOpacity
@@ -572,6 +479,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: theme.spacing.xl + 60,
   },
+  emptyListContent: {
+    flexGrow: 1,
+    minHeight: 500,
+    paddingTop: 100,
+    justifyContent: "center",
+  },
   loadingMoreContainer: {
     paddingVertical: theme.spacing.m,
     alignItems: "center",
@@ -623,12 +536,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: theme.spacing.m,
   },
-  emptyState: {
+  emptyStateContainer: {
     flex: 1,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.m,
+    minHeight: 500,
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: theme.spacing.xl,
   },
 });
 
