@@ -133,7 +133,7 @@ export const useItems = () => {
     }
   }, []);
 
-  // Função para obter itens por doador
+  // Função para obter itens por doador - CORRIGIDA
   const fetchItemsByDonor = useCallback(
     async (donorId: string, pageOptions?: PageOptionsDto) => {
       setIsLoading(true);
@@ -141,16 +141,34 @@ export const useItems = () => {
 
       try {
         const response = await ItemsService.getByDonor(donorId, pageOptions);
-        setItems((prevItems) => [...prevItems, ...response.data]);
+
+        // Verificar se a resposta possui dados válidos
+        if (!response || !response.data) {
+          throw new Error("Resposta inválida do servidor");
+        }
+
+        // Se for a primeira página, substituir os itens
+        // Se for página subsequente, acumular os itens
+        if (pageOptions?.page === 1 || !pageOptions?.page) {
+          setItems(response.data);
+        } else {
+          setItems((prevItems) => [...prevItems, ...response.data]);
+        }
+
+        // Atualizar dados de paginação
         setPagination({
           page: response.meta.page,
           totalPages: response.meta.pageCount,
           totalItems: response.meta.itemCount,
         });
-        setError(null);
+
         return response;
       } catch (err: any) {
-        setError(err.message || "Erro ao buscar itens do doador");
+        const errorMessage =
+          err.response?.data?.message ||
+          err.message ||
+          "Erro ao buscar itens do doador";
+        setError(errorMessage);
         return null;
       } finally {
         setIsLoading(false);
