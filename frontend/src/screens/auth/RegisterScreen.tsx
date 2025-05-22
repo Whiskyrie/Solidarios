@@ -25,6 +25,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
+import { maskPhone } from "../../utils/authUtils";
 
 // Esquema de validação
 const RegisterSchema = Yup.object().shape({
@@ -34,8 +35,8 @@ const RegisterSchema = Yup.object().shape({
   email: Yup.string().email("Email inválido").required("Email é obrigatório"),
   phone: Yup.string()
     .matches(
-      /^\(?[1-9]{2}\)? ?(?:9[1-9]|[2-9])[0-9]{3}-?[0-9]{4}$/,
-      "Formato de telefone inválido"
+      /^\(\d{2}\) \d{5}-\d{4}$/,
+      "Formato de telefone inválido. Use: (99) 99999-9999"
     )
     .required("Telefone é obrigatório"),
   address: Yup.string()
@@ -369,7 +370,10 @@ const RegisterScreen: React.FC = () => {
                       placeholderTextColor="#999"
                       keyboardType="phone-pad"
                       value={values.phone}
-                      onChangeText={handleChange("phone")}
+                      onChangeText={(text) => {
+                        const formattedPhone = maskPhone(text);
+                        setFieldValue("phone", formattedPhone);
+                      }}
                       onBlur={handleBlur("phone")}
                     />
                   </View>

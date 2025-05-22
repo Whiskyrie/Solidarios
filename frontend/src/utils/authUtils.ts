@@ -61,3 +61,27 @@ export const hasValidToken = async (): Promise<boolean> => {
   const token = await AsyncStorage.getItem("@auth_token");
   return token !== null;
 };
+
+export const maskPhone = (value: string) => {
+  // Remove todos os caracteres não-numéricos
+  let cleaned = value.replace(/\D/g, "");
+
+  // Limita a 11 dígitos (DDD + 9 dígitos)
+  cleaned = cleaned.slice(0, 11);
+
+  // Aplica a máscara
+  let formatted = cleaned;
+
+  if (cleaned.length > 2) {
+    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+  }
+
+  if (cleaned.length > 7) {
+    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(
+      2,
+      7
+    )}-${cleaned.slice(7)}`;
+  }
+
+  return formatted;
+};
