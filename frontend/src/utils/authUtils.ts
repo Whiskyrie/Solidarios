@@ -85,6 +85,7 @@ export const maskPhone = (value: string) => {
 
   return formatted;
 };
+<<<<<<< HEAD
 
 export const maskCpf = (value: string) => {
   // Remove todos os caracteres não-numéricos
@@ -110,3 +111,5 @@ export const maskCpf = (value: string) => {
 
   return formatted;
 };
+=======
+>>>>>>> 50bf762 (feat(RegisterScreen): adicionar máscara para formatação de telefone e melhorar validação)
