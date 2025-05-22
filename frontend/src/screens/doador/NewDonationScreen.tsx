@@ -42,9 +42,31 @@ import { useItems } from "../../hooks/useItems";
 import { useCategories } from "../../hooks/useCategories";
 
 // Tipos e rotas
-import { ItemType } from "../../types/items.types";
+import { CreateItemDto, ItemType } from "../../types/items.types";
 import { DOADOR_ROUTES } from "../../navigation/routes";
 import { DoadorNewDonationStackParamList } from "../../navigation/types";
+
+// Definindo interface para valores do formulário
+interface DonationFormValues {
+  type: ItemType;
+  description: string;
+  conservationState: string;
+  size: string;
+  categoryId: string;
+  photos: Array<{
+    uri: string;
+    name: string;
+    type: string;
+  }>;
+}
+
+// Interface para notificação
+interface NotificationState {
+  visible: boolean;
+  type: "success" | "error";
+  message: string;
+  description?: string;
+}
 
 // Validação do formulário
 const DonationSchema = Yup.object().shape({
