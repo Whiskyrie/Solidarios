@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { BeneficiarioStackParamList } from "../../navigation/types";
@@ -45,17 +39,20 @@ const MyReceiptsScreen: React.FC = () => {
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredDistributions, setFilteredDistributions] =
-    useState(distributions);
+  const [filteredDistributions, setFilteredDistributions] = useState<any[]>([]);
 
   // Carregar recebimentos do usuário
   const loadReceipts = useCallback(
     async (page = 1) => {
-      if (user) {
+      if (user?.id) {
+        console.log(
+          "[MyReceiptsScreen] Carregando recebimentos para usuário:",
+          user.id
+        );
         await fetchDistributionsByBeneficiary(user.id, { page, take: 10 });
       }
     },
-    [user, fetchDistributionsByBeneficiary]
+    [user?.id, fetchDistributionsByBeneficiary]
   );
 
   // Carregar ao focar na tela
@@ -65,42 +62,98 @@ const MyReceiptsScreen: React.FC = () => {
     }, [loadReceipts])
   );
 
-  // Aplicar busca aos recebimentos
+  // Aplicar busca aos recebimentos com validação adequada
   useEffect(() => {
-    if (!distributions) return;
+    console.log(
+      "[MyReceiptsScreen] Aplicando filtros. Distributions:",
+      distributions
+    );
 
-    let result = [...distributions];
-
-    // Aplicar busca
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (distribution) =>
-          distribution.items.some((item) =>
-            item.description.toLowerCase().includes(query)
-          ) || distribution.observations?.toLowerCase().includes(query)
+    // Validação robusta para garantir que distributions é um array
+    if (!distributions || !Array.isArray(distributions)) {
+      console.log(
+        "[MyReceiptsScreen] Distributions não é um array válido:",
+        typeof distributions
       );
+      setFilteredDistributions([]);
+      return;
     }
 
-    setFilteredDistributions(result);
+    // Criar uma cópia segura do array
+    let result: any[] = [];
+
+    try {
+      // Usar Array.from para garantir que temos um array válido
+      result = Array.from(distributions);
+
+      // Aplicar busca se houver query
+      if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        result = result.filter((distribution) => {
+          if (!distribution) return false;
+
+          // Buscar nos itens da distribuição
+          const hasMatchingItems =
+            distribution.items && Array.isArray(distribution.items)
+              ? distribution.items.some((item: any) =>
+                  item?.description?.toLowerCase().includes(query)
+                )
+              : false;
+
+          // Buscar nas observações
+          const hasMatchingObservations = distribution.observations
+            ?.toLowerCase()
+            .includes(query);
+
+          // Buscar no ID da distribuição
+          const hasMatchingId = distribution.id?.toLowerCase().includes(query);
+
+          return hasMatchingItems || hasMatchingObservations || hasMatchingId;
+        });
+      }
+
+      console.log(
+        "[MyReceiptsScreen] Resultado da filtragem:",
+        result.length,
+        "itens"
+      );
+      setFilteredDistributions(result);
+    } catch (error) {
+      console.error("[MyReceiptsScreen] Erro ao filtrar distributions:", error);
+      setFilteredDistributions([]);
+    }
   }, [distributions, searchQuery]);
 
   // Função para pull-to-refresh
   const handleRefresh = async () => {
+    console.log("[MyReceiptsScreen] Executando refresh");
     setRefreshing(true);
-    await loadReceipts(1);
-    setRefreshing(false);
+    try {
+      await loadReceipts(1);
+    } catch (error) {
+      console.error("[MyReceiptsScreen] Erro no refresh:", error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Função para carregar mais itens
   const handleLoadMore = () => {
-    if (pagination && pagination.page < pagination.totalPages) {
+    if (pagination && pagination.page < pagination.totalPages && !isLoading) {
+      console.log(
+        "[MyReceiptsScreen] Carregando próxima página:",
+        pagination.page + 1
+      );
       loadReceipts(pagination.page + 1);
     }
   };
 
   // Se estiver carregando inicialmente, mostrar loading
-  if (isLoading && !refreshing && !distributions.length) {
+  if (
+    isLoading &&
+    !refreshing &&
+    (!distributions || distributions.length === 0)
+  ) {
     return (
       <Loading
         visible={true}
@@ -147,18 +200,22 @@ const MyReceiptsScreen: React.FC = () => {
         {/* Lista de recebimentos */}
         <FlatList
           data={filteredDistributions}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <DistributionCard
-              distribution={item}
-              onPress={() =>
-                navigation.navigate(BENEFICIARIO_ROUTES.RECEIPT_DETAIL, {
-                  id: item.id,
-                })
-              }
-              showItems={true}
-            />
-          )}
+          keyExtractor={(item, index) => item?.id || `item-${index}`}
+          renderItem={({ item }) => {
+            if (!item) return null;
+
+            return (
+              <DistributionCard
+                distribution={item}
+                onPress={() =>
+                  navigation.navigate(BENEFICIARIO_ROUTES.RECEIPT_DETAIL, {
+                    id: item.id,
+                  })
+                }
+                showItems={true}
+              />
+            );
+          }}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -169,7 +226,7 @@ const MyReceiptsScreen: React.FC = () => {
             <EmptyState
               title="Nenhum recebimento encontrado"
               description={
-                searchQuery
+                searchQuery && searchQuery.trim()
                   ? "Tente ajustar sua busca"
                   : "Você ainda não recebeu nenhuma doação"
               }
@@ -179,6 +236,12 @@ const MyReceiptsScreen: React.FC = () => {
               }
             />
           }
+          // Adicionar props para melhor performance
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={10}
         />
       </View>
     </View>
