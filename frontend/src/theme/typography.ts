@@ -24,6 +24,7 @@ interface TypographyStyle {
   fontWeight: FontWeight;
   color: string;
   lineHeight?: number;
+  letterSpacing?: number;
 }
 
 // Família de fontes
@@ -89,12 +90,22 @@ export const typography: Record<string, TypographyStyle> = {
     fontFamily: fontFamily.primary,
     fontWeight: "600",
     color: colors.neutral.white,
+    lineHeight: 20,
+    letterSpacing: 0.5,
   },
   buttonSmall: {
     fontSize: 12,
     fontFamily: fontFamily.primary,
     fontWeight: "600",
     color: colors.neutral.white,
+  },
+  caption: {
+    fontSize: 11,
+    fontFamily: fontFamily.primary,
+    fontWeight: "400" as const,
+    color: colors.neutral.mediumGray,
+    lineHeight: 14,
+    letterSpacing: 0.2,
   },
 };
 
