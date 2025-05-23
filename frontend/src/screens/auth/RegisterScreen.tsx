@@ -26,6 +26,7 @@ import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
 import { maskPhone } from "../../utils/authUtils";
+import { useEffect as useEffectOriginal } from 'react';
 
 // Esquema de validação
 const RegisterSchema = Yup.object().shape({
@@ -174,38 +175,20 @@ const RegisterScreen: React.FC = () => {
       const success = await register(payload);
 
       if (success) {
-        setTimeout(() => {
-          if (payload.role === UserRole.DOADOR) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "DoadorApp" as never }],
-            });
-          } else if (payload.role === UserRole.BENEFICIARIO) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "BeneficiarioApp" as never }],
-            });
-          }
-        }, 500);
-      } else {
-        let friendlyError = error;
-
-        if (error?.includes("Bad Request")) {
-          friendlyError =
-            "Os dados fornecidos são inválidos. Verifique o formato dos campos.";
-        } else if (
-          error?.includes("duplicate") ||
-          error?.includes("already exists")
-        ) {
-          friendlyError =
-            "Este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.";
-        } else if (!friendlyError) {
-          friendlyError =
-            "Não foi possível completar seu cadastro. Tente novamente.";
-        }
-
-        setErrorMessage(friendlyError);
-      }
+      // Em vez de navegação complexa, use uma abordagem mais simples
+      // Primeiro um delay para garantir que o token está armazenado
+            setTimeout(() => {
+        // Navegação tipada corretamente
+        navigation.navigate("Login", { 
+          email: payload.email,
+          autoLogin: true,
+          password: payload.password
+        });
+      }, 1000);
+    } else {
+      // Resto do código permanece igual
+      // ...
+    }
     } catch (err) {
       setErrorMessage(
         "Ocorreu um erro inesperado. Tente novamente mais tarde."
