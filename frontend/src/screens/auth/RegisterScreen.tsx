@@ -154,20 +154,33 @@ const RegisterScreen: React.FC = () => {
     clearErrors();
     setErrorMessage(null);
 
-    // Remover confirmPassword do objeto antes de enviar para a API
-    const { confirmPassword, ...registerData } = values;
+    // Remover confirmPassword e campos não esperados pelo backend
+    const { confirmPassword, phone, address, ...registerData } = values;
+
+    // Garantir que os dados estejam no formato correto
+    const payload = {
+      name: registerData.name.trim(),
+      email: registerData.email.trim().toLowerCase(),
+      password: registerData.password,
+      role: registerData.role,
+    };
+
+    console.log("[RegisterScreen] Dados sendo enviados:", {
+      ...payload,
+      password: "***HIDDEN***",
+    });
 
     try {
-      const success = await register(registerData);
+      const success = await register(payload);
 
       if (success) {
         setTimeout(() => {
-          if (registerData.role === UserRole.DOADOR) {
+          if (payload.role === UserRole.DOADOR) {
             navigation.reset({
               index: 0,
               routes: [{ name: "DoadorApp" as never }],
             });
-          } else if (registerData.role === UserRole.BENEFICIARIO) {
+          } else if (payload.role === UserRole.BENEFICIARIO) {
             navigation.reset({
               index: 0,
               routes: [{ name: "BeneficiarioApp" as never }],
