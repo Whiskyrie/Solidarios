@@ -13,7 +13,7 @@ import { PageOptionsDto } from "../types/common.types";
 
 // Hook para gerenciamento de distribuições
 export const useDistributions = () => {
-  // Estados locais
+  // Estados locais - CORREÇÃO: Sempre inicializar como array
   const [distributions, setDistributions] = useState<Distribution[]>([]);
   const [distribution, setDistribution] = useState<Distribution | null>(null);
   const [stats, setStats] = useState<{
@@ -38,7 +38,19 @@ export const useDistributions = () => {
     setError(null);
   }, []);
 
-  // Função para obter todas as distribuições com paginação
+  // Função para garantir que sempre temos um array válido
+  const ensureArray = useCallback((data: any): Distribution[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (data.data && Array.isArray(data.data)) return data.data;
+    console.warn(
+      "[useDistributions] Dados não são um array válido:",
+      typeof data
+    );
+    return [];
+  }, []);
+
+  // CORREÇÃO: Função para obter todas as distribuições com paginação
   const fetchDistributions = useCallback(
     async (pageOptions?: PageOptionsDto) => {
       setIsLoading(true);
@@ -46,24 +58,30 @@ export const useDistributions = () => {
 
       try {
         const response = await DistributionsService.getAll(pageOptions);
-        setDistributions(response.data);
+
+        // CORREÇÃO: Garantir que sempre setamos um array válido
+        const distributionsArray = ensureArray(response.data);
+        setDistributions(distributionsArray);
+
         setPagination({
-          page: response.meta.page,
-          totalPages: response.meta.pageCount,
-          totalItems: response.meta.itemCount,
+          page: response.meta?.page || 1,
+          totalPages: response.meta?.pageCount || 1,
+          totalItems: response.meta?.itemCount || 0,
         });
         return response;
       } catch (err: any) {
         setError(err.message || "Erro ao buscar distribuições");
+        // CORREÇÃO: Em caso de erro, garantir que distributions seja um array vazio
+        setDistributions([]);
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [ensureArray]
   );
 
-  // Função para obter uma distribuição por ID
+  // CORREÇÃO: Função para obter uma distribuição por ID
   const fetchDistributionById = useCallback(async (id: string) => {
     setIsLoading(true);
     setError(null);
@@ -80,7 +98,7 @@ export const useDistributions = () => {
     }
   }, []);
 
-  // Função para obter distribuições por beneficiário
+  // CORREÇÃO: Função para obter distribuições por beneficiário
   const fetchDistributionsByBeneficiary = useCallback(
     async (beneficiaryId: string, pageOptions?: PageOptionsDto) => {
       setIsLoading(true);
@@ -91,24 +109,30 @@ export const useDistributions = () => {
           beneficiaryId,
           pageOptions
         );
-        setDistributions(response.data);
+
+        // CORREÇÃO: Garantir que sempre setamos um array válido
+        const distributionsArray = ensureArray(response.data);
+        setDistributions(distributionsArray);
+
         setPagination({
-          page: response.meta.page,
-          totalPages: response.meta.pageCount,
-          totalItems: response.meta.itemCount,
+          page: response.meta?.page || 1,
+          totalPages: response.meta?.pageCount || 1,
+          totalItems: response.meta?.itemCount || 0,
         });
         return response;
       } catch (err: any) {
         setError(err.message || "Erro ao buscar distribuições do beneficiário");
+        // CORREÇÃO: Em caso de erro, garantir que distributions seja um array vazio
+        setDistributions([]);
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [ensureArray]
   );
 
-  // Função para criar uma nova distribuição
+  // CORREÇÃO: Função para criar uma nova distribuição
   const createDistribution = useCallback(
     async (distributionData: CreateDistributionDto) => {
       setIsLoading(true);
@@ -117,8 +141,12 @@ export const useDistributions = () => {
       try {
         const data = await DistributionsService.create(distributionData);
         setDistribution(data);
-        // Atualizar a lista de distribuições se necessário
-        setDistributions((prev) => [...prev, data]);
+
+        // CORREÇÃO: Atualizar a lista garantindo que é um array
+        setDistributions((prev) => {
+          const currentArray = ensureArray(prev);
+          return [...currentArray, data];
+        });
         return data;
       } catch (err: any) {
         setError(err.message || "Erro ao criar distribuição");
@@ -127,10 +155,10 @@ export const useDistributions = () => {
         setIsLoading(false);
       }
     },
-    []
+    [ensureArray]
   );
 
-  // Função para atualizar uma distribuição existente
+  // CORREÇÃO: Função para atualizar uma distribuição existente
   const updateDistribution = useCallback(
     async (id: string, distributionData: UpdateDistributionDto) => {
       setIsLoading(true);
@@ -139,8 +167,12 @@ export const useDistributions = () => {
       try {
         const data = await DistributionsService.update(id, distributionData);
         setDistribution(data);
-        // Atualizar a lista de distribuições se necessário
-        setDistributions((prev) => prev.map((d) => (d.id === id ? data : d)));
+
+        // CORREÇÃO: Atualizar a lista garantindo que é um array
+        setDistributions((prev) => {
+          const currentArray = ensureArray(prev);
+          return currentArray.map((d) => (d.id === id ? data : d));
+        });
         return data;
       } catch (err: any) {
         setError(err.message || "Erro ao atualizar distribuição");
@@ -149,26 +181,33 @@ export const useDistributions = () => {
         setIsLoading(false);
       }
     },
-    []
+    [ensureArray]
   );
 
-  // Função para remover uma distribuição
-  const removeDistribution = useCallback(async (id: string) => {
-    setIsLoading(true);
-    setError(null);
+  // CORREÇÃO: Função para remover uma distribuição
+  const removeDistribution = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      await DistributionsService.remove(id);
-      // Atualizar a lista de distribuições
-      setDistributions((prev) => prev.filter((d) => d.id !== id));
-      return true;
-    } catch (err: any) {
-      setError(err.message || "Erro ao remover distribuição");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        await DistributionsService.remove(id);
+
+        // CORREÇÃO: Atualizar a lista garantindo que é um array
+        setDistributions((prev) => {
+          const currentArray = ensureArray(prev);
+          return currentArray.filter((d) => d.id !== id);
+        });
+        return true;
+      } catch (err: any) {
+        setError(err.message || "Erro ao remover distribuição");
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureArray]
+  );
 
   // Função para obter estatísticas de distribuições
   const fetchDistributionStats = useCallback(
@@ -190,7 +229,7 @@ export const useDistributions = () => {
     []
   );
 
-  // Função para obter distribuições por período
+  // CORREÇÃO: Função para obter distribuições por período
   const fetchDistributionsByDateRange = useCallback(
     async (
       startDate: string,
@@ -206,21 +245,27 @@ export const useDistributions = () => {
           endDate,
           pageOptions
         );
-        setDistributions(response.data);
+
+        // CORREÇÃO: Garantir que sempre setamos um array válido
+        const distributionsArray = ensureArray(response.data);
+        setDistributions(distributionsArray);
+
         setPagination({
-          page: response.meta.page,
-          totalPages: response.meta.pageCount,
-          totalItems: response.meta.itemCount,
+          page: response.meta?.page || 1,
+          totalPages: response.meta?.pageCount || 1,
+          totalItems: response.meta?.itemCount || 0,
         });
         return response;
       } catch (err: any) {
         setError(err.message || "Erro ao buscar distribuições por período");
+        // CORREÇÃO: Em caso de erro, garantir que distributions seja um array vazio
+        setDistributions([]);
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [ensureArray]
   );
 
   // Retornar as funções e estado
