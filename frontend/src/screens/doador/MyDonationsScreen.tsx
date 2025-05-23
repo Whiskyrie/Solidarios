@@ -214,6 +214,63 @@ const MyDonationsScreen: React.FC = () => {
     </>
   );
 
+  // Componente de cabeçalho da lista
+  const ListHeader = () => (
+    <View>
+      {/* Barra de pesquisa */}
+      <View style={styles.searchContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Buscar doações..."
+          containerStyle={styles.searchBar}
+        />
+      </View>
+
+      {/* Filtros */}
+      <View style={styles.filtersContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersScrollContent}
+        >
+          {STATUS_FILTERS.map((filter) => (
+            <TouchableOpacity
+              key={filter.value}
+              onPress={() => setActiveFilter(filter.value)}
+              activeOpacity={0.7}
+            >
+              {activeFilter === filter.value ? (
+                <LinearGradient
+                  colors={["#173F5F", "#006E58"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeFilterItem}
+                >
+                  <Typography
+                    variant="bodySecondary"
+                    color={theme.colors.neutral.white}
+                  >
+                    {filter.label}
+                  </Typography>
+                </LinearGradient>
+              ) : (
+                <View style={styles.filterItem}>
+                  <Typography
+                    variant="bodySecondary"
+                    color={theme.colors.neutral.darkGray}
+                  >
+                    {filter.label}
+                  </Typography>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+
   // Estado de carregamento inicial
   if (isLoading && !dataLoaded && !refreshing) {
     return (
@@ -285,67 +342,40 @@ const MyDonationsScreen: React.FC = () => {
     <View style={styles.container}>
       <Header />
 
-      {/* Conteúdo */}
-      <View style={styles.content}>
-        {/* Barra de pesquisa */}
-        <View style={styles.searchContainer}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Buscar doações..."
-            containerStyle={styles.searchBar}
+      {/* Estado de carregamento inicial */}
+      {isLoading && !dataLoaded && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <Loading visible={true} message="Buscando suas doações..." />
+        </View>
+      ) : error ? (
+        // Estado de erro
+        <View style={styles.content}>
+          <ErrorState
+            title="Erro ao carregar doações"
+            description={error}
+            icon={
+              <View style={styles.errorIconContainer}>
+                <MaterialIcons
+                  name="error-outline"
+                  size={70}
+                  color={theme.colors.status.error}
+                />
+              </View>
+            }
+            actionLabel="Tentar novamente"
+            onAction={() => {
+              clearError();
+              loadDonations(1);
+            }}
           />
         </View>
-
-        {/* Filtros */}
-        <View style={styles.filtersContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersScrollContent}
-          >
-            {STATUS_FILTERS.map((filter) => (
-              <TouchableOpacity
-                key={filter.value}
-                onPress={() => setActiveFilter(filter.value)}
-                activeOpacity={0.7}
-              >
-                {activeFilter === filter.value ? (
-                  <LinearGradient
-                    colors={["#173F5F", "#006E58"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.activeFilterItem}
-                  >
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.white}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.filterItem}>
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.darkGray}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Visualização do estado vazio com verificação simplificada */}
-        {dataLoaded && filteredItems.length === 0 ? (
-          <NoItemsView />
-        ) : (
+      ) : (
+        // Lista principal sem ScrollView aninhado
+        <View style={styles.content}>
           <FlatList
             data={filteredItems}
             keyExtractor={(item) => item.id}
+            ListHeaderComponent={ListHeader}
             renderItem={({ item }) => (
               <ItemCard
                 item={item}
@@ -378,33 +408,36 @@ const MyDonationsScreen: React.FC = () => {
                 </View>
               ) : null
             }
-            ListEmptyComponent={NoItemsView}
+            ListEmptyComponent={
+              dataLoaded && filteredItems.length === 0 ? <NoItemsView /> : null
+            }
+            showsVerticalScrollIndicator={false}
           />
-        )}
 
-        {/* Botão flutuante para nova doação */}
-        <TouchableOpacity
-          style={styles.floatingButtonContainer}
-          onPress={navigateToNewDonation}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={["#173F5F", "#006E58"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.floatingButton}
+          {/* Botão flutuante para nova doação */}
+          <TouchableOpacity
+            style={styles.floatingButtonContainer}
+            onPress={navigateToNewDonation}
+            activeOpacity={0.8}
           >
-            <MaterialIcons name="add" size={20} color="#fff" />
-            <Typography
-              variant="bodySecondary"
-              color={theme.colors.neutral.white}
-              style={styles.buttonText}
+            <LinearGradient
+              colors={["#173F5F", "#006E58"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.floatingButton}
             >
-              Nova Doação
-            </Typography>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+              <MaterialIcons name="add" size={20} color="#fff" />
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.neutral.white}
+                style={styles.buttonText}
+              >
+                Nova Doação
+              </Typography>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
