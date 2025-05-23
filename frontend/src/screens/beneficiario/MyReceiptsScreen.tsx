@@ -324,47 +324,43 @@ const MyReceiptsScreen: React.FC = () => {
     navigation.navigate(BENEFICIARIO_ROUTES.AVAILABLE_ITEMS);
   }, [navigation]);
 
+  // Ajuste do componente Header
+
   // Componente de cabeçalho com gradiente
   const Header = () => (
     <>
       <StatusBar
         barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
+        backgroundColor={Platform.OS === 'android' ? "#4A90E2" : "transparent"}
+        translucent={Platform.OS === 'ios'}
       />
-      <LinearGradient
-        colors={["#4A90E2", "#7BB3F0", "#A8D0FF"]}
-        locations={[0, 0.4, 0.8]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <Animated.View
-          style={[
-            styles.header,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={["#4A90E2", "#7BB3F0", "#A8D0FF"]}
+          locations={[0, 0.4, 0.8]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
         >
-          <View style={styles.welcomeContainer}>
-            <Typography
-              variant="h1"
-              style={styles.welcomeText}
-              color={theme.colors.neutral.white}
-            >
-              Meus Recebimentos
-            </Typography>
-            <Typography
-              variant="bodySecondary"
-              color="rgba(255, 255, 255, 0.9)"
-            >
-              Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
-            </Typography>
+          <View style={styles.header}>
+            <View style={styles.welcomeContainer}>
+              <Typography
+                variant="h1"
+                style={styles.welcomeText}
+                color={theme.colors.neutral.white}
+              >
+                Meus Recebimentos
+              </Typography>
+              <Typography
+                variant="bodySecondary"
+                color="rgba(255, 255, 255, 0.9)"
+              >
+                Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
+              </Typography>
+            </View>
           </View>
-        </Animated.View>
-      </LinearGradient>
+        </LinearGradient>
+      </View>
     </>
   );
 
@@ -373,7 +369,7 @@ const MyReceiptsScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <Header />
-        <View style={styles.loadingContainer}>
+        <View style={[styles.content, styles.loadingContainer]}>
           <Loading visible={true} message="Carregando seus recebimentos..." />
         </View>
       </View>
@@ -406,7 +402,7 @@ const MyReceiptsScreen: React.FC = () => {
     );
   }
 
-  // Componente EmptyState melhorado
+  // Componente EmptyState melhorado - removendo o botão duplicado
   const NoReceiptsView = () => (
     <View style={styles.emptyStateContainer}>
       <EmptyState
@@ -425,26 +421,18 @@ const MyReceiptsScreen: React.FC = () => {
             />
           </View>
         }
-        actionLabel="Ver Itens Disponíveis"
-        onAction={navigateToAvailableItems}
+        // Remova o botão daqui para evitar duplicação
+        // Usuários podem usar o botão flutuante
       />
     </View>
   );
 
+  // Renderização principal
   return (
     <View style={styles.container}>
       <Header />
 
-      {/* Conteúdo */}
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
+      <View style={styles.content}>
         {/* Barra de pesquisa */}
         <View style={styles.searchContainer}>
           <SearchBar
@@ -505,10 +493,7 @@ const MyReceiptsScreen: React.FC = () => {
             data={filteredDistributions}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
-            contentContainerStyle={[
-              styles.listContent,
-              filteredDistributions.length === 0 && styles.emptyListContent,
-            ]}
+            contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -527,38 +512,32 @@ const MyReceiptsScreen: React.FC = () => {
               ) : null
             }
             ListEmptyComponent={NoReceiptsView}
-            // Props para melhor performance
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            initialNumToRender={10}
-            windowSize={10}
           />
         )}
 
         {/* Botão flutuante para itens disponíveis */}
-        <TouchableOpacity
-          style={styles.floatingButtonContainer}
-          onPress={navigateToAvailableItems}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={["#4A90E2", "#7BB3F0"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.floatingButton}
+        <View style={styles.floatingButtonContainer}>
+          <TouchableOpacity
+            onPress={navigateToAvailableItems}
+            activeOpacity={0.8}
           >
-            <MaterialIcons name="search" size={20} color="#fff" />
-            <Typography
-              variant="bodySecondary"
-              color={theme.colors.neutral.white}
-              style={styles.buttonText}
+            <LinearGradient
+              colors={["#4A90E2", "#7BB3F0"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.floatingButton}
             >
-              Ver Disponíveis
-            </Typography>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
+              <MaterialIcons name="search" size={20} color="#fff" />
+              <Typography
+                variant="bodySecondary"
+                style={styles.buttonText}
+              >
+                Ver Disponíveis
+              </Typography>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 };
@@ -568,24 +547,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.neutral.white,
   },
+  headerContainer: {
+    width: '100%',
+  },
   headerGradient: {
-    paddingTop:
-      Platform.OS === "ios" ? 60 : 40 + (StatusBar.currentHeight ?? 0),
-    paddingBottom: 20,
+    paddingTop: Platform.OS === "ios" ? 60 : 40 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: 30,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    ...theme.shadows.medium,
+    // Garantindo que o gradiente apareça corretamente
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   header: {
     paddingHorizontal: theme.spacing.m,
   },
   welcomeContainer: {
     marginBottom: theme.spacing.s,
+    paddingTop: Platform.OS === "ios" ? 0 : 10,
   },
   welcomeText: {
     fontWeight: "bold",
     fontSize: 28,
     marginBottom: 5,
+    color: "#FFFFFF",
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 3,
   },
   content: {
     flex: 1,
@@ -594,6 +585,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     backgroundColor: theme.colors.neutral.white,
     paddingHorizontal: theme.spacing.s,
+    paddingTop: theme.spacing.s,
   },
   searchContainer: {
     marginTop: theme.spacing.s,
@@ -678,29 +670,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: theme.spacing.xl,
+    // Adicionar padding inferior para evitar sobreposição com o botão flutuante
+    paddingBottom: 100, // Aumentando o padding inferior
   },
   floatingButtonContainer: {
     position: "absolute",
     right: theme.spacing.m,
-    bottom: theme.spacing.m,
+    // Mover o botão flutuante para cima para dar mais espaço
+    bottom: theme.spacing.xl,
     borderRadius: 12,
     overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   floatingButton: {
     flexDirection: "row",
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: 12,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   buttonText: {
-    marginLeft: 5,
+    marginLeft: 8,
     fontWeight: "600",
+    color: "#ffffff",
+    fontSize: 14,
   },
 });
 
