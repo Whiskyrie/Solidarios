@@ -21,6 +21,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useDistributions } from "../../hooks/useDistributions";
 
 // Tipos e rotas
+import { Distribution } from "../../types/distributions.types";
 import { BENEFICIARIO_ROUTES } from "../../navigation/routes";
 
 const MyReceiptsScreen: React.FC = () => {
@@ -39,7 +40,58 @@ const MyReceiptsScreen: React.FC = () => {
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredDistributions, setFilteredDistributions] = useState<any[]>([]);
+  // CORREÇÃO: Tipagem explícita e inicialização como array
+  const [filteredDistributions, setFilteredDistributions] = useState<
+    Distribution[]
+  >([]);
+
+  // CORREÇÃO: Função para validar se distributions é um array válido
+  const validateDistributionsArray = useCallback(
+    (data: any): Distribution[] => {
+      // Log para debug
+      console.log("[MyReceiptsScreen] Validando distributions:", {
+        data,
+        type: typeof data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : "N/A",
+      });
+
+      // Verificações robustas
+      if (!data) {
+        console.log("[MyReceiptsScreen] Data é null/undefined");
+        return [];
+      }
+
+      if (Array.isArray(data)) {
+        console.log(
+          "[MyReceiptsScreen] Data é um array válido com",
+          data.length,
+          "itens"
+        );
+        return data;
+      }
+
+      // Se data tem uma propriedade 'data' que é array
+      if (data.data && Array.isArray(data.data)) {
+        console.log(
+          "[MyReceiptsScreen] Data.data é um array válido com",
+          data.data.length,
+          "itens"
+        );
+        return data.data;
+      }
+
+      // Se chegou aqui, não é um formato esperado
+      console.error("[MyReceiptsScreen] Formato de dados inesperado:", {
+        data,
+        type: typeof data,
+        keys: Object.keys(data || {}),
+      });
+
+      return [];
+    },
+    []
+  );
 
   // Carregar recebimentos do usuário
   const loadReceipts = useCallback(
@@ -49,7 +101,14 @@ const MyReceiptsScreen: React.FC = () => {
           "[MyReceiptsScreen] Carregando recebimentos para usuário:",
           user.id
         );
-        await fetchDistributionsByBeneficiary(user.id, { page, take: 10 });
+        try {
+          await fetchDistributionsByBeneficiary(user.id, { page, take: 10 });
+        } catch (error) {
+          console.error(
+            "[MyReceiptsScreen] Erro ao carregar recebimentos:",
+            error
+          );
+        }
       }
     },
     [user?.id, fetchDistributionsByBeneficiary]
@@ -62,54 +121,114 @@ const MyReceiptsScreen: React.FC = () => {
     }, [loadReceipts])
   );
 
-  // Aplicar busca aos recebimentos com validação adequada
+  // CORREÇÃO: Aplicar busca aos recebimentos com validação robusta
   useEffect(() => {
-    console.log(
-      "[MyReceiptsScreen] Aplicando filtros. Distributions:",
-      distributions
-    );
-
-    // Validação robusta para garantir que distributions é um array
-    if (!distributions || !Array.isArray(distributions)) {
-      console.log(
-        "[MyReceiptsScreen] Distributions não é um array válido:",
-        typeof distributions
-      );
-      setFilteredDistributions([]);
-      return;
-    }
-
-    // Criar uma cópia segura do array
-    let result: any[] = [];
+    console.log("[MyReceiptsScreen] Aplicando filtros...");
 
     try {
-      // Usar Array.from para garantir que temos um array válido
-      result = Array.from(distributions);
+      // CORREÇÃO: Usar a função de validação
+      const validDistributions = validateDistributionsArray(distributions);
+
+      // Se não há dados válidos, definir array vazio
+      if (validDistributions.length === 0) {
+        console.log(
+          "[MyReceiptsScreen] Nenhuma distribuição válida encontrada"
+        );
+        setFilteredDistributions([]);
+        return;
+      }
+
+      // CORREÇÃO: Usar Array.from para garantir que temos uma cópia segura
+      let result: Distribution[] = [];
+
+      try {
+        result = Array.from(validDistributions);
+        console.log(
+          "[MyReceiptsScreen] Array copiado com sucesso:",
+          result.length,
+          "itens"
+        );
+      } catch (copyError) {
+        console.error("[MyReceiptsScreen] Erro ao copiar array:", copyError);
+        setFilteredDistributions([]);
+        return;
+      }
 
       // Aplicar busca se houver query
       if (searchQuery && searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        result = result.filter((distribution) => {
-          if (!distribution) return false;
+        console.log("[MyReceiptsScreen] Aplicando busca:", query);
 
-          // Buscar nos itens da distribuição
-          const hasMatchingItems =
-            distribution.items && Array.isArray(distribution.items)
-              ? distribution.items.some((item: any) =>
-                  item?.description?.toLowerCase().includes(query)
-                )
-              : false;
+        try {
+          // CORREÇÃO: Verificação adicional antes do filter
+          if (!Array.isArray(result)) {
+            console.error(
+              "[MyReceiptsScreen] Result não é array antes do filter"
+            );
+            setFilteredDistributions([]);
+            return;
+          }
 
-          // Buscar nas observações
-          const hasMatchingObservations = distribution.observations
-            ?.toLowerCase()
-            .includes(query);
+          result = result.filter((distribution) => {
+            // CORREÇÃO: Verificação robusta do item
+            if (!distribution || typeof distribution !== "object") {
+              console.warn(
+                "[MyReceiptsScreen] Item de distribuição inválido:",
+                distribution
+              );
+              return false;
+            }
 
-          // Buscar no ID da distribuição
-          const hasMatchingId = distribution.id?.toLowerCase().includes(query);
+            // Buscar nos itens da distribuição
+            let hasMatchingItems = false;
+            try {
+              if (distribution.items && Array.isArray(distribution.items)) {
+                hasMatchingItems = distribution.items.some((item: any) => {
+                  return item?.description?.toLowerCase().includes(query);
+                });
+              }
+            } catch (itemsError) {
+              console.warn(
+                "[MyReceiptsScreen] Erro ao buscar nos itens:",
+                itemsError
+              );
+              hasMatchingItems = false;
+            }
 
-          return hasMatchingItems || hasMatchingObservations || hasMatchingId;
-        });
+            // Buscar nas observações
+            let hasMatchingObservations = false;
+            try {
+              hasMatchingObservations =
+                distribution.observations?.toLowerCase().includes(query) ||
+                false;
+            } catch (obsError) {
+              console.warn(
+                "[MyReceiptsScreen] Erro ao buscar nas observações:",
+                obsError
+              );
+              hasMatchingObservations = false;
+            }
+
+            // Buscar no ID da distribuição
+            let hasMatchingId = false;
+            try {
+              hasMatchingId =
+                distribution.id?.toLowerCase().includes(query) || false;
+            } catch (idError) {
+              console.warn("[MyReceiptsScreen] Erro ao buscar no ID:", idError);
+              hasMatchingId = false;
+            }
+
+            return hasMatchingItems || hasMatchingObservations || hasMatchingId;
+          });
+        } catch (filterError) {
+          console.error(
+            "[MyReceiptsScreen] Erro durante o filter:",
+            filterError
+          );
+          setFilteredDistributions([]);
+          return;
+        }
       }
 
       console.log(
@@ -119,10 +238,13 @@ const MyReceiptsScreen: React.FC = () => {
       );
       setFilteredDistributions(result);
     } catch (error) {
-      console.error("[MyReceiptsScreen] Erro ao filtrar distributions:", error);
+      console.error(
+        "[MyReceiptsScreen] Erro geral ao filtrar distributions:",
+        error
+      );
       setFilteredDistributions([]);
     }
-  }, [distributions, searchQuery]);
+  }, [distributions, searchQuery, validateDistributionsArray]);
 
   // Função para pull-to-refresh
   const handleRefresh = async () => {
@@ -148,12 +270,11 @@ const MyReceiptsScreen: React.FC = () => {
     }
   };
 
+  // CORREÇÃO: Validação mais robusta para loading state
+  const validDistributions = validateDistributionsArray(distributions);
+
   // Se estiver carregando inicialmente, mostrar loading
-  if (
-    isLoading &&
-    !refreshing &&
-    (!distributions || distributions.length === 0)
-  ) {
+  if (isLoading && !refreshing && validDistributions.length === 0) {
     return (
       <Loading
         visible={true}
@@ -199,22 +320,50 @@ const MyReceiptsScreen: React.FC = () => {
 
         {/* Lista de recebimentos */}
         <FlatList
-          data={filteredDistributions}
-          keyExtractor={(item, index) => item?.id || `item-${index}`}
-          renderItem={({ item }) => {
-            if (!item) return null;
+          // CORREÇÃO: Garantir que sempre passamos um array válido
+          data={
+            Array.isArray(filteredDistributions) ? filteredDistributions : []
+          }
+          keyExtractor={(item, index) => {
+            // CORREÇÃO: Verificação robusta da chave
+            if (item && typeof item === "object" && item.id) {
+              return item.id;
+            }
+            return `item-${index}`;
+          }}
+          renderItem={({ item, index }) => {
+            // CORREÇÃO: Verificação robusta do item antes do render
+            if (!item || typeof item !== "object") {
+              console.warn(
+                "[MyReceiptsScreen] Item inválido no índice",
+                index,
+                ":",
+                item
+              );
+              return null;
+            }
 
-            return (
-              <DistributionCard
-                distribution={item}
-                onPress={() =>
-                  navigation.navigate(BENEFICIARIO_ROUTES.RECEIPT_DETAIL, {
-                    id: item.id,
-                  })
-                }
-                showItems={true}
-              />
-            );
+            try {
+              return (
+                <DistributionCard
+                  distribution={item}
+                  onPress={() => {
+                    if (item.id) {
+                      navigation.navigate(BENEFICIARIO_ROUTES.RECEIPT_DETAIL, {
+                        id: item.id,
+                      });
+                    }
+                  }}
+                  showItems={true}
+                />
+              );
+            } catch (renderError) {
+              console.error(
+                "[MyReceiptsScreen] Erro ao renderizar item:",
+                renderError
+              );
+              return null;
+            }
           }}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -236,12 +385,18 @@ const MyReceiptsScreen: React.FC = () => {
               }
             />
           }
-          // Adicionar props para melhor performance
+          // CORREÇÃO: Props para melhor performance e estabilidade
           removeClippedSubviews={true}
           maxToRenderPerBatch={10}
           updateCellsBatchingPeriod={50}
           initialNumToRender={10}
           windowSize={10}
+          // CORREÇÃO: Adicionar getItemLayout se possível para melhor performance
+          // getItemLayout={(data, index) => ({
+          //   length: 100, // altura estimada do item
+          //   offset: 100 * index,
+          //   index,
+          // })}
         />
       </View>
     </View>
