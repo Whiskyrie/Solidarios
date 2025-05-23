@@ -1,7 +1,7 @@
 /**
  * Hook personalizado para gerenciamento de categorias
  */
-import { useCallback, useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import CategoriesService from "../api/categories";
 import {
   Category,
@@ -27,6 +27,8 @@ export const useCategories = () => {
     totalPages: 1,
     totalItems: 0,
   });
+  const lastFetchTime = useRef<number>(0);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
   // Função para limpar erros
   const clearError = useCallback(() => {
@@ -34,26 +36,43 @@ export const useCategories = () => {
   }, []);
 
   // Função para obter todas as categorias com paginação
-  const fetchCategories = useCallback(async (pageOptions?: PageOptionsDto) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchCategories = useCallback(
+    async (pageOptions?: PageOptionsDto, forceRefresh = false) => {
+      const now = Date.now();
 
-    try {
-      const response = await CategoriesService.getAll(pageOptions);
-      setCategories(response.data);
-      setPagination({
-        page: response.meta.page,
-        totalPages: response.meta.pageCount,
-        totalItems: response.meta.itemCount,
-      });
-      return response;
-    } catch (err: any) {
-      setError(err.message || "Erro ao buscar categorias");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      // Verificar se precisa fazer nova requisição
+      if (
+        !forceRefresh &&
+        categories.length > 0 &&
+        now - lastFetchTime.current < CACHE_DURATION
+      ) {
+        return; // Usar dados em cache
+      }
+
+      if (isLoading) return; // Evitar múltiplas chamadas simultâneas
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await CategoriesService.getAll(pageOptions);
+        setCategories(response.data);
+        setPagination({
+          page: response.meta.page,
+          totalPages: response.meta.pageCount,
+          totalItems: response.meta.itemCount,
+        });
+        lastFetchTime.current = now;
+        return response;
+      } catch (err: any) {
+        setError(err.message || "Erro ao buscar categorias");
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [categories.length, isLoading]
+  );
 
   // Função para obter uma categoria por ID
   const fetchCategoryById = useCallback(async (id: string) => {
