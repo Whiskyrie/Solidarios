@@ -1,5 +1,5 @@
 // src/screens/doador/NewDonationScreen.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -85,7 +85,11 @@ const NewDonationScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { createItem, isLoading, error, clearError } = useItems();
-  const { fetchCategories } = useCategories();
+  const {
+    fetchCategories,
+    categories,
+    isLoading: categoriesLoading,
+  } = useCategories();
   const [notification, setNotification] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -97,58 +101,61 @@ const NewDonationScreen: React.FC = () => {
     message: "",
   });
 
-  // Carregar categorias ao montar o componente
+  // Carregar categorias apenas se não estiverem carregadas
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  // Função para lidar com a submissão da nova doação
-  const handleSubmit = async (values: any) => {
-    if (!user) {
-      setNotification({
-        visible: true,
-        type: "error",
-        message: "Erro ao criar doação",
-        description: "Você precisa estar logado para doar.",
-      });
-      return;
+    // Verificar se as categorias já foram carregadas para evitar requisições duplicadas
+    if (!categories || categories.length === 0) {
+      fetchCategories();
     }
+  }, []); // Array de dependências vazio para executar apenas uma vez
 
-    try {
-      // Adicionar donorId aos valores
-      const itemData = {
-        ...values,
-        donorId: user.id,
-      };
-
-      // Criar o item
-      const newItem = await createItem(itemData);
-
-      if (newItem) {
-        // Mostrar notificação de sucesso
+  // Memoizar a função de submit para evitar re-renders desnecessários
+  const handleSubmit = useCallback(
+    async (values: any) => {
+      if (!user) {
         setNotification({
           visible: true,
-          type: "success",
-          message: "Doação cadastrada com sucesso!",
-          description: "Obrigado pela sua contribuição.",
+          type: "error",
+          message: "Erro ao criar doação",
+          description: "Você precisa estar logado para doar.",
         });
-
-        // Limpar campos e navegar após 2 segundos
-        setTimeout(() => {
-          setNotification({ ...notification, visible: false });
-          navigation.navigate(DOADOR_ROUTES.MY_DONATIONS as never);
-        }, 2000);
+        return;
       }
-    } catch (err) {
-      console.error("Erro ao criar item:", err);
-      setNotification({
-        visible: true,
-        type: "error",
-        message: "Erro ao criar doação",
-        description: "Não foi possível cadastrar sua doação. Tente novamente.",
-      });
-    }
-  };
+
+      try {
+        const itemData = {
+          ...values,
+          donorId: user.id,
+        };
+
+        const newItem = await createItem(itemData);
+
+        if (newItem) {
+          setNotification({
+            visible: true,
+            type: "success",
+            message: "Doação cadastrada com sucesso!",
+            description: "Obrigado pela sua contribuição.",
+          });
+
+          setTimeout(() => {
+            setNotification((prev) => ({ ...prev, visible: false }));
+            navigation.navigate(DOADOR_ROUTES.MY_DONATIONS as never);
+          }, 2000);
+        }
+      } catch (err) {
+        console.error("Erro ao criar item:", err);
+        setNotification({
+          visible: true,
+          type: "error",
+          message: "Erro ao criar doação",
+          description:
+            "Não foi possível cadastrar sua doação. Tente novamente.",
+        });
+      }
+    },
+    [user, createItem, navigation]
+  );
 
   return (
     <KeyboardAvoidingView
