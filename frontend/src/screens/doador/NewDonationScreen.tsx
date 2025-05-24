@@ -906,6 +906,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.m,
     borderTopWidth: 1,
     borderTopColor: theme.colors.neutral.mediumGray,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
     ...theme.shadows.large,
   },
   actionButtons: {
