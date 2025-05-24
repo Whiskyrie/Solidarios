@@ -426,10 +426,9 @@ const NewDonationScreen: React.FC = () => {
       </View>
     </View>
   );
-
   // Estrutura de seções do formulário
   const formSections = [
-    { id: "progress", type: "progress" },
+    { id: "progress", type: "card", icon: "info", title: "Progresso" },
     {
       id: "basic-info",
       type: "card",
@@ -520,11 +519,8 @@ const NewDonationScreen: React.FC = () => {
               placeholder="Descreva o item que está doando"
               multiline
               numberOfLines={3}
-              style={[
-                styles.textField,
-                { minHeight: 45, maxHeight: 120, width: "100%" },
-              ]}
-              scrollEnabled={true}
+              inputContainerStyle={styles.selectField}
+              textAlignVertical="top"
             />
           </View>
           <View style={styles.fieldContainer}>
@@ -567,7 +563,7 @@ const NewDonationScreen: React.FC = () => {
               onBlur={handleBlur("size")}
               error={touched.size && errors.size ? errors.size : undefined}
               placeholder="Ex: PP, P, M, G, GG, 38, 40, etc."
-              style={styles.textField}
+              inputContainerStyle={styles.selectField}
             />
           </View>
         </View>
@@ -657,8 +653,15 @@ const NewDonationScreen: React.FC = () => {
         >
           {(formikProps) => (
             <>
+              <View style={styles.fixedProgressContainer}>
+                <ProgressIndicator
+                  progress={calculateProgress(formikProps.values)}
+                />
+              </View>
               <FlatList
-                data={formSections}
+                data={formSections.filter(
+                  (section) => section.type !== "progress"
+                )}
                 renderItem={({ item }) =>
                   renderFormSection({ item, formikProps })
                 }
@@ -732,8 +735,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.neutral.lightGray },
   headerGradient: {
     paddingTop:
-      Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
-    paddingBottom: 20,
+      Platform.OS === "ios" ? 45 : 25 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: 15,
     ...theme.shadows.large,
   },
   backButton: {
@@ -770,7 +773,21 @@ const styles = StyleSheet.create({
   },
   counterNumber: { fontWeight: "bold", fontSize: 18, marginVertical: 2 },
   content: { flex: 1 },
-  scrollContainer: { padding: theme.spacing.m, paddingBottom: 100 },
+  fixedProgressContainer: {
+    backgroundColor: theme.colors.neutral.white,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.mediumGray,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    ...theme.shadows.large,
+  },
+  scrollContainer: {
+    padding: theme.spacing.m,
+    paddingBottom: 100,
+    paddingTop: theme.spacing.s,
+  },
   formCard: {
     backgroundColor: theme.colors.neutral.white,
     borderRadius: 16,
@@ -798,6 +815,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.neutral.mediumGray,
     paddingHorizontal: theme.spacing.s,
     paddingVertical: theme.spacing.xs,
+  },
+  textAreaField: {
+    backgroundColor: theme.colors.neutral.lightGray,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.mediumGray,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    textAlignVertical: "top",
   },
   selectField: {
     backgroundColor: theme.colors.neutral.lightGray,
@@ -846,14 +872,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  progressContainer: { marginBottom: theme.spacing.m },
+  progressContainer: {
+    marginBottom: theme.spacing.m,
+    width: "94%", // Ajustado para manter largura similar ao header
+    alignSelf: "center",
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
   progressInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: theme.spacing.xs,
   },
   progressBar: {
-    height: 4,
+    height: 3, // Altura reduzida
     backgroundColor: theme.colors.neutral.mediumGray,
     borderRadius: 2,
     overflow: "hidden",
