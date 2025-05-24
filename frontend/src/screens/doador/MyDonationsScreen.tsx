@@ -6,11 +6,9 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  ScrollView,
   Animated,
   StatusBar,
   Platform,
-  Text,
   TextInput,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -417,8 +415,6 @@ const MyDonationsScreen: React.FC = () => {
             />
           </View>
         }
-        actionLabel="Fazer uma doação"
-        onAction={navigateToNewDonation}
       />
     </View>
   );
@@ -506,7 +502,9 @@ const styles = StyleSheet.create({
     paddingTop:
       Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
     paddingBottom: 20,
-    ...theme.shadows.large,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    ...theme.shadows.strong,
   },
   welcomeSection: {
     flexDirection: "row",
