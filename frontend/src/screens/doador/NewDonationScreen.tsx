@@ -9,7 +9,6 @@ import React, {
 import {
   View,
   StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Animated,
@@ -17,8 +16,9 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  FlatList, // Adicionado FlatList
 } from "react-native";
-import { Formik } from "formik";
+import { Formik, FormikProps } from "formik"; // Adicionado FormikProps para tipagem da ref
 import * as Yup from "yup";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -74,26 +74,10 @@ const DonationSchema = Yup.object().shape({
 
 // Opções de tipo de item com ícones
 const TYPE_OPTIONS = [
-  {
-    label: "Roupa",
-    value: ItemType.ROUPA,
-    icon: "checkroom",
-  },
-  {
-    label: "Calçado",
-    value: ItemType.CALCADO,
-    icon: "sports-tennis",
-  },
-  {
-    label: "Utensílio",
-    value: ItemType.UTENSILIO,
-    icon: "kitchen",
-  },
-  {
-    label: "Outro",
-    value: ItemType.OUTRO,
-    icon: "category",
-  },
+  { label: "Roupa", value: ItemType.ROUPA, icon: "checkroom" },
+  { label: "Calçado", value: ItemType.CALCADO, icon: "sports-tennis" },
+  { label: "Utensílio", value: ItemType.UTENSILIO, icon: "kitchen" },
+  { label: "Outro", value: ItemType.OUTRO, icon: "category" },
 ];
 
 // Opções de estado de conservação com ícones
@@ -147,10 +131,10 @@ const NewDonationScreen: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Refs para animações
+  // Refs para animações e Formik
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const formikRef = useRef<FormikProps<any>>(null); // Adicionado ref para Formik
 
   // Animação de entrada
   useEffect(() => {
@@ -168,7 +152,7 @@ const NewDonationScreen: React.FC = () => {
     ]).start();
   }, []);
 
-  // Função para atualizar notificação
+  // Funções de notificação
   const showNotification = useCallback(
     (notificationData: NotificationState) => {
       setNotification(notificationData);
@@ -241,12 +225,7 @@ const NewDonationScreen: React.FC = () => {
       }
 
       try {
-        const itemData = {
-          ...values,
-          donorId: user.id,
-          photos: photos,
-        };
-
+        const itemData = { ...values, donorId: user.id, photos: photos };
         const newItem = await createItem(itemData);
 
         if (newItem) {
@@ -291,7 +270,7 @@ const NewDonationScreen: React.FC = () => {
     []
   );
 
-  // Componente de Header melhorado
+  // Componente de Header
   const Header = useCallback(
     () => (
       <>
@@ -306,7 +285,6 @@ const NewDonationScreen: React.FC = () => {
           end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
         >
-          {/* Botão de voltar */}
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -314,8 +292,6 @@ const NewDonationScreen: React.FC = () => {
           >
             <MaterialIcons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-
-          {/* Seção de boas-vindas */}
           <View style={styles.welcomeSection}>
             <View style={styles.titleSection}>
               <Typography
@@ -333,8 +309,6 @@ const NewDonationScreen: React.FC = () => {
                 Sua generosidade faz a diferença
               </Typography>
             </View>
-
-            {/* Contador de doações */}
             <View style={styles.donationCounter}>
               <MaterialIcons
                 name="volunteer-activism"
@@ -359,59 +333,77 @@ const NewDonationScreen: React.FC = () => {
     [navigation, items?.length]
   );
 
-  // Componente de upload de fotos visual
-  const PhotoUploadSection = ({ photos, onPickImage, onRemovePhoto }: any) => (
-    <View style={styles.photoSection}>
-      <Typography variant="h4" style={styles.sectionTitle}>
-        Fotos do Item
-      </Typography>
-      <Typography variant="bodySecondary" style={styles.sectionSubtitle}>
-        Adicione até 5 fotos para mostrar melhor o item
-      </Typography>
+  // Componente de Upload de Fotos com FlatList
+  const PhotoUploadSection = ({ photos, onPickImage, onRemovePhoto }: any) => {
+    const photoData = [
+      { type: "add-button", id: "add-button" },
+      ...photos.map((photo: Photo, index: number) => ({
+        type: "photo",
+        photo,
+        index,
+        id: `photo-${index}`,
+      })),
+    ];
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.photoScroll}
-      >
-        {/* Botão para adicionar foto */}
-        <TouchableOpacity
-          style={styles.addPhotoButton}
-          onPress={onPickImage}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name="add-a-photo"
-            size={32}
-            color={theme.colors.primary.secondary}
-          />
-          <Typography
-            variant="caption"
-            color={theme.colors.primary.secondary}
-            style={styles.addPhotoText}
+    const renderPhotoItem = ({ item }: any) => {
+      if (item.type === "add-button") {
+        return (
+          <TouchableOpacity
+            style={styles.addPhotoButton}
+            onPress={onPickImage}
+            activeOpacity={0.7}
           >
-            Adicionar Foto
-          </Typography>
-        </TouchableOpacity>
-
-        {/* Fotos adicionadas */}
-        {photos.map((photo: Photo, index: number) => (
-          <View key={index} style={styles.photoContainer}>
-            <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
-            <TouchableOpacity
-              style={styles.removePhotoButton}
-              onPress={() => onRemovePhoto(index)}
-              activeOpacity={0.7}
+            <MaterialIcons
+              name="add-a-photo"
+              size={32}
+              color={theme.colors.primary.secondary}
+            />
+            <Typography
+              variant="caption"
+              color={theme.colors.primary.secondary}
+              style={styles.addPhotoText}
             >
-              <MaterialIcons name="close" size={16} color="white" />
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
+              Adicionar Foto
+            </Typography>
+          </TouchableOpacity>
+        );
+      }
 
-  // Componente de progresso visual
+      return (
+        <View style={styles.photoContainer}>
+          <Image source={{ uri: item.photo.uri }} style={styles.photoPreview} />
+          <TouchableOpacity
+            style={styles.removePhotoButton}
+            onPress={() => onRemovePhoto(item.index)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="close" size={16} color="white" />
+          </TouchableOpacity>
+        </View>
+      );
+    };
+
+    return (
+      <View style={styles.photoSection}>
+        <Typography variant="h4" style={styles.sectionTitle}>
+          Fotos do Item
+        </Typography>
+        <Typography variant="bodySecondary" style={styles.sectionSubtitle}>
+          Adicione até 5 fotos para mostrar melhor o item
+        </Typography>
+        <FlatList
+          data={photoData}
+          renderItem={renderPhotoItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.photoListContent}
+        />
+      </View>
+    );
+  };
+
+  // Componente de Progresso
   const ProgressIndicator = ({ progress }: { progress: number }) => (
     <View style={styles.progressContainer}>
       <View style={styles.progressInfo}>
@@ -430,16 +422,190 @@ const NewDonationScreen: React.FC = () => {
       </View>
       <View style={styles.progressBar}>
         <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: `${progress * 100}%`,
-            },
-          ]}
+          style={[styles.progressFill, { width: `${progress * 100}%` }]}
         />
       </View>
     </View>
   );
+
+  // Estrutura de seções do formulário
+  const formSections = [
+    { id: "progress", type: "progress" },
+    {
+      id: "basic-info",
+      type: "card",
+      icon: "info",
+      title: "Informações do Item",
+    },
+    { id: "category", type: "card", icon: "label", title: "Categoria" },
+    {
+      id: "photos",
+      type: "card",
+      icon: "photo-camera",
+      title: "Fotos do Item",
+    },
+  ];
+
+  // Função para renderizar seções do formulário
+  const renderFormSection = ({ item, formikProps }: any) => {
+    const { values, errors, touched, handleChange, handleBlur, setFieldValue } =
+      formikProps;
+
+    if (item.type === "progress") {
+      return <ProgressIndicator progress={calculateProgress(values)} />;
+    }
+
+    if (item.id === "basic-info") {
+      return (
+        <View style={styles.formCard}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons
+              name={item.icon}
+              size={24}
+              color={theme.colors.primary.secondary}
+            />
+            <Typography variant="h4" style={styles.cardTitle}>
+              {item.title}
+            </Typography>
+          </View>
+          <View style={styles.fieldContainer}>
+            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+              <MaterialIcons
+                name="category"
+                size={16}
+                color={theme.colors.neutral.darkGray}
+              />{" "}
+              Tipo de Item *
+            </Typography>
+            <Select
+              options={TYPE_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.value,
+              }))}
+              selectedValue={values.type}
+              onSelect={(value) => setFieldValue("type", value)}
+              error={touched.type && errors.type ? errors.type : undefined}
+              selectStyle={styles.selectField}
+            />
+          </View>
+          <View style={styles.fieldContainer}>
+            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+              <MaterialIcons
+                name="description"
+                size={16}
+                color={theme.colors.neutral.darkGray}
+              />{" "}
+              Descrição *
+            </Typography>
+            <TextField
+              value={values.description}
+              onChangeText={handleChange("description")}
+              onBlur={handleBlur("description")}
+              error={
+                touched.description && errors.description
+                  ? errors.description
+                  : undefined
+              }
+              placeholder="Descreva o item que está doando"
+              multiline
+              numberOfLines={3}
+              style={styles.textField}
+            />
+          </View>
+          <View style={styles.fieldContainer}>
+            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+              <MaterialIcons
+                name="grade"
+                size={16}
+                color={theme.colors.neutral.darkGray}
+              />{" "}
+              Estado de Conservação
+            </Typography>
+            <Select
+              options={CONSERVATION_STATE_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.value,
+              }))}
+              selectedValue={values.conservationState}
+              onSelect={(value) => setFieldValue("conservationState", value)}
+              error={
+                touched.conservationState && errors.conservationState
+                  ? errors.conservationState
+                  : undefined
+              }
+              placeholder="Selecione o estado de conservação"
+              selectStyle={styles.selectField}
+            />
+          </View>
+          <View style={styles.fieldContainer}>
+            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+              <MaterialIcons
+                name="straighten"
+                size={16}
+                color={theme.colors.neutral.darkGray}
+              />{" "}
+              Tamanho
+            </Typography>
+            <TextField
+              value={values.size}
+              onChangeText={handleChange("size")}
+              onBlur={handleBlur("size")}
+              error={touched.size && errors.size ? errors.size : undefined}
+              placeholder="Ex: PP, P, M, G, GG, 38, 40, etc."
+              style={styles.textField}
+            />
+          </View>
+        </View>
+      );
+    }
+
+    if (item.id === "category") {
+      return (
+        <View style={styles.formCard}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons
+              name={item.icon}
+              size={24}
+              color={theme.colors.primary.secondary}
+            />
+            <Typography variant="h4" style={styles.cardTitle}>
+              {item.title}
+            </Typography>
+          </View>
+          <CategoryPicker
+            name="categoryId"
+            label=""
+            required={false}
+            multiple={false}
+          />
+        </View>
+      );
+    }
+
+    if (item.id === "photos") {
+      return (
+        <View style={styles.formCard}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons
+              name={item.icon}
+              size={24}
+              color={theme.colors.primary.secondary}
+            />
+            <Typography variant="h4" style={styles.cardTitle}>
+              {item.title}
+            </Typography>
+          </View>
+          <PhotoUploadSection
+            photos={photos}
+            onPickImage={pickImage}
+            onRemovePhoto={removePhoto}
+          />
+        </View>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <KeyboardAvoidingView
@@ -448,8 +614,6 @@ const NewDonationScreen: React.FC = () => {
       keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
     >
       <Header />
-
-      {/* Notificação */}
       <NotificationBanner
         visible={notification.visible}
         type={notification.type}
@@ -457,8 +621,6 @@ const NewDonationScreen: React.FC = () => {
         description={notification.description}
         onClose={hideNotification}
       />
-
-      {/* Notificação de erro do hook */}
       <NotificationBanner
         visible={!!error}
         type="error"
@@ -466,273 +628,90 @@ const NewDonationScreen: React.FC = () => {
         description={error || "Ocorreu um erro. Tente novamente."}
         onClose={clearError}
       />
-
       <Animated.View
         style={[
           styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
       >
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <Formik
+          ref={formikRef} // Adicionado ref ao Formik
+          initialValues={initialValues}
+          validationSchema={DonationSchema}
+          onSubmit={handleSubmit}
         >
-          <Formik
-            initialValues={initialValues}
-            validationSchema={DonationSchema}
-            onSubmit={handleSubmit}
-          >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              setFieldValue,
-              values,
-              errors,
-              touched,
-            }) => (
-              <View style={styles.form}>
-                {/* Indicador de progresso */}
-                <ProgressIndicator progress={calculateProgress(values)} />
-
-                {/* Seção de informações básicas */}
-                <View style={styles.formCard}>
-                  <View style={styles.cardHeader}>
-                    <MaterialIcons
-                      name="info"
-                      size={24}
-                      color={theme.colors.primary.secondary}
-                    />
-                    <Typography variant="h4" style={styles.cardTitle}>
-                      Informações do Item
-                    </Typography>
-                  </View>
-
-                  {/* Tipo de Item */}
-                  <View style={styles.fieldContainer}>
+          {(formikProps) => (
+            <>
+              <FlatList
+                data={formSections}
+                renderItem={({ item }) =>
+                  renderFormSection({ item, formikProps })
+                }
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              />
+              <View style={styles.bottomActions}>
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => navigation.goBack()}
+                    activeOpacity={0.7}
+                  >
                     <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
+                      variant="body"
+                      color={theme.colors.neutral.darkGray}
                     >
-                      <MaterialIcons
-                        name="category"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Tipo de Item *
+                      Cancelar
                     </Typography>
-                    <Select
-                      options={TYPE_OPTIONS.map((option) => ({
-                        label: option.label,
-                        value: option.value,
-                      }))}
-                      selectedValue={values.type}
-                      onSelect={(value) => setFieldValue("type", value)}
-                      error={
-                        touched.type && errors.type ? errors.type : undefined
-                      }
-                      selectStyle={styles.selectField} // ← Mudança aqui
-                    />
-                  </View>
-
-                  {/* Descrição */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.submitButtonContainer}
+                    onPress={() => formikRef.current?.handleSubmit()} // Usando ref para submit
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={["#173F5F", "#006E58"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.submitButton}
                     >
-                      <MaterialIcons
-                        name="description"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Descrição *
-                    </Typography>
-                    <TextField
-                      value={values.description}
-                      onChangeText={handleChange("description")}
-                      onBlur={handleBlur("description")}
-                      error={
-                        touched.description && errors.description
-                          ? errors.description
-                          : undefined
-                      }
-                      placeholder="Descreva o item que está doando"
-                      multiline
-                      numberOfLines={3}
-                      style={styles.textField}
-                    />
-                  </View>
-
-                  {/* Estado de Conservação */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="grade"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Estado de Conservação
-                    </Typography>
-                    <Select
-                      options={CONSERVATION_STATE_OPTIONS.map((option) => ({
-                        label: option.label,
-                        value: option.value,
-                      }))}
-                      selectedValue={values.conservationState}
-                      onSelect={(value) =>
-                        setFieldValue("conservationState", value)
-                      }
-                      error={
-                        touched.conservationState && errors.conservationState
-                          ? errors.conservationState
-                          : undefined
-                      }
-                      placeholder="Selecione o estado de conservação"
-                      selectStyle={styles.selectField} // ← Mudança aqui
-                    />
-                  </View>
-
-                  {/* Tamanho */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="straighten"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Tamanho
-                    </Typography>
-                    <TextField
-                      value={values.size}
-                      onChangeText={handleChange("size")}
-                      onBlur={handleBlur("size")}
-                      error={
-                        touched.size && errors.size ? errors.size : undefined
-                      }
-                      placeholder="Ex: PP, P, M, G, GG, 38, 40, etc."
-                      style={styles.textField}
-                    />
-                  </View>
-                </View>
-
-                {/* Seção de categoria */}
-                <View style={styles.formCard}>
-                  <View style={styles.cardHeader}>
-                    <MaterialIcons
-                      name="label"
-                      size={24}
-                      color={theme.colors.primary.secondary}
-                    />
-                    <Typography variant="h4" style={styles.cardTitle}>
-                      Categoria
-                    </Typography>
-                  </View>
-
-                  <CategoryPicker
-                    name="categoryId"
-                    label=""
-                    required={false}
-                    multiple={false}
-                  />
-                </View>
-
-                {/* Seção de fotos */}
-                <View style={styles.formCard}>
-                  <View style={styles.cardHeader}>
-                    <MaterialIcons
-                      name="photo-camera"
-                      size={24}
-                      color={theme.colors.primary.secondary}
-                    />
-                    <Typography variant="h4" style={styles.cardTitle}>
-                      Fotos do Item
-                    </Typography>
-                  </View>
-
-                  <PhotoUploadSection
-                    photos={photos}
-                    onPickImage={pickImage}
-                    onRemovePhoto={removePhoto}
-                  />
+                      {isLoading ? (
+                        <MaterialIcons
+                          name="hourglass-empty"
+                          size={20}
+                          color="white"
+                        />
+                      ) : (
+                        <MaterialIcons
+                          name="volunteer-activism"
+                          size={20}
+                          color="white"
+                        />
+                      )}
+                      <Typography
+                        variant="body"
+                        color={theme.colors.neutral.white}
+                        style={styles.submitButtonText}
+                      >
+                        {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
+                      </Typography>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </View>
               </View>
-            )}
-          </Formik>
-        </ScrollView>
-
-        {/* Botões de ação fixos */}
-        <View style={styles.bottomActions}>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => navigation.goBack()}
-              activeOpacity={0.7}
-            >
-              <Typography variant="body" color={theme.colors.neutral.darkGray}>
-                Cancelar
-              </Typography>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.submitButtonContainer}
-              onPress={() => {
-                // Trigger form submission
-                // Note: You'll need to access the Formik handleSubmit here
-              }}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["#173F5F", "#006E58"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitButton}
-              >
-                {isLoading ? (
-                  <MaterialIcons
-                    name="hourglass-empty"
-                    size={20}
-                    color="white"
-                  />
-                ) : (
-                  <MaterialIcons
-                    name="volunteer-activism"
-                    size={20}
-                    color="white"
-                  />
-                )}
-                <Typography
-                  variant="body"
-                  color={theme.colors.neutral.white}
-                  style={styles.submitButtonText}
-                >
-                  {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
-                </Typography>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+            </>
+          )}
+        </Formik>
       </Animated.View>
     </KeyboardAvoidingView>
   );
 };
 
+// Estilos
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.neutral.lightGray,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.neutral.lightGray },
   headerGradient: {
     paddingTop:
       Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
@@ -758,17 +737,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.m,
     marginTop: 40,
   },
-  titleSection: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontWeight: "bold",
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-  },
+  titleSection: { flex: 1 },
+  headerTitle: { fontWeight: "bold", fontSize: 24, marginBottom: 4 },
+  headerSubtitle: { fontSize: 14 },
   donationCounter: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -779,43 +750,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
     minWidth: 80,
   },
-  counterNumber: {
-    fontWeight: "bold",
-    fontSize: 18,
-    marginVertical: 2,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContainer: {
-    padding: theme.spacing.m,
-    paddingBottom: 100,
-  },
-  form: {
-    width: "100%",
-  },
-  progressContainer: {
-    marginBottom: theme.spacing.m,
-  },
-  progressInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: theme.spacing.xs,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: theme.colors.neutral.mediumGray,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: theme.colors.primary.secondary,
-    borderRadius: 2,
-  },
+  counterNumber: { fontWeight: "bold", fontSize: 18, marginVertical: 2 },
+  content: { flex: 1 },
+  scrollContainer: { padding: theme.spacing.m, paddingBottom: 100 },
   formCard: {
     backgroundColor: theme.colors.neutral.white,
     borderRadius: 16,
@@ -828,13 +765,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: theme.spacing.m,
   },
-  cardTitle: {
-    marginLeft: theme.spacing.s,
-    fontWeight: "600",
-  },
-  fieldContainer: {
-    marginBottom: theme.spacing.m,
-  },
+  cardTitle: { marginLeft: theme.spacing.s, fontWeight: "600" },
+  fieldContainer: { marginBottom: theme.spacing.m },
   fieldLabel: {
     marginBottom: theme.spacing.xs,
     fontWeight: "500",
@@ -853,20 +785,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
   },
-  photoSection: {
-    marginTop: theme.spacing.s,
-  },
-  sectionTitle: {
-    marginBottom: theme.spacing.xs,
-    fontWeight: "600",
-  },
+  photoSection: { marginTop: theme.spacing.s },
+  sectionTitle: { marginBottom: theme.spacing.xs, fontWeight: "600" },
   sectionSubtitle: {
     marginBottom: theme.spacing.m,
     color: theme.colors.neutral.darkGray,
   },
-  photoScroll: {
-    marginHorizontal: -theme.spacing.s,
-  },
+  photoListContent: { paddingHorizontal: theme.spacing.xs }, // Novo estilo para FlatList de fotos
   addPhotoButton: {
     width: 100,
     height: 100,
@@ -877,17 +802,13 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: theme.spacing.s,
   },
   addPhotoText: {
     marginTop: theme.spacing.xs,
     textAlign: "center",
     fontSize: 12,
   },
-  photoContainer: {
-    position: "relative",
-    marginLeft: theme.spacing.s,
-  },
+  photoContainer: { position: "relative", marginLeft: theme.spacing.s },
   photoPreview: {
     width: 100,
     height: 100,
@@ -905,6 +826,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  progressContainer: { marginBottom: theme.spacing.m },
+  progressInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.xs,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: theme.colors.primary.secondary,
+    borderRadius: 2,
+  },
   bottomActions: {
     position: "absolute",
     bottom: 0,
@@ -921,31 +859,31 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     gap: theme.spacing.s,
+    justifyContent: "space-between", // Espaça os botões adequadamente
   },
   cancelButton: {
-    flex: 1,
-    paddingVertical: theme.spacing.m,
+    flex: 1, // Botão "Cancelar" ocupa menos espaço
+    paddingVertical: theme.spacing.s, // Tamanho reduzido
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
+    backgroundColor: theme.colors.neutral.lightGray, // Fundo cinza para destaque
   },
   submitButtonContainer: {
-    flex: 2,
+    flex: 2, // Botão "Cadastrar Doação" ocupa mais espaço
     borderRadius: 12,
     overflow: "hidden",
   },
   submitButton: {
     flexDirection: "row",
-    paddingVertical: theme.spacing.m,
+    paddingVertical: theme.spacing.s, // Tamanho reduzido
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing.xs,
   },
-  submitButtonText: {
-    fontWeight: "600",
-  },
+  submitButtonText: { fontWeight: "600" },
 });
 
 export default NewDonationScreen;
