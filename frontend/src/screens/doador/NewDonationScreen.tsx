@@ -1,4 +1,3 @@
-// src/screens/doador/NewDonationScreen.tsx
 import React, {
   useState,
   useEffect,
@@ -16,9 +15,9 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  FlatList, // Adicionado FlatList
+  FlatList,
 } from "react-native";
-import { Formik, FormikProps } from "formik"; // Adicionado FormikProps para tipagem da ref
+import { Formik, FormikProps } from "formik";
 import * as Yup from "yup";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -134,7 +133,7 @@ const NewDonationScreen: React.FC = () => {
   // Refs para animações e Formik
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const formikRef = useRef<FormikProps<any>>(null); // Adicionado ref para Formik
+  const formikRef = useRef<FormikProps<any>>(null);
 
   // Animação de entrada
   useEffect(() => {
@@ -475,7 +474,13 @@ const NewDonationScreen: React.FC = () => {
                 size={16}
                 color={theme.colors.neutral.darkGray}
               />{" "}
-              Tipo de Item *
+              Tipo de Item{" "}
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.status.error}
+              >
+                *
+              </Typography>
             </Typography>
             <Select
               options={TYPE_OPTIONS.map((option) => ({
@@ -495,7 +500,13 @@ const NewDonationScreen: React.FC = () => {
                 size={16}
                 color={theme.colors.neutral.darkGray}
               />{" "}
-              Descrição *
+              Descrição{" "}
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.status.error}
+              >
+                *
+              </Typography>
             </Typography>
             <TextField
               value={values.description}
@@ -509,7 +520,11 @@ const NewDonationScreen: React.FC = () => {
               placeholder="Descreva o item que está doando"
               multiline
               numberOfLines={3}
-              style={styles.textField}
+              style={[
+                styles.textField,
+                { minHeight: 45, maxHeight: 120, width: "100%" },
+              ]}
+              scrollEnabled={true}
             />
           </View>
           <View style={styles.fieldContainer}>
@@ -635,7 +650,7 @@ const NewDonationScreen: React.FC = () => {
         ]}
       >
         <Formik
-          ref={formikRef} // Adicionado ref ao Formik
+          ref={formikRef}
           initialValues={initialValues}
           validationSchema={DonationSchema}
           onSubmit={handleSubmit}
@@ -655,7 +670,10 @@ const NewDonationScreen: React.FC = () => {
               <View style={styles.bottomActions}>
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    style={styles.cancelButton}
+                    style={[
+                      styles.cancelButton,
+                      { backgroundColor: theme.colors.neutral.lightGray },
+                    ]}
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                   >
@@ -668,7 +686,7 @@ const NewDonationScreen: React.FC = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.submitButtonContainer}
-                    onPress={() => formikRef.current?.handleSubmit()} // Usando ref para submit
+                    onPress={() => formikRef.current?.handleSubmit()}
                     activeOpacity={0.8}
                   >
                     <LinearGradient
@@ -778,6 +796,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
   },
   selectField: {
     backgroundColor: theme.colors.neutral.lightGray,
@@ -791,7 +811,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
     color: theme.colors.neutral.darkGray,
   },
-  photoListContent: { paddingHorizontal: theme.spacing.xs }, // Novo estilo para FlatList de fotos
+  photoListContent: { paddingHorizontal: theme.spacing.xs },
   addPhotoButton: {
     width: 100,
     height: 100,
@@ -859,26 +879,28 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     gap: theme.spacing.s,
-    justifyContent: "space-between", // Espaça os botões adequadamente
+    justifyContent: "space-between",
   },
   cancelButton: {
-    flex: 1, // Botão "Cancelar" ocupa menos espaço
-    paddingVertical: theme.spacing.s, // Tamanho reduzido
+    flex: 1,
+    paddingVertical: theme.spacing.s,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
-    backgroundColor: theme.colors.neutral.lightGray, // Fundo cinza para destaque
+    backgroundColor: theme.colors.neutral.lightGray,
+    ...theme.shadows.small, // Adicionando sombra
   },
   submitButtonContainer: {
-    flex: 2, // Botão "Cadastrar Doação" ocupa mais espaço
+    flex: 2,
     borderRadius: 12,
     overflow: "hidden",
+    ...theme.shadows.small, // Adicionando sombra
   },
   submitButton: {
     flexDirection: "row",
-    paddingVertical: theme.spacing.s, // Tamanho reduzido
+    paddingVertical: theme.spacing.s,
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing.xs,
