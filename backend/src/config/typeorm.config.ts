@@ -6,6 +6,9 @@ import { join } from 'path';
 // Carrega as variáveis de ambiente do arquivo .env
 dotenv.config();
 
+// Desabilita a verificação de certificados TLS/SSL globalmente
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // Configuração para as entidades
 const entitiesPath = join(__dirname, '..', '**', '*.entity{.ts,.js}');
 
