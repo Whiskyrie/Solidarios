@@ -145,18 +145,18 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     borderWidth: 1,
     borderRadius: theme.borderRadius.medium,
     paddingHorizontal: theme.spacing.xs,
-    height: 48,
+    minHeight: 48,
   },
   input: {
     flex: 1,
     fontFamily: theme.fontFamily.primary,
     fontSize: 16,
-    height: "100%",
-    paddingVertical: 0,
+    minHeight: 48,
+    paddingVertical: theme.spacing.xs,
   },
   leftIcon: {
     marginRight: theme.spacing.xs,

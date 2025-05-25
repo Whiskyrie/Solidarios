@@ -6,11 +6,10 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  ScrollView,
   Animated,
   StatusBar,
   Platform,
-  Text,
+  TextInput,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -22,7 +21,6 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import {
   Typography,
   ItemCard,
-  SearchBar,
   EmptyState,
   Loading,
   ErrorState,
@@ -40,10 +38,10 @@ import { Order } from "../../types/common.types";
 
 // Filtros de status
 const STATUS_FILTERS = [
-  { label: "Todos", value: "all" },
-  { label: "Disponíveis", value: ItemStatus.DISPONIVEL },
-  { label: "Reservados", value: ItemStatus.RESERVADO },
-  { label: "Distribuídos", value: ItemStatus.DISTRIBUIDO },
+  { label: "Todos", value: "all", icon: "view-list" },
+  { label: "Disponíveis", value: ItemStatus.DISPONIVEL, icon: "check-circle" },
+  { label: "Reservados", value: ItemStatus.RESERVADO, icon: "schedule" },
+  { label: "Distribuídos", value: ItemStatus.DISTRIBUIDO, icon: "done-all" },
 ];
 
 const MyDonationsScreen: React.FC = () => {
@@ -59,10 +57,12 @@ const MyDonationsScreen: React.FC = () => {
   const [filteredItems, setFilteredItems] = useState<Item[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const filterRotation = useRef(new Animated.Value(0)).current;
 
   // Carregar doações do usuário
   const loadDonations = useCallback(
@@ -73,18 +73,15 @@ const MyDonationsScreen: React.FC = () => {
             `Carregando doações para o usuário ${user.id}, página ${page}`
           );
 
-          // Definir um número razoável de itens por página
           await fetchItemsByDonor(user.id, {
             page,
             take: 10,
-            order: Order.DESC, // Mostrar mais recentes primeiro
+            order: Order.DESC,
           });
 
-          // Marcar que os dados foram carregados (independente do resultado)
           setDataLoaded(true);
         } catch (error) {
           console.error("Erro ao carregar doações:", error);
-          // Mesmo em caso de erro, consideramos que os dados foram "carregados"
           setDataLoaded(true);
         }
       }
@@ -95,7 +92,6 @@ const MyDonationsScreen: React.FC = () => {
   // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
-      // Iniciar animações
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -109,14 +105,12 @@ const MyDonationsScreen: React.FC = () => {
         }),
       ]).start();
 
-      // Carregar doações - sempre começar pela página 1 ao focar na tela
       loadDonations(1);
     }, [loadDonations, fadeAnim, slideAnim])
   );
 
   // Filtragem de itens
   useEffect(() => {
-    // Se items não existir ou não for um array, não prosseguir
     if (!items || !Array.isArray(items)) {
       setFilteredItems([]);
       return;
@@ -124,12 +118,10 @@ const MyDonationsScreen: React.FC = () => {
 
     let result = [...items];
 
-    // Aplicar filtro de status
     if (activeFilter !== "all") {
       result = result.filter((item) => item.status === activeFilter);
     }
 
-    // Aplicar busca
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -148,17 +140,15 @@ const MyDonationsScreen: React.FC = () => {
   // Função para pull-to-refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    clearError(); // Limpar erros anteriores
-    await loadDonations(1); // Sempre carregar primeira página no refresh
+    clearError();
+    await loadDonations(1);
     setRefreshing(false);
   };
 
   // Função para carregar mais itens
   const handleLoadMore = async () => {
-    // Evitar múltiplas chamadas simultâneas
     if (isLoadingMore || isLoading || refreshing) return;
 
-    // Verificar se há mais páginas para carregar
     if (pagination && pagination.page < pagination.totalPages) {
       setIsLoadingMore(true);
       try {
@@ -171,45 +161,196 @@ const MyDonationsScreen: React.FC = () => {
 
   // Função para navegar para a tela de nova doação
   const navigateToNewDonation = () => {
-    // Navegar para a tab NewDonation
     const rootNavigation = navigation.getParent();
     if (rootNavigation) {
       rootNavigation.navigate("NewDonation");
     }
   };
 
-  // Componente de cabeçalho comum
+  // Toggle dropdown de filtros
+  const toggleFilterDropdown = () => {
+    const toValue = showFilterDropdown ? 0 : 1;
+    Animated.timing(filterRotation, {
+      toValue,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+    setShowFilterDropdown(!showFilterDropdown);
+  };
+
+  // Componente de cabeçalho redesenhado
   const Header = () => (
     <>
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor="transparent"
+        barStyle="light-content"
+        backgroundColor="#173F5F"
         translucent
       />
       <LinearGradient
-        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-        locations={[0, 0.3, 0.6]}
+        colors={["#173F5F", "#006E58"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
-        <View style={styles.header}>
-          <View style={styles.welcomeContainer}>
+        {/* Seção de boas-vindas */}
+        <View style={styles.welcomeSection}>
+          <View>
             <Typography
-              variant="h1"
+              variant="h2"
               style={styles.welcomeText}
-              color={theme.colors.primary.main}
+              color={theme.colors.neutral.white}
             >
               Minhas Doações
             </Typography>
             <Typography
               variant="bodySecondary"
-              color={theme.colors.neutral.darkGray}
+              color="rgba(255,255,255,0.8)"
+              style={styles.greetingText}
             >
               Olá, {user?.name?.split(" ")[0] || "Doador"}
             </Typography>
           </View>
+
+          {/* Contador de doações */}
+          <View style={styles.donationCounter}>
+            <Typography
+              variant="h2"
+              color={theme.colors.neutral.white}
+              style={styles.counterNumber}
+            >
+              {items?.length || 0}
+            </Typography>
+            <Typography variant="caption" color="rgba(255,255,255,0.8)">
+              doações
+            </Typography>
+          </View>
         </View>
+
+        {/* Seção integrada de busca e filtros */}
+        <View style={styles.searchFilterSection}>
+          <View style={styles.searchContainer}>
+            {/* SearchBar customizado para melhor controle de cores */}
+            <View style={styles.searchBar}>
+              <MaterialIcons
+                name="search"
+                size={20}
+                color="rgba(255,255,255,0.6)"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar doações..."
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                style={styles.searchInput}
+                selectionColor="rgba(255,255,255,0.8)"
+                underlineColorAndroid="transparent"
+              />
+            </View>
+
+            {/* Botão de filtro compacto */}
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={toggleFilterDropdown}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name="filter-list"
+                size={20}
+                color={theme.colors.neutral.white}
+              />
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: filterRotation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["0deg", "180deg"],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <MaterialIcons
+                  name="expand-more"
+                  size={16}
+                  color={theme.colors.neutral.white}
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Indicador de filtro ativo */}
+          {activeFilter !== "all" && (
+            <View style={styles.activeFilterIndicator}>
+              <MaterialIcons
+                name={
+                  STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
+                  "filter-list"
+                }
+                size={14}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography
+                variant="caption"
+                color={theme.colors.primary.secondary}
+                style={styles.activeFilterText}
+              >
+                {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label}
+              </Typography>
+              <TouchableOpacity
+                onPress={() => setActiveFilter("all")}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons
+                  name="close"
+                  size={14}
+                  color={theme.colors.primary.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Dropdown de filtros */}
+        {showFilterDropdown && (
+          <Animated.View style={styles.filterDropdown}>
+            {STATUS_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter.value}
+                style={[
+                  styles.filterOption,
+                  activeFilter === filter.value && styles.activeFilterOption,
+                ]}
+                onPress={() => {
+                  setActiveFilter(filter.value);
+                  setShowFilterDropdown(false);
+                }}
+              >
+                <MaterialIcons
+                  name={filter.icon}
+                  size={18}
+                  color={
+                    activeFilter === filter.value
+                      ? theme.colors.primary.secondary
+                      : theme.colors.neutral.darkGray
+                  }
+                />
+                <Typography
+                  variant="bodySecondary"
+                  color={
+                    activeFilter === filter.value
+                      ? theme.colors.primary.secondary
+                      : theme.colors.neutral.black
+                  }
+                  style={styles.filterOptionText}
+                >
+                  {filter.label}
+                </Typography>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+        )}
       </LinearGradient>
     </>
   );
@@ -274,8 +415,6 @@ const MyDonationsScreen: React.FC = () => {
             />
           </View>
         }
-        actionLabel="Fazer uma doação"
-        onAction={navigateToNewDonation}
       />
     </View>
   );
@@ -285,102 +424,47 @@ const MyDonationsScreen: React.FC = () => {
     <View style={styles.container}>
       <Header />
 
-      {/* Conteúdo */}
       <View style={styles.content}>
-        {/* Barra de pesquisa */}
-        <View style={styles.searchContainer}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Buscar doações..."
-            containerStyle={styles.searchBar}
-          />
-        </View>
-
-        {/* Filtros */}
-        <View style={styles.filtersContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersScrollContent}
-          >
-            {STATUS_FILTERS.map((filter) => (
-              <TouchableOpacity
-                key={filter.value}
-                onPress={() => setActiveFilter(filter.value)}
-                activeOpacity={0.7}
-              >
-                {activeFilter === filter.value ? (
-                  <LinearGradient
-                    colors={["#173F5F", "#006E58"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.activeFilterItem}
-                  >
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.white}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.filterItem}>
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.darkGray}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Visualização do estado vazio com verificação simplificada */}
-        {dataLoaded && filteredItems.length === 0 ? (
-          <NoItemsView />
-        ) : (
-          <FlatList
-            data={filteredItems}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ItemCard
-                item={item}
-                onPress={() =>
-                  navigation.navigate(DOADOR_ROUTES.DONATION_DETAIL, {
-                    id: item.id,
-                  })
-                }
-                showDonor={false}
-              />
-            )}
-            contentContainerStyle={[
-              styles.listContent,
-              filteredItems.length === 0 && styles.emptyListContent,
-            ]}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.colors.primary.secondary]}
-                tintColor={theme.colors.primary.secondary}
-              />
-            }
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              isLoadingMore ? (
-                <View style={styles.loadingMoreContainer}>
-                  <Loading visible size="small" message="Carregando mais..." />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={NoItemsView}
-          />
-        )}
+        <FlatList
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ItemCard
+              item={item}
+              onPress={() =>
+                navigation.navigate(DOADOR_ROUTES.DONATION_DETAIL, {
+                  id: item.id,
+                })
+              }
+              showDonor={false}
+            />
+          )}
+          contentContainerStyle={[
+            styles.listContent,
+            filteredItems.length === 0 && styles.emptyListContent,
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary.secondary]}
+              tintColor={theme.colors.primary.secondary}
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <Loading visible size="small" message="Carregando mais..." />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            dataLoaded && filteredItems.length === 0 ? <NoItemsView /> : null
+          }
+          showsVerticalScrollIndicator={false}
+        />
 
         {/* Botão flutuante para nova doação */}
         <TouchableOpacity
@@ -416,67 +500,132 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingTop:
-      Platform.OS === "ios" ? 60 : 40 + (StatusBar.currentHeight ?? 0),
+      Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
     paddingBottom: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    ...theme.shadows.medium,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    ...theme.shadows.strong,
   },
-  header: {
+  welcomeSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: theme.spacing.m,
-  },
-  welcomeContainer: {
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
   },
   welcomeText: {
     fontWeight: "bold",
-    fontSize: 28,
-    marginBottom: 5,
+    fontSize: 24,
+    marginBottom: 2,
+  },
+  greetingText: {
+    fontSize: 14,
+  },
+  donationCounter: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  counterNumber: {
+    fontWeight: "bold",
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  searchFilterSection: {
+    paddingHorizontal: theme.spacing.m,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    paddingHorizontal: theme.spacing.s,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.neutral.white,
+    fontSize: 14,
+    fontFamily: "System",
+    padding: 0,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: theme.spacing.s,
+    height: 44,
+    borderRadius: 12,
+    gap: 4,
+  },
+  activeFilterIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.neutral.white,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: theme.spacing.xs,
+    alignSelf: "flex-start",
+    gap: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.primary.secondary,
+  },
+  activeFilterText: {
+    marginLeft: 2,
+    marginRight: 4,
+    fontWeight: "600",
+  },
+  filterDropdown: {
+    backgroundColor: theme.colors.neutral.white,
+    marginHorizontal: theme.spacing.m,
+    marginTop: theme.spacing.xs,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.mediumGray,
+    ...theme.shadows.medium,
+  },
+  filterOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    gap: theme.spacing.xs,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  activeFilterOption: {
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+  },
+  filterOptionText: {
+    flex: 1,
+    color: theme.colors.neutral.black,
   },
   content: {
     flex: 1,
-    marginTop: -20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: theme.spacing.s,
-  },
-  searchContainer: {
-    marginTop: theme.spacing.s,
-  },
-  searchBar: {
-    marginVertical: theme.spacing.s,
-    borderRadius: 12,
-    ...theme.shadows.small,
-  },
-  filtersContainer: {
-    marginBottom: theme.spacing.xs,
-  },
-  filtersScrollContent: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.xxs,
-  },
-  filterItem: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-    borderRadius: 12,
-    backgroundColor: "#F5F8FF",
-    borderWidth: 1,
-    borderColor: "#E0E7FF",
-    ...theme.shadows.small,
-  },
-  activeFilterItem: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-    borderRadius: 12,
-    ...theme.shadows.small,
-  },
-  listContainer: {
-    flex: 1,
+    backgroundColor: theme.colors.neutral.lightGray,
   },
   listContent: {
     flexGrow: 1,
+    paddingTop: theme.spacing.s,
+    paddingHorizontal: theme.spacing.s,
     paddingBottom: theme.spacing.xl + 60,
   },
   emptyListContent: {
