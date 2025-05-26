@@ -62,37 +62,52 @@ const DistributionsScreen: React.FC = () => {
 
   // Aplicar filtros e busca às distribuições
   useEffect(() => {
-    if (!distributions) return;
+    // CORREÇÃO: Verificação robusta antes de usar spread operator
+    if (!distributions || !Array.isArray(distributions)) {
+      console.log("[DistributionsScreen] Distributions não é um array válido");
+      setFilteredDistributions([]);
+      return;
+    }
 
-    let result = [...distributions];
+    try {
+      // CORREÇÃO: Usar Array.from para garantir cópia segura
+      let result = Array.from(distributions);
 
-    // Aplicar busca
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (dist) =>
-          dist.beneficiary?.name.toLowerCase().includes(query) ||
-          dist.items.some((item) =>
-            item.description.toLowerCase().includes(query)
-          )
+      // Aplicar busca
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        result = result.filter(
+          (dist) =>
+            dist?.beneficiary?.name?.toLowerCase().includes(query) ||
+            (Array.isArray(dist?.items) &&
+              dist.items.some((item) =>
+                item?.description?.toLowerCase().includes(query)
+              ))
+        );
+      }
+
+      // Aplicar ordenação
+      switch (sortBy) {
+        case "date_desc":
+          result.sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          break;
+        case "date_asc":
+          result.sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          );
+          break;
+      }
+
+      setFilteredDistributions(result);
+    } catch (error) {
+      console.error(
+        "[DistributionsScreen] Erro ao filtrar distributions:",
+        error
       );
+      setFilteredDistributions([]);
     }
-
-    // Aplicar ordenação
-    switch (sortBy) {
-      case "date_desc":
-        result.sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-        break;
-      case "date_asc":
-        result.sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        break;
-    }
-
-    setFilteredDistributions(result);
   }, [distributions, searchQuery, sortBy]);
 
   // Carregar distribuições
