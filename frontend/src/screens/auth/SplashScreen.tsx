@@ -9,151 +9,113 @@ import {
   TouchableWithoutFeedback,
   StatusBar,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import theme from "../../theme";
 
 const { width, height } = Dimensions.get("window");
 
+// Constantes de timing para melhor previsibilidade
+const SPLASH_DURATION = 3000; // 3 segundos fixos
+const ANIMATION_DURATION = 2500; // 500ms buffer antes do finish
+
 const SplashScreen: React.FC<{ onFinish?: () => void }> = ({ onFinish }) => {
-  // Animações principais
+  // Animações simplificadas - apenas 2 principais
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [animationComplete, setAnimationComplete] = useState(false);
-  const [allAnimationsFinished, setAllAnimationsFinished] = useState(false);
+  const [canSkip, setCanSkip] = useState(false);
 
-  // Converter rotação para string interpolada
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: ["-8deg", "0deg", "8deg"],
-  });
-
-  // Interpolar a escala do efeito de pulso
+  // Interpolar a escala do efeito de pulso (mais sutil)
   const pulseScale = pulseAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.95, 1.05, 0.95],
+    inputRange: [0, 1],
+    outputRange: [0.98, 1.02], // Menos agressivo que antes
   });
 
-  // Iniciar todas as animações uma única vez
+  // Combinar escalas para efeito final
+  const combinedScale = Animated.multiply(scaleAnim, pulseScale);
+
   useEffect(() => {
-    const animations: Animated.CompositeAnimation[] = [];
-    let completedAnimations = 0;
-    const totalAnimations = 3; // Agora temos 3 animações para acompanhar (spin, pulse, main)
+    // Permitir skip após 1 segundo
+    const skipTimer = setTimeout(() => {
+      setCanSkip(true);
+    }, 1000);
 
-    // Função para verificar se todas as animações terminaram
-    const checkAllAnimationsFinished = () => {
-      completedAnimations++;
-      if (completedAnimations >= totalAnimations) {
-        setAllAnimationsFinished(true);
-        // Chamar callback quando todas as animações estiverem concluídas
-        if (onFinish) {
-          setTimeout(onFinish, 500); // Um pequeno atraso para garantir que tudo está renderizado
-        }
+    // Timer principal da splash - sempre 3 segundos
+    const finishTimer = setTimeout(() => {
+      if (onFinish) {
+        onFinish();
       }
-    };
+    }, SPLASH_DURATION);
 
-    // Animação de rotação contínua
-    const spinAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 2,
-          duration: 3000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-      ]),
-      { iterations: 2 }
-    );
-    animations.push(spinAnimation);
-
-    // Animação de pulsação contínua
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-      ]),
-      { iterations: 4 }
-    );
-    animations.push(pulseAnimation);
-
-    // Sequência de animação principal
+    // Animação principal simplificada
     const mainAnimation = Animated.sequence([
-      // 1. Fade in e zoom inicial
+      // 1. Entrada suave - fade + scale
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 1800,
+          duration: 1200,
           useNativeDriver: true,
           easing: Easing.out(Easing.cubic),
         }),
         Animated.timing(scaleAnim, {
-          toValue: 1.2,
-          duration: 1800,
+          toValue: 1.1,
+          duration: 1200,
           useNativeDriver: true,
           easing: Easing.out(Easing.cubic),
         }),
       ]),
 
-      // 2. Scale down para tamanho normal com bounce
+      // 2. Settle para tamanho final
       Animated.timing(scaleAnim, {
         toValue: 1,
-        duration: 1200,
+        duration: 800,
         useNativeDriver: true,
-        easing: Easing.out(Easing.back(1.7)),
+        easing: Easing.out(Easing.back(1.2)), // Bounce mais suave
       }),
     ]);
-    animations.push(mainAnimation);
 
-    // Iniciar todas as animações com callbacks para verificar o término
-    spinAnimation.start(({ finished }) => {
-      if (finished) checkAllAnimationsFinished();
-    });
+    // Animação de pulsação sutil
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ]),
+      { iterations: 2 } // Apenas 2 pulsos
+    );
 
-    pulseAnimation.start(({ finished }) => {
-      if (finished) checkAllAnimationsFinished();
-    });
-
-    // Iniciar animação principal com callback
+    // Iniciar animações
     mainAnimation.start(({ finished }) => {
       if (finished) {
         setAnimationComplete(true);
-        checkAllAnimationsFinished();
       }
     });
 
-    // Limpar animações quando o componente for desmontado
+    pulseAnimation.start();
+
+    // Cleanup
     return () => {
-      animations.forEach((anim) => anim.stop());
+      clearTimeout(skipTimer);
+      clearTimeout(finishTimer);
+      mainAnimation.stop();
+      pulseAnimation.stop();
     };
   }, []);
 
-  // Função para pular a animação
+  // Função para pular a animação (apenas se permitido)
   const skipAnimation = () => {
-    if (onFinish && !allAnimationsFinished) {
-      setAllAnimationsFinished(true);
+    if (onFinish && canSkip) {
       onFinish();
     }
   };
@@ -161,31 +123,55 @@ const SplashScreen: React.FC<{ onFinish?: () => void }> = ({ onFinish }) => {
   return (
     <TouchableWithoutFeedback onPress={skipAnimation}>
       <View style={styles.container}>
-        <StatusBar hidden />
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
 
-        {/* Conteúdo animado */}
-        <View style={styles.contentContainer}>
-          {/* Logo */}
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              {
-                opacity: fadeAnim,
-                transform: [
-                  { scale: scaleAnim },
-                  { rotate },
-                  { scale: pulseScale },
-                ],
-              },
-            ]}
-          >
-            <Image
-              source={require("../../../assets/icon.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
-        </View>
+        {/* Background com gradiente consistente */}
+        <LinearGradient
+          colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}
+        >
+          {/* Conteúdo animado */}
+          <View style={styles.contentContainer}>
+            {/* Logo com tamanho otimizado */}
+            <Animated.View
+              style={[
+                styles.logoContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: combinedScale }],
+                },
+              ]}
+            >
+              <Image
+                source={require("../../../assets/icon.png")}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="Logo do aplicativo"
+              />
+            </Animated.View>
+
+            {/* Indicador sutil de que pode tocar para pular */}
+            {canSkip && (
+              <Animated.View
+                style={[
+                  styles.skipIndicator,
+                  {
+                    opacity: fadeAnim,
+                  },
+                ]}
+              >
+                <View style={styles.skipDot} />
+              </Animated.View>
+            )}
+          </View>
+        </LinearGradient>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -194,9 +180,11 @@ const SplashScreen: React.FC<{ onFinish?: () => void }> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  gradientBackground: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: theme.colors.primary.main, // Fundo escuro para contraste com a logo
   },
   contentContainer: {
     justifyContent: "center",
@@ -206,10 +194,31 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: "center",
     justifyContent: "center",
+    // Adicionar sombra sutil para profundidade
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   logo: {
-    width: 220,
-    height: 220,
+    width: 160, // Reduzido de 220px para melhor proporção
+    height: 160,
+  },
+  skipIndicator: {
+    position: "absolute",
+    bottom: -60,
+    alignItems: "center",
+  },
+  skipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    marginBottom: 4,
   },
 });
 
