@@ -57,4 +57,22 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole, { message: 'Papel inválido' })
   role?: UserRole;
+
+  @ApiProperty({
+    example: '(11) 99999-9999',
+    description: 'Telefone do usuário',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'O telefone deve ser uma string' })
+  phone?: string;
+
+  @ApiProperty({
+    example: 'Rua das Flores, 123, Centro, São Paulo - SP',
+    description: 'Endereço completo do usuário',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'O endereço deve ser uma string' })
+  address?: string;
 }
