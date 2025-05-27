@@ -35,4 +35,12 @@ export class CreateUserDto {
 
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'O telefone deve ser uma string' })
+  phone?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O endereço deve ser uma string' })
+  address?: string;
 }
