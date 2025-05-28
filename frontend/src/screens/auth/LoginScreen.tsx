@@ -45,11 +45,13 @@ const LoginScreen: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const autoLoginData = route.params as {
-    email?: string;
-    autoLogin?: boolean;
-    password?: string;
-  } | undefined;
+  const autoLoginData = route.params as
+    | {
+        email?: string;
+        autoLogin?: boolean;
+        password?: string;
+      }
+    | undefined;
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -436,8 +438,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 85,
+    height: 85,
   },
   headerTextContainer: {
     alignItems: "center",

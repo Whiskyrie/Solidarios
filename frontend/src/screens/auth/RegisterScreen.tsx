@@ -36,7 +36,7 @@ import { maskPhone } from "../../utils/authUtils";
 import AddressAutocomplete, {
   AddressAutocompleteRef,
 } from "../../components/profile/AddressAutocomplete";
-import { AddressSuggestion } from "../../api/geocoding";
+import { AddressSuggestion } from "../../types/geocode.types";
 
 // Esquema de validação
 const RegisterSchema = Yup.object().shape({
@@ -775,8 +775,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 50,
+    height: 50,
   },
   headerTextContainer: {
     alignItems: "center",

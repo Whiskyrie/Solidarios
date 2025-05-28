@@ -167,8 +167,8 @@ const styles = StyleSheet.create({
   logo: {
     width: width * 0.6,
     height: width * 0.6,
-    maxWidth: 220,
-    maxHeight: 220,
+    maxWidth: 145,
+    maxHeight: 145,
   },
   textContainer: {
     alignItems: "center",
