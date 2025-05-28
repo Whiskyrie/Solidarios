@@ -18,6 +18,8 @@ export interface NominatimResponse {
     suburb?: string;
     city_district?: string;
     city?: string;
+    town?: string;
+    village?: string;
     county?: string;
     state_district?: string;
     state?: string;
@@ -27,7 +29,7 @@ export interface NominatimResponse {
   };
 }
 
-// Interface para sugestão de endereço formatada
+// Interface para sugestão de endereço formatada - SIMPLIFICADA
 export interface AddressSuggestion {
   id: string;
   displayName: string;
@@ -35,9 +37,6 @@ export interface AddressSuggestion {
   number?: string;
   neighborhood?: string;
   city?: string;
-  state?: string;
-  postalCode?: string;
-  country?: string;
   coordinates: {
     lat: number;
     lon: number;
@@ -53,6 +52,53 @@ class GeocodingService {
   private readonly minInterval = 1000; // 1 segundo
 
   /**
+   * Preparar consulta para melhor precisão
+   */
+  private prepareQuery(query: string): string {
+    // Limpar e normalizar a consulta
+    let cleanQuery = query
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ") // Múltiplos espaços por um só
+      .replace(/[,;.]+/g, ",") // Normalizar separadores
+      .replace(
+        /\b(rua|av|avenida|travessa|alameda|praça|largo|estrada)\b/gi,
+        (match) => {
+          const normalized = {
+            rua: "rua",
+            av: "avenida",
+            avenida: "avenida",
+            travessa: "travessa",
+            alameda: "alameda",
+            praça: "praça",
+            largo: "largo",
+            estrada: "estrada",
+          };
+          return (
+            normalized[match.toLowerCase() as keyof typeof normalized] || match
+          );
+        }
+      );
+
+    // Adicionar contexto do Brasil se não houver referência geográfica
+    if (
+      !cleanQuery.includes("brasil") &&
+      !cleanQuery.includes("brazil") &&
+      !cleanQuery.includes(" sp ") &&
+      !cleanQuery.includes(" rj ") &&
+      !cleanQuery.includes(" mg ") &&
+      !cleanQuery.includes(" pr ") &&
+      !cleanQuery.match(
+        /\b(são paulo|rio de janeiro|minas gerais|paraná|bahia|ceará|pernambuco|rio grande do sul|santa catarina|goiás|maranhão|acre|alagoas|amapá|amazonas|distrito federal|espírito santo|mato grosso|mato grosso do sul|pará|paraíba|piauí|rondônia|roraima|sergipe|tocantins)\b/i
+      )
+    ) {
+      cleanQuery += ", Brasil";
+    }
+
+    return cleanQuery;
+  }
+
+  /**
    * Buscar endereços usando geocodificação direta
    * @param query Termo de busca para o endereço
    * @param countryCode Código do país (padrão: 'br' para Brasil)
@@ -62,7 +108,7 @@ class GeocodingService {
   async searchAddresses(
     query: string,
     countryCode: string = "br",
-    limit: number = 5
+    limit: number = 8
   ): Promise<AddressSuggestion[]> {
     // Rate limiting
     const now = Date.now();
@@ -73,28 +119,41 @@ class GeocodingService {
       await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
 
+    const preparedQuery = this.prepareQuery(query);
+
     try {
       const response = await axios.get<NominatimResponse[]>(
         `${this.baseUrl}/search`,
         {
           params: {
-            q: query,
+            q: preparedQuery,
             format: "json",
             addressdetails: 1,
             limit,
             countrycodes: countryCode,
             "accept-language": "pt-BR,pt,en",
+            dedupe: 1, // Remover duplicatas
+            extratags: 1, // Tags extras para melhor contexto
+            namedetails: 1, // Detalhes do nome
+            bounded: 0, // Não limitar à área específica
+            exclude_place_ids: "", // Não excluir lugares
           },
           headers: {
             "User-Agent": this.userAgent,
           },
-          timeout: 5000,
+          timeout: 8000, // Aumentar timeout
         }
       );
 
       this.lastRequestTime = Date.now();
 
-      return response.data.map(this.formatAddressSuggestion);
+      // Filtrar e ordenar resultados por relevância
+      const formatted = response.data
+        .map(this.formatAddressSuggestion)
+        .filter(this.filterRelevantResults)
+        .sort(this.sortByRelevance);
+
+      return formatted.slice(0, limit);
     } catch (error) {
       console.error("Erro ao buscar endereços:", error);
       throw new Error("Não foi possível buscar sugestões de endereço");
@@ -102,7 +161,36 @@ class GeocodingService {
   }
 
   /**
-   * Formatar resposta do Nominatim para sugestão de endereço
+   * Filtrar resultados relevantes - FOCO NO ESSENCIAL
+   */
+  private filterRelevantResults = (suggestion: AddressSuggestion): boolean => {
+    // Deve ter pelo menos rua E cidade
+    if (!suggestion.street || !suggestion.city) return false;
+
+    // Preferir endereços com bairro
+    return true;
+  };
+
+  /**
+   * Ordenar por relevância - PRIORIZAR COMPLETUDE
+   */
+  private sortByRelevance = (
+    a: AddressSuggestion,
+    b: AddressSuggestion
+  ): number => {
+    // Priorizar endereços com número
+    if (a.number && !b.number) return -1;
+    if (!a.number && b.number) return 1;
+
+    // Priorizar endereços com bairro
+    if (a.neighborhood && !b.neighborhood) return -1;
+    if (!a.neighborhood && b.neighborhood) return 1;
+
+    return 0;
+  };
+
+  /**
+   * Formatar resposta do Nominatim - APENAS CAMPOS ESSENCIAIS
    */
   private formatAddressSuggestion = (
     item: NominatimResponse
@@ -115,10 +203,7 @@ class GeocodingService {
       street: address.road,
       number: address.house_number,
       neighborhood: address.suburb || address.city_district,
-      city: address.city || address.county,
-      state: address.state,
-      postalCode: address.postcode,
-      country: address.country,
+      city: address.city || address.town || address.village,
       coordinates: {
         lat: parseFloat(item.lat),
         lon: parseFloat(item.lon),

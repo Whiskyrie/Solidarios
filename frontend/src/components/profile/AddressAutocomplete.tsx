@@ -28,10 +28,10 @@ export interface AddressAutocompleteProps {
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
   required?: boolean;
-  onAddressSelect?: (address: AddressSuggestion) => void;
-  onSuggestionsChange?: (suggestions: AddressSuggestion[]) => void;
-  onLoadingChange?: (loading: boolean) => void;
-  onInputChange?: (value: string) => void;
+  onSuggestionsChange?: (
+    suggestions: AddressSuggestion[],
+    loading: boolean
+  ) => void;
   countryCode?: string;
   disabled?: boolean;
 }
@@ -40,18 +40,7 @@ export interface AddressAutocompleteRef {
   focus: () => void;
   blur: () => void;
   clear: () => void;
-  getValue: () => string;
-  setValue: (value: string) => void;
-}
-
-interface AddressFields {
-  street?: string;
-  number?: string;
-  neighborhood?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  fullAddress?: string;
+  selectAddress: (address: AddressSuggestion) => void;
 }
 
 const AddressAutocomplete = forwardRef<
@@ -65,10 +54,7 @@ const AddressAutocomplete = forwardRef<
       placeholder = "Digite seu endereço...",
       style,
       required = false,
-      onAddressSelect,
       onSuggestionsChange,
-      onLoadingChange,
-      onInputChange,
       countryCode = "br",
       disabled = false,
     },
@@ -76,16 +62,15 @@ const AddressAutocomplete = forwardRef<
   ) => {
     const { values, setFieldValue, touched, errors } = useFormikContext<any>();
     const [inputValue, setInputValue] = useState("");
-    const [selectedSuggestion, setSelectedSuggestion] =
-      useState<AddressSuggestion | null>(null);
+    const [isAddressSelected, setIsAddressSelected] = useState(false);
     const inputRef = useRef<TextInput>(null);
 
-    const { suggestions, isLoading, error, searchAddresses, clearSuggestions } =
+    const { suggestions, isLoading, searchAddresses, clearSuggestions } =
       useGeocoding({
         countryCode,
-        debounceMs: 500,
+        debounceMs: 300,
         minQueryLength: 3,
-        maxSuggestions: 6,
+        maxSuggestions: 8,
       });
 
     // Obter valores do formulário
@@ -99,46 +84,61 @@ const AddressAutocomplete = forwardRef<
       clear: () => {
         setInputValue("");
         setFieldValue(name, "");
-        setSelectedSuggestion(null);
+        setIsAddressSelected(false);
         clearSuggestions();
       },
-      getValue: () => inputValue,
-      setValue: (newValue: string) => {
-        setInputValue(newValue);
-        setFieldValue(name, newValue);
+      selectAddress: (address: AddressSuggestion) => {
+        const formattedAddress = formatSelectedAddress(address);
+        setInputValue(formattedAddress);
+        setFieldValue(name, formattedAddress);
+        setIsAddressSelected(true);
+        clearSuggestions();
       },
     }));
 
     // Sincronizar com valor do formulário
     useEffect(() => {
-      if (value && value !== inputValue && !selectedSuggestion) {
+      if (value && value !== inputValue && !isAddressSelected) {
         setInputValue(value);
       }
-    }, [value, inputValue, selectedSuggestion]);
+    }, [value, inputValue, isAddressSelected]);
 
-    // Notificar mudanças nas sugestões para o componente pai
+    // Notificar mudanças para o componente pai
     useEffect(() => {
       if (onSuggestionsChange) {
-        onSuggestionsChange(suggestions);
+        onSuggestionsChange(suggestions, isLoading);
       }
-    }, [suggestions, onSuggestionsChange]);
+    }, [suggestions, isLoading, onSuggestionsChange]);
 
-    // Notificar mudanças no loading para o componente pai
-    useEffect(() => {
-      if (onLoadingChange) {
-        onLoadingChange(isLoading);
+    const formatSelectedAddress = (suggestion: AddressSuggestion): string => {
+      const parts = [];
+
+      // Rua + Número
+      if (suggestion.street) {
+        if (suggestion.number) {
+          parts.push(`${suggestion.street}, ${suggestion.number}`);
+        } else {
+          parts.push(suggestion.street);
+        }
       }
-    }, [isLoading, onLoadingChange]);
+
+      // Bairro
+      if (suggestion.neighborhood) {
+        parts.push(suggestion.neighborhood);
+      }
+
+      // Cidade
+      if (suggestion.city) {
+        parts.push(suggestion.city);
+      }
+
+      return parts.join(" - ");
+    };
 
     const handleTextChange = (text: string) => {
       setInputValue(text);
       setFieldValue(name, text);
-      setSelectedSuggestion(null);
-
-      // Notificar mudança no input para o componente pai
-      if (onInputChange) {
-        onInputChange(text);
-      }
+      setIsAddressSelected(false);
 
       if (text.trim().length >= 3) {
         searchAddresses(text.trim());
@@ -146,57 +146,6 @@ const AddressAutocomplete = forwardRef<
         clearSuggestions();
       }
     };
-
-    // Método público para seleção de endereço (chamado pelo componente pai)
-    const selectAddress = useCallback(
-      (suggestion: AddressSuggestion) => {
-        setSelectedSuggestion(suggestion);
-        setInputValue(suggestion.displayName);
-        setFieldValue(name, suggestion.displayName);
-
-        // Preencher campos relacionados
-        const addressFields: AddressFields = {
-          street: suggestion.street,
-          number: suggestion.number,
-          neighborhood: suggestion.neighborhood,
-          city: suggestion.city,
-          state: suggestion.state,
-          postalCode: suggestion.postalCode,
-          fullAddress: suggestion.displayName,
-        };
-
-        Object.entries(addressFields).forEach(([field, value]) => {
-          if (value) {
-            const fieldNames = [
-              `${field}`,
-              `address.${field}`,
-              `endereco.${field}`,
-              `address${field.charAt(0).toUpperCase() + field.slice(1)}`,
-            ];
-
-            fieldNames.forEach((fieldName) => {
-              if (getIn(values, fieldName) !== undefined) {
-                setFieldValue(fieldName, value);
-              }
-            });
-          }
-        });
-
-        if (onAddressSelect) {
-          onAddressSelect(suggestion);
-        }
-
-        setTimeout(() => clearSuggestions(), 300);
-      },
-      [name, setFieldValue, values, onAddressSelect, clearSuggestions]
-    );
-
-    // Expor o método selectAddress para uso externo
-    React.useEffect(() => {
-      if (ref && typeof ref === "object" && ref.current) {
-        (ref.current as any).selectAddress = selectAddress;
-      }
-    }, [selectAddress, ref]);
 
     return (
       <View style={[styles.container, style]}>
@@ -247,7 +196,7 @@ const AddressAutocomplete = forwardRef<
             />
           )}
 
-          {selectedSuggestion && !isLoading && (
+          {isAddressSelected && !isLoading && (
             <MaterialIcons
               name="check-circle"
               size={20}

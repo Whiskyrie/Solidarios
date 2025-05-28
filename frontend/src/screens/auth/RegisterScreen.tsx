@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -87,15 +87,12 @@ const RegisterScreen: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedAddress, setSelectedAddress] =
-    useState<AddressSuggestion | null>(null);
 
-  // Estados para controle do BottomSheet de endereços
+  // Estados simplificados para controle do BottomSheet
   const [addressSuggestions, setAddressSuggestions] = useState<
     AddressSuggestion[]
   >([]);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
-  const [addressInputValue, setAddressInputValue] = useState("");
 
   // Refs para animações e componentes
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -123,15 +120,12 @@ const RegisterScreen: React.FC = () => {
 
   // Controlar BottomSheet baseado nas sugestões
   useEffect(() => {
-    if (
-      addressInputValue.length >= 3 &&
-      (addressSuggestions.length > 0 || isLoadingAddress)
-    ) {
+    if (addressSuggestions.length > 0 || isLoadingAddress) {
       bottomSheetRef.current?.snapToIndex(0);
     } else {
       bottomSheetRef.current?.close();
     }
-  }, [addressSuggestions, addressInputValue, isLoadingAddress]);
+  }, [addressSuggestions, isLoadingAddress]);
 
   // Animação de seleção
   const animateSelection = () => {
@@ -178,31 +172,19 @@ const RegisterScreen: React.FC = () => {
     }
   }, [error]);
 
-  // Callbacks para comunicação com AddressAutocomplete
-  const handleAddressSelect = (address: AddressSuggestion) => {
-    setSelectedAddress(address);
-    console.log("Endereço selecionado:", address);
-  };
-
-  const handleSuggestionsChange = (suggestions: AddressSuggestion[]) => {
-    setAddressSuggestions(suggestions);
-  };
-
-  const handleLoadingChange = (loading: boolean) => {
-    setIsLoadingAddress(loading);
-  };
-
-  const handleInputChange = (value: string) => {
-    setAddressInputValue(value);
-  };
+  // Callback simplificado para mudanças nas sugestões
+  const handleSuggestionsChange = useCallback(
+    (suggestions: AddressSuggestion[], loading: boolean) => {
+      setAddressSuggestions(suggestions);
+      setIsLoadingAddress(loading);
+    },
+    []
+  );
 
   // Função para selecionar sugestão (chamada do BottomSheet)
   const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
-    if (
-      addressAutocompleteRef.current &&
-      "selectAddress" in addressAutocompleteRef.current
-    ) {
-      (addressAutocompleteRef.current as any).selectAddress(suggestion);
+    if (addressAutocompleteRef.current) {
+      addressAutocompleteRef.current.selectAddress(suggestion);
     }
     bottomSheetRef.current?.close();
     Keyboard.dismiss();
@@ -256,7 +238,7 @@ const RegisterScreen: React.FC = () => {
     }
   };
 
-  // Renderizar item de sugestão
+  // Renderizar item de sugestão - SIMPLIFICADO
   const renderSuggestionItem = (item: AddressSuggestion, index: number) => (
     <TouchableOpacity
       key={item.id}
@@ -279,12 +261,11 @@ const RegisterScreen: React.FC = () => {
         <Text style={styles.suggestionMainText} numberOfLines={1}>
           {item.street && item.number
             ? `${item.street}, ${item.number}`
-            : item.displayName.split(",")[0]}
+            : item.street || "Endereço"}
         </Text>
         <Text style={styles.suggestionSubText} numberOfLines={1}>
-          {item.neighborhood && item.city
-            ? `${item.neighborhood}, ${item.city} - ${item.state}`
-            : `${item.city || ""} - ${item.state || ""}`}
+          {[item.neighborhood, item.city].filter(Boolean).join(" - ") ||
+            "Localização"}
         </Text>
       </View>
 
@@ -516,7 +497,7 @@ const RegisterScreen: React.FC = () => {
                       <Text style={styles.validationError}>{errors.phone}</Text>
                     )}
 
-                    {/* Campo de endereço com autocomplete - COMPONENTE MODULAR */}
+                    {/* Campo de endereço com autocomplete - COMPONENTE SIMPLIFICADO */}
                     <View style={styles.addressContainer}>
                       <AddressAutocomplete
                         ref={addressAutocompleteRef}
@@ -524,10 +505,7 @@ const RegisterScreen: React.FC = () => {
                         label="Endereço"
                         placeholder="Digite seu endereço completo..."
                         required
-                        onAddressSelect={handleAddressSelect}
                         onSuggestionsChange={handleSuggestionsChange}
-                        onLoadingChange={handleLoadingChange}
-                        onInputChange={handleInputChange}
                         countryCode="br"
                       />
                     </View>
@@ -754,20 +732,6 @@ const RegisterScreen: React.FC = () => {
                     renderSuggestionItem(suggestion, index)
                   )}
                 </>
-              ) : addressInputValue.length >= 3 ? (
-                <View style={styles.centeredContainer}>
-                  <MaterialIcons
-                    name="search-off"
-                    size={48}
-                    color={theme.colors.neutral.mediumGray}
-                  />
-                  <Text style={styles.emptyTitle}>
-                    Nenhum endereço encontrado
-                  </Text>
-                  <Text style={styles.emptySubtitle}>
-                    Tente ser mais específico com o endereço
-                  </Text>
-                </View>
               ) : (
                 <View style={styles.centeredContainer}>
                   <Text style={styles.placeholderText}>
