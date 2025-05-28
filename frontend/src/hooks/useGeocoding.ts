@@ -1,14 +1,30 @@
-/**
- * Hook para autocompletar endereços com debounce e cache
- */
-import { useState, useCallback, useRef, useEffect } from "react";
-import GeocodingService, { AddressSuggestion } from "../api/geocoding";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { AddressSuggestion, GeocodingConfig } from "../types/geocode.types";
+import GeocodingService from "../api/geocoding";
 
-interface UseGeocodingOptions {
+interface UseGeocodingOptions extends GeocodingConfig {
   debounceMs?: number;
   minQueryLength?: number;
   maxSuggestions?: number;
   countryCode?: string;
+  autoSelect?: boolean; // Auto-selecionar primeiro resultado de alta confiança
+  prefetchPopular?: string[]; // Endereços para pré-carregar
+  onError?: (error: string) => void;
+  onSuccess?: (results: AddressSuggestion[]) => void;
+}
+
+interface GeocodingState {
+  suggestions: AddressSuggestion[];
+  isLoading: boolean;
+  error: string | null;
+  hasResults: boolean;
+  confidence: "high" | "medium" | "low" | null;
+  selectedSuggestion: AddressSuggestion | null;
+  metrics: {
+    totalSearches: number;
+    cacheHits: number;
+    averageResponseTime: number;
+  };
 }
 
 export const useGeocoding = (options: UseGeocodingOptions = {}) => {
@@ -17,60 +33,133 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
     minQueryLength = 3,
     maxSuggestions = 8,
     countryCode = "br",
+    autoSelect = false,
+    prefetchPopular = [],
+    onError,
+    onSuccess,
+    enableLogging = false,
+    ...geocodingConfig
   } = options;
 
-  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Criar instância do serviço com configuração personalizada
+  const geocodingService = useMemo(
+    () =>
+      new GeocodingService({
+        ...geocodingConfig,
+        enableLogging,
+      }),
+    [geocodingConfig, enableLogging]
+  );
 
-  // Cache inteligente com limpeza automática
-  const cacheRef = useRef<
-    Map<string, { data: AddressSuggestion[]; timestamp: number }>
-  >(new Map());
+  const [state, setState] = useState<GeocodingState>({
+    suggestions: [],
+    isLoading: false,
+    error: null,
+    hasResults: false,
+    confidence: null,
+    selectedSuggestion: null,
+    metrics: {
+      totalSearches: 0,
+      cacheHits: 0,
+      averageResponseTime: 0,
+    },
+  });
+
+  // Refs para controle de estado
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const currentQueryRef = useRef<string>("");
-  const cacheExpiryTime = 5 * 60 * 1000; // 5 minutos
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const searchStartTimeRef = useRef<number>(0);
 
   /**
-   * Limpar cache expirado
+   * Avaliar confiança geral dos resultados
    */
-  const cleanExpiredCache = useCallback(() => {
-    const now = Date.now();
-    for (const [key, value] of cacheRef.current.entries()) {
-      if (now - value.timestamp > cacheExpiryTime) {
-        cacheRef.current.delete(key);
+  const evaluateConfidence = useCallback((suggestions: AddressSuggestion[]) => {
+    if (suggestions.length === 0) return null;
+
+    const avgConfidence =
+      suggestions.reduce((sum, s) => sum + s.confidence, 0) /
+      suggestions.length;
+
+    if (avgConfidence >= 0.8) return "high";
+    if (avgConfidence >= 0.6) return "medium";
+    return "low";
+  }, []);
+
+  /**
+   * Auto-seleção inteligente
+   */
+  const autoSelectBestMatch = useCallback(
+    (suggestions: AddressSuggestion[]) => {
+      if (!autoSelect || suggestions.length === 0) return null;
+
+      const firstResult = suggestions[0];
+      // Auto-selecionar apenas se confiança for muito alta
+      if (firstResult.confidence >= 0.9 && firstResult.type === "exact") {
+        return firstResult;
       }
-    }
-  }, [cacheExpiryTime]);
+
+      return null;
+    },
+    [autoSelect]
+  );
+
+  /**
+   * Atualizar métricas internas
+   */
+  const updateMetrics = useCallback(
+    (fromCache: boolean = false) => {
+      const responseTime = Date.now() - searchStartTimeRef.current;
+      const serviceMetrics = geocodingService.getMetrics();
+
+      setState((prev) => ({
+        ...prev,
+        metrics: {
+          totalSearches: prev.metrics.totalSearches + 1,
+          cacheHits: fromCache
+            ? prev.metrics.cacheHits + 1
+            : prev.metrics.cacheHits,
+          averageResponseTime: serviceMetrics.averageResponseTime,
+        },
+      }));
+    },
+    [geocodingService]
+  );
 
   /**
    * Buscar sugestões de endereço
    */
   const searchAddresses = useCallback(
-    async (query: string) => {
+    async (query: string, immediate: boolean = false) => {
       if (query.length < minQueryLength) {
-        setSuggestions([]);
+        setState((prev) => ({
+          ...prev,
+          suggestions: [],
+          hasResults: false,
+          confidence: null,
+          selectedSuggestion: null,
+          error: null,
+        }));
         return;
       }
 
-      const cacheKey = query.toLowerCase().trim();
-
-      // Limpar cache expirado
-      cleanExpiredCache();
-
-      // Verificar cache primeiro
-      const cached = cacheRef.current.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheExpiryTime) {
-        setSuggestions(cached.data);
-        return;
+      // Cancelar busca anterior
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+      abortControllerRef.current = new AbortController();
 
-      setIsLoading(true);
-      setError(null);
+      setState((prev) => ({
+        ...prev,
+        isLoading: true,
+        error: null,
+      }));
+
       currentQueryRef.current = query;
+      searchStartTimeRef.current = Date.now();
 
       try {
-        const results = await GeocodingService.searchAddresses(
+        const results = await geocodingService.searchAddresses(
           query,
           countryCode,
           maxSuggestions
@@ -78,21 +167,46 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
 
         // Verificar se ainda é a consulta mais recente
         if (currentQueryRef.current === query) {
-          setSuggestions(results);
-          // Salvar no cache com timestamp
-          cacheRef.current.set(cacheKey, {
-            data: results,
-            timestamp: Date.now(),
-          });
+          const confidence = evaluateConfidence(results);
+          const selectedSuggestion = autoSelectBestMatch(results);
+
+          setState((prev) => ({
+            ...prev,
+            suggestions: results,
+            hasResults: results.length > 0,
+            confidence,
+            selectedSuggestion,
+            isLoading: false,
+          }));
+
+          updateMetrics();
+          onSuccess?.(results);
+
+          if (enableLogging) {
+            console.log(
+              `Geocoding: Found ${results.length} results for "${query}"`
+            );
+          }
         }
       } catch (err: any) {
         if (currentQueryRef.current === query) {
-          setError(err.message || "Erro ao buscar endereços");
-          setSuggestions([]);
-        }
-      } finally {
-        if (currentQueryRef.current === query) {
-          setIsLoading(false);
+          const errorMessage = err.message || "Erro ao buscar endereços";
+
+          setState((prev) => ({
+            ...prev,
+            error: errorMessage,
+            suggestions: [],
+            hasResults: false,
+            confidence: null,
+            selectedSuggestion: null,
+            isLoading: false,
+          }));
+
+          onError?.(errorMessage);
+
+          if (enableLogging) {
+            console.error(`Geocoding error for "${query}":`, err);
+          }
         }
       }
     },
@@ -100,8 +214,13 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
       minQueryLength,
       maxSuggestions,
       countryCode,
-      cleanExpiredCache,
-      cacheExpiryTime,
+      geocodingService,
+      evaluateConfidence,
+      autoSelectBestMatch,
+      updateMetrics,
+      onSuccess,
+      onError,
+      enableLogging,
     ]
   );
 
@@ -114,23 +233,146 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
         clearTimeout(debounceRef.current);
       }
 
-      debounceRef.current = setTimeout(() => {
-        searchAddresses(query);
-      }, debounceMs);
+      // Busca imediata para queries muito específicas (ex: CEP)
+      const isImmediate = /^\d{5}-?\d{3}$/.test(query.trim()); // CEP brasileiro
+
+      if (isImmediate) {
+        searchAddresses(query, true);
+      } else {
+        debounceRef.current = setTimeout(() => {
+          searchAddresses(query);
+        }, debounceMs);
+      }
     },
     [searchAddresses, debounceMs]
   );
 
   /**
-   * Limpar sugestões
+   * Geocodificação reversa
+   */
+  const reverseGeocode = useCallback(
+    async (lat: number, lon: number) => {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        const result = await geocodingService.reverseGeocode(lat, lon);
+
+        if (result) {
+          setState((prev) => ({
+            ...prev,
+            suggestions: [result],
+            hasResults: true,
+            confidence:
+              result.confidence >= 0.8
+                ? "high"
+                : result.confidence >= 0.6
+                ? "medium"
+                : "low",
+            selectedSuggestion: result,
+            isLoading: false,
+          }));
+
+          return result;
+        } else {
+          setState((prev) => ({
+            ...prev,
+            error: "Não foi possível encontrar endereço para as coordenadas",
+            suggestions: [],
+            hasResults: false,
+            confidence: null,
+            selectedSuggestion: null,
+            isLoading: false,
+          }));
+        }
+      } catch (err: any) {
+        const errorMessage = err.message || "Erro na geocodificação reversa";
+        setState((prev) => ({
+          ...prev,
+          error: errorMessage,
+          isLoading: false,
+        }));
+        onError?.(errorMessage);
+      }
+
+      return null;
+    },
+    [geocodingService, onError]
+  );
+
+  /**
+   * Selecionar sugestão manualmente
+   */
+  const selectSuggestion = useCallback(
+    (suggestion: AddressSuggestion | null) => {
+      setState((prev) => ({
+        ...prev,
+        selectedSuggestion: suggestion,
+      }));
+    },
+    []
+  );
+
+  /**
+   * Limpar sugestões e estado
    */
   const clearSuggestions = useCallback(() => {
-    setSuggestions([]);
-    setError(null);
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    setState({
+      suggestions: [],
+      isLoading: false,
+      error: null,
+      hasResults: false,
+      confidence: null,
+      selectedSuggestion: null,
+      metrics: {
+        totalSearches: 0,
+        cacheHits: 0,
+        averageResponseTime: 0,
+      },
+    });
+
+    currentQueryRef.current = "";
   }, []);
+
+  /**
+   * Retry da última busca
+   */
+  const retryLastSearch = useCallback(() => {
+    if (currentQueryRef.current) {
+      searchAddresses(currentQueryRef.current, true);
+    }
+  }, [searchAddresses]);
+
+  /**
+   * Pré-carregar endereços populares
+   */
+  useEffect(() => {
+    if (prefetchPopular.length > 0) {
+      geocodingService
+        .preloadPopularAddresses(prefetchPopular)
+        .then(() => {
+          if (enableLogging) {
+            console.log(
+              "Preload concluído:",
+              prefetchPopular.length,
+              "endereços"
+            );
+          }
+        })
+        .catch((err) => {
+          if (enableLogging) {
+            console.warn("Erro no preload:", err);
+          }
+        });
+    }
+  }, [prefetchPopular, geocodingService, enableLogging]);
 
   // Cleanup no unmount
   useEffect(() => {
@@ -138,15 +380,50 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
   return {
-    suggestions,
-    isLoading,
-    error,
+    // Estado principal
+    ...state,
+
+    // Ações
     searchAddresses: debouncedSearch,
+    reverseGeocode,
+    selectSuggestion,
     clearSuggestions,
+    retryLastSearch,
+
+    // Utilidades
+    clearCache: useCallback(
+      () => geocodingService.clearCache(),
+      [geocodingService]
+    ),
+    getServiceMetrics: useCallback(
+      () => geocodingService.getMetrics(),
+      [geocodingService]
+    ),
+
+    // Estado computado
+    isEmpty: state.suggestions.length === 0,
+    hasHighConfidence: state.confidence === "high",
+    hasMediumConfidence: state.confidence === "medium",
+    hasLowConfidence: state.confidence === "low",
+
+    // Helpers para UI
+    getSuggestionsByType: useCallback(
+      (type: AddressSuggestion["type"]) =>
+        state.suggestions.filter((s) => s.type === type),
+      [state.suggestions]
+    ),
+
+    getHighConfidenceSuggestions: useCallback(
+      () => state.suggestions.filter((s) => s.confidence >= 0.8),
+      [state.suggestions]
+    ),
   };
 };
 
