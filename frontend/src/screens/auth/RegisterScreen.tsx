@@ -19,6 +19,7 @@ import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -26,7 +27,8 @@ import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
 import { maskPhone } from "../../utils/authUtils";
-import { useEffect as useEffectOriginal } from 'react';
+import AddressAutocomplete from "../../components/profile/AddressAutocomplete";
+import { AddressSuggestion } from "../../api/geocoding";
 
 // Esquema de validação
 const RegisterSchema = Yup.object().shape({
@@ -75,6 +77,8 @@ const RegisterScreen: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedAddress, setSelectedAddress] =
+    useState<AddressSuggestion | null>(null);
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -143,6 +147,12 @@ const RegisterScreen: React.FC = () => {
     }
   }, [error]);
 
+  const handleAddressSelect = (address: AddressSuggestion) => {
+    setSelectedAddress(address);
+    // Você pode adicionar lógica adicional aqui se precisar
+    // Por exemplo, extrair CEP, cidade, estado, etc.
+  };
+
   const handleRegister = async (values: {
     name: string;
     email: string;
@@ -156,7 +166,7 @@ const RegisterScreen: React.FC = () => {
     setErrorMessage(null);
 
     // Remover confirmPassword e campos não esperados pelo backend
-    const { confirmPassword, phone, address, ...registerData } = values;
+    const { confirmPassword, ...registerData } = values;
 
     // Garantir que os dados estejam no formato correto
     const payload = {
@@ -164,6 +174,8 @@ const RegisterScreen: React.FC = () => {
       email: registerData.email.trim().toLowerCase(),
       password: registerData.password,
       role: registerData.role,
+      phone: registerData.phone,
+      address: registerData.address, // Adicionar o endereço
     };
 
     console.log("[RegisterScreen] Dados sendo enviados:", {
@@ -175,20 +187,16 @@ const RegisterScreen: React.FC = () => {
       const success = await register(payload);
 
       if (success) {
-      // Em vez de navegação complexa, use uma abordagem mais simples
-      // Primeiro um delay para garantir que o token está armazenado
-            setTimeout(() => {
-        // Navegação tipada corretamente
-        navigation.navigate("Login", { 
-          email: payload.email,
-          autoLogin: true,
-          password: payload.password
-        });
-      }, 1000);
-    } else {
-      // Resto do código permanece igual
-      // ...
-    }
+        // Em vez de navegação complexa, use uma abordagem mais simples
+        // Primeiro um delay para garantir que o token está armazenado
+        setTimeout(() => {
+          // Navegação tipada corretamente
+          return navigation.navigate("Login");
+        }, 1000);
+      } else {
+        // Resto do código permanece igual
+        // ...
+      }
     } catch (err) {
       setErrorMessage(
         "Ocorreu um erro inesperado. Tente novamente mais tarde."
@@ -197,385 +205,388 @@ const RegisterScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="transparent"
-        translucent
-      />
-
-      <LinearGradient
-        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-        locations={[0, 0.6, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradientBackground}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="transparent"
+          translucent
+        />
+
+        <LinearGradient
+          colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+          locations={[0, 0.6, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}
         >
-          {/* Botão de voltar */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Ionicons
-              name="arrow-undo"
-              size={22}
-              color={theme.colors.primary.main}
-            />
-          </TouchableOpacity>
-
-          {/* Logo animada */}
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Image
-              source={require("../../../assets/icon.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
-
-          {/* Título e subtítulo animados */}
-          <Animated.View
-            style={[
-              styles.headerTextContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.welcomeText}>Crie sua conta</Text>
-            <Text style={styles.subtitle}>
-              Preencha os campos abaixo para começar
-            </Text>
-          </Animated.View>
-
-          {/* Formulário de registro */}
-          <Animated.View
-            style={[
-              styles.formContainer,
-              {
-                opacity: fadeAnim,
-                transform: [
-                  { translateY: slideAnim },
-                  { translateX: shakeAnim },
-                ],
-              },
-            ]}
-          >
-            {errorMessage && (
-              <View style={styles.errorContainer}>
-                <MaterialIcons name="error-outline" size={20} color="#FF3B30" />
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            )}
-
-            <Formik
-              initialValues={{
-                name: "",
-                email: "",
-                phone: "",
-                address: "",
-                password: "",
-                confirmPassword: "",
-                role: UserRole.DOADOR,
-              }}
-              validationSchema={RegisterSchema}
-              onSubmit={handleRegister}
+            {/* Botão de voltar */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
             >
-              {({
-                handleChange,
-                handleBlur,
-                handleSubmit,
-                setFieldValue,
-                values,
-                errors,
-                touched,
-              }) => (
-                <>
-                  {/* Campo de nome */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="person"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Nome completo"
-                      placeholderTextColor="#999"
-                      value={values.name}
-                      onChangeText={handleChange("name")}
-                      onBlur={handleBlur("name")}
-                    />
-                  </View>
-                  {touched.name && errors.name && (
-                    <Text style={styles.validationError}>{errors.name}</Text>
-                  )}
+              <Ionicons
+                name="arrow-undo"
+                size={22}
+                color={theme.colors.primary.main}
+              />
+            </TouchableOpacity>
 
-                  {/* Campo de email */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="email"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Email"
-                      placeholderTextColor="#999"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={values.email}
-                      onChangeText={handleChange("email")}
-                      onBlur={handleBlur("email")}
-                    />
-                  </View>
-                  {touched.email && errors.email && (
-                    <Text style={styles.validationError}>{errors.email}</Text>
-                  )}
+            {/* Logo animada */}
+            <Animated.View
+              style={[
+                styles.logoContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Image
+                source={require("../../../assets/icon.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </Animated.View>
 
-                  {/* Campo de telefone */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="phone"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Telefone (ex: 11 99999-9999)"
-                      placeholderTextColor="#999"
-                      keyboardType="phone-pad"
-                      value={values.phone}
-                      onChangeText={(text) => {
-                        const formattedPhone = maskPhone(text);
-                        setFieldValue("phone", formattedPhone);
-                      }}
-                      onBlur={handleBlur("phone")}
-                    />
-                  </View>
-                  {touched.phone && errors.phone && (
-                    <Text style={styles.validationError}>{errors.phone}</Text>
-                  )}
+            {/* Título e subtítulo animados */}
+            <Animated.View
+              style={[
+                styles.headerTextContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={styles.welcomeText}>Crie sua conta</Text>
+              <Text style={styles.subtitle}>
+                Preencha os campos abaixo para começar
+              </Text>
+            </Animated.View>
 
-                  {/* Campo de endereço */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="location-on"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Endereço completo"
-                      placeholderTextColor="#999"
-                      value={values.address}
-                      onChangeText={handleChange("address")}
-                      onBlur={handleBlur("address")}
-                    />
-                  </View>
-                  {touched.address && errors.address && (
-                    <Text style={styles.validationError}>{errors.address}</Text>
-                  )}
+            {/* Formulário de registro */}
+            <Animated.View
+              style={[
+                styles.formContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    { translateY: slideAnim },
+                    { translateX: shakeAnim },
+                  ],
+                },
+              ]}
+            >
+              {errorMessage && (
+                <View style={styles.errorContainer}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={20}
+                    color="#FF3B30"
+                  />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
 
-                  {/* Campo de senha */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="lock"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Senha"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!passwordVisible}
-                      value={values.password}
-                      onChangeText={handleChange("password")}
-                      onBlur={handleBlur("password")}
-                    />
-                    <TouchableOpacity
-                      style={styles.passwordToggle}
-                      onPress={() => setPasswordVisible(!passwordVisible)}
-                    >
+              <Formik
+                initialValues={{
+                  name: "",
+                  email: "",
+                  phone: "",
+                  address: "",
+                  password: "",
+                  confirmPassword: "",
+                  role: UserRole.DOADOR,
+                }}
+                validationSchema={RegisterSchema}
+                onSubmit={handleRegister}
+              >
+                {({
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                  setFieldValue,
+                  values,
+                  errors,
+                  touched,
+                }) => (
+                  <>
+                    {/* Campo de nome */}
+                    <View style={styles.inputContainer}>
                       <MaterialIcons
-                        name={passwordVisible ? "visibility" : "visibility-off"}
+                        name="person"
                         size={22}
                         color="#666"
+                        style={styles.inputIcon}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  {touched.password && errors.password && (
-                    <Text style={styles.validationError}>
-                      {errors.password}
-                    </Text>
-                  )}
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Nome completo"
+                        placeholderTextColor="#999"
+                        value={values.name}
+                        onChangeText={handleChange("name")}
+                        onBlur={handleBlur("name")}
+                      />
+                    </View>
+                    {touched.name && errors.name && (
+                      <Text style={styles.validationError}>{errors.name}</Text>
+                    )}
 
-                  {/* Campo de confirmação de senha */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="lock"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirmar senha"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!confirmPasswordVisible}
-                      value={values.confirmPassword}
-                      onChangeText={handleChange("confirmPassword")}
-                      onBlur={handleBlur("confirmPassword")}
-                    />
-                    <TouchableOpacity
-                      style={styles.passwordToggle}
-                      onPress={() =>
-                        setConfirmPasswordVisible(!confirmPasswordVisible)
-                      }
-                    >
+                    {/* Campo de email */}
+                    <View style={styles.inputContainer}>
                       <MaterialIcons
-                        name={
-                          confirmPasswordVisible
-                            ? "visibility"
-                            : "visibility-off"
-                        }
+                        name="email"
                         size={22}
                         color="#666"
+                        style={styles.inputIcon}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  {touched.confirmPassword && errors.confirmPassword && (
-                    <Text style={styles.validationError}>
-                      {errors.confirmPassword}
-                    </Text>
-                  )}
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        placeholderTextColor="#999"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={values.email}
+                        onChangeText={handleChange("email")}
+                        onBlur={handleBlur("email")}
+                      />
+                    </View>
+                    {touched.email && errors.email && (
+                      <Text style={styles.validationError}>{errors.email}</Text>
+                    )}
 
-                  {/* Seleção de papel com cards */}
-                  <View style={styles.roleContainer}>
-                    <Text style={styles.roleLabel}>Você quer:</Text>
+                    {/* Campo de telefone */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="phone"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Telefone (ex: 11 99999-9999)"
+                        placeholderTextColor="#999"
+                        keyboardType="phone-pad"
+                        value={values.phone}
+                        onChangeText={(text) => {
+                          const formattedPhone = maskPhone(text);
+                          setFieldValue("phone", formattedPhone);
+                        }}
+                        onBlur={handleBlur("phone")}
+                      />
+                    </View>
+                    {touched.phone && errors.phone && (
+                      <Text style={styles.validationError}>{errors.phone}</Text>
+                    )}
 
-                    <View style={styles.roleRow}>
-                      {roles.map((role) => {
-                        const isSelected = values.role === role.value;
-                        return (
-                          <Animated.View
-                            key={role.value}
-                            style={{
-                              transform: [
-                                { scale: isSelected ? scaleAnim : 1 },
-                              ],
-                              flex: 1,
-                              maxWidth: "48%",
-                            }}
-                          >
-                            <TouchableOpacity
-                              activeOpacity={0.8}
-                              style={[
-                                styles.roleCard,
-                                isSelected && styles.roleCardSelected,
-                              ]}
-                              onPress={() => {
-                                setFieldValue("role", role.value);
-                                animateSelection();
-                              }}
-                            >
-                              <View style={styles.roleIconContainer}>
-                                <MaterialIcons
-                                  name={role.icon}
-                                  size={24}
-                                  color={isSelected ? "#006E58" : "#666"}
-                                />
-                              </View>
-                              <Text
-                                style={[
-                                  styles.roleText,
-                                  isSelected && styles.roleTextSelected,
-                                ]}
-                              >
-                                {role.label}
-                              </Text>
-                            </TouchableOpacity>
-                          </Animated.View>
-                        );
-                      })}
+                    {/* Campo de endereço com autocomplete */}
+                    <View style={styles.addressContainer}>
+                      <AddressAutocomplete
+                        name="address"
+                        label="Endereço"
+                        placeholder="Digite seu endereço completo..."
+                        required
+                        onAddressSelect={handleAddressSelect}
+                        countryCode="br"
+                      />
                     </View>
 
-                    {touched.role && errors.role && (
-                      <Text style={styles.validationError}>{errors.role}</Text>
+                    {/* Campo de senha */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="lock"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Senha"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!passwordVisible}
+                        value={values.password}
+                        onChangeText={handleChange("password")}
+                        onBlur={handleBlur("password")}
+                      />
+                      <TouchableOpacity
+                        style={styles.passwordToggle}
+                        onPress={() => setPasswordVisible(!passwordVisible)}
+                      >
+                        <MaterialIcons
+                          name={
+                            passwordVisible ? "visibility" : "visibility-off"
+                          }
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {touched.password && errors.password && (
+                      <Text style={styles.validationError}>
+                        {errors.password}
+                      </Text>
                     )}
-                  </View>
 
-                  {/* Botão de registro */}
-                  <TouchableOpacity
-                    style={styles.registerButtonContainer}
-                    onPress={() => handleSubmit()}
-                    activeOpacity={0.8}
-                    disabled={isLoading}
-                  >
-                    <LinearGradient
-                      colors={["#173F5F", "#006E58"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.registerButton}
-                    >
-                      {isLoading ? (
-                        <View style={styles.loadingIndicator} />
-                      ) : (
-                        <Text style={styles.registerButtonText}>Cadastrar</Text>
+                    {/* Campo de confirmação de senha */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="lock"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Confirmar senha"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!confirmPasswordVisible}
+                        value={values.confirmPassword}
+                        onChangeText={handleChange("confirmPassword")}
+                        onBlur={handleBlur("confirmPassword")}
+                      />
+                      <TouchableOpacity
+                        style={styles.passwordToggle}
+                        onPress={() =>
+                          setConfirmPasswordVisible(!confirmPasswordVisible)
+                        }
+                      >
+                        <MaterialIcons
+                          name={
+                            confirmPasswordVisible
+                              ? "visibility"
+                              : "visibility-off"
+                          }
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {touched.confirmPassword && errors.confirmPassword && (
+                      <Text style={styles.validationError}>
+                        {errors.confirmPassword}
+                      </Text>
+                    )}
+
+                    {/* Seleção de papel com cards */}
+                    <View style={styles.roleContainer}>
+                      <Text style={styles.roleLabel}>Você quer:</Text>
+
+                      <View style={styles.roleRow}>
+                        {roles.map((role) => {
+                          const isSelected = values.role === role.value;
+                          return (
+                            <Animated.View
+                              key={role.value}
+                              style={{
+                                transform: [
+                                  { scale: isSelected ? scaleAnim : 1 },
+                                ],
+                                flex: 1,
+                                maxWidth: "48%",
+                              }}
+                            >
+                              <TouchableOpacity
+                                activeOpacity={0.8}
+                                style={[
+                                  styles.roleCard,
+                                  isSelected && styles.roleCardSelected,
+                                ]}
+                                onPress={() => {
+                                  setFieldValue("role", role.value);
+                                  animateSelection();
+                                }}
+                              >
+                                <View style={styles.roleIconContainer}>
+                                  <MaterialIcons
+                                    name={role.icon}
+                                    size={24}
+                                    color={isSelected ? "#006E58" : "#666"}
+                                  />
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.roleText,
+                                    isSelected && styles.roleTextSelected,
+                                  ]}
+                                >
+                                  {role.label}
+                                </Text>
+                              </TouchableOpacity>
+                            </Animated.View>
+                          );
+                        })}
+                      </View>
+
+                      {touched.role && errors.role && (
+                        <Text style={styles.validationError}>
+                          {errors.role}
+                        </Text>
                       )}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Formik>
-          </Animated.View>
+                    </View>
 
-          {/* Link para login */}
-          <Animated.View
-            style={[
-              styles.loginContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.loginText}>Já tem uma conta?</Text>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate(
-                  AUTH_ROUTES.LOGIN as keyof AuthStackParamList
-                )
-              }
+                    {/* Botão de registro */}
+                    <TouchableOpacity
+                      style={styles.registerButtonContainer}
+                      onPress={() => handleSubmit()}
+                      activeOpacity={0.8}
+                      disabled={isLoading}
+                    >
+                      <LinearGradient
+                        colors={["#173F5F", "#006E58"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.registerButton}
+                      >
+                        {isLoading ? (
+                          <View style={styles.loadingIndicator} />
+                        ) : (
+                          <Text style={styles.registerButtonText}>
+                            Cadastrar
+                          </Text>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </Formik>
+            </Animated.View>
+
+            {/* Link para login */}
+            <Animated.View
+              style={[
+                styles.loginContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
             >
-              <Text style={styles.loginLink}>Faça login</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </ScrollView>
-      </LinearGradient>
-    </KeyboardAvoidingView>
+              <Text style={styles.loginText}>Já tem uma conta?</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate(
+                    AUTH_ROUTES.LOGIN as keyof AuthStackParamList
+                  )
+                }
+              >
+                <Text style={styles.loginLink}>Faça login</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
+        </LinearGradient>
+      </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -673,6 +684,9 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
     marginLeft: 2,
+  },
+  addressContainer: {
+    marginBottom: 12,
   },
   roleContainer: {
     marginVertical: 16,
