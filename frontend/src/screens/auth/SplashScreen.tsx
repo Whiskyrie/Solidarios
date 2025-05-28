@@ -150,7 +150,7 @@ const SplashScreen: React.FC<{ onFinish?: () => void }> = ({ onFinish }) => {
               ]}
             >
               <Image
-                source={require("../../../assets/icon.png")}
+                source={require("../../../assets/images/icon.png")}
                 style={styles.logo}
                 resizeMode="contain"
                 accessibilityLabel="Logo do aplicativo"
