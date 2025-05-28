@@ -5,6 +5,7 @@ import {
   MinLength,
   IsOptional,
   IsEnum,
+  Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../users/entities/user.entity';
@@ -65,6 +66,10 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsString({ message: 'O telefone deve ser uma string' })
+  @Matches(/^\(\d{2}\) \d{4,5}-\d{4}$/, {
+    message:
+      'Formato de telefone inválido. Use: (99) 99999-9999 ou (99) 9999-9999',
+  })
   phone?: string;
 
   @ApiProperty({
@@ -74,5 +79,6 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsString({ message: 'O endereço deve ser uma string' })
+  @MinLength(5, { message: 'O endereço deve ter pelo menos 5 caracteres' })
   address?: string;
 }
