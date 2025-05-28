@@ -1,19 +1,27 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
   StyleSheet,
   StyleProp,
   ViewStyle,
-  Modal,
-  Pressable,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFormikContext, getIn } from "formik";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetFlatList,
+} from "@gorhom/bottom-sheet";
 import Typography from "../common/Typography";
 import theme from "../../theme";
 import useGeocoding from "../../hooks/useGeocoding";
@@ -52,10 +60,10 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 }) => {
   const { values, setFieldValue, touched, errors } = useFormikContext<any>();
   const [inputValue, setInputValue] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] =
     useState<AddressSuggestion | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
 
   const { suggestions, isLoading, error, searchAddresses, clearSuggestions } =
     useGeocoding({
@@ -69,12 +77,33 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   const value = getIn(values, name) || "";
   const fieldError = getIn(touched, name) && getIn(errors, name);
 
+  // Pontos de snap do bottom sheet
+  const snapPoints = useMemo(() => {
+    const suggestionHeight = 72; // altura aproximada de cada sugestão
+    const headerHeight = 50;
+    const maxHeight = 400;
+    const calculatedHeight = Math.min(
+      suggestions.length * suggestionHeight + headerHeight,
+      maxHeight
+    );
+    return [calculatedHeight];
+  }, [suggestions.length]);
+
   // Sincronizar com valor do formulário
   useEffect(() => {
     if (value && value !== inputValue && !selectedSuggestion) {
       setInputValue(value);
     }
   }, [value, inputValue, selectedSuggestion]);
+
+  // Controlar bottom sheet baseado nas sugestões
+  useEffect(() => {
+    if (suggestions.length > 0 && inputValue.length >= 3) {
+      bottomSheetRef.current?.expand();
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [suggestions, inputValue]);
 
   /**
    * Manipular mudança de texto
@@ -86,91 +115,134 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
     if (text.trim().length >= 3) {
       searchAddresses(text.trim());
-      setShowSuggestions(true);
     } else {
       clearSuggestions();
-      setShowSuggestions(false);
+      bottomSheetRef.current?.close();
     }
   };
 
   /**
    * Selecionar sugestão
    */
-  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
-    setSelectedSuggestion(suggestion);
-    setInputValue(suggestion.displayName);
-    setFieldValue(name, suggestion.displayName);
-    setShowSuggestions(false);
+  const handleSelectSuggestion = useCallback(
+    (suggestion: AddressSuggestion) => {
+      setSelectedSuggestion(suggestion);
+      setInputValue(suggestion.displayName);
+      setFieldValue(name, suggestion.displayName);
+      bottomSheetRef.current?.close();
+      Keyboard.dismiss();
 
-    // Preencher campos relacionados se existirem no formulário
-    const addressFields: AddressFields = {
-      street: suggestion.street,
-      number: suggestion.number,
-      neighborhood: suggestion.neighborhood,
-      city: suggestion.city,
-      state: suggestion.state,
-      postalCode: suggestion.postalCode,
-      fullAddress: suggestion.displayName,
-    };
+      // Preencher campos relacionados se existirem no formulário
+      const addressFields: AddressFields = {
+        street: suggestion.street,
+        number: suggestion.number,
+        neighborhood: suggestion.neighborhood,
+        city: suggestion.city,
+        state: suggestion.state,
+        postalCode: suggestion.postalCode,
+        fullAddress: suggestion.displayName,
+      };
 
-    // Tentar preencher campos comuns
-    Object.entries(addressFields).forEach(([field, value]) => {
-      if (value) {
-        // Verificar se o campo existe no formulário
-        const fieldNames = [
-          `${field}`,
-          `address.${field}`,
-          `endereco.${field}`,
-          `address${field.charAt(0).toUpperCase() + field.slice(1)}`,
-        ];
+      // Tentar preencher campos comuns
+      Object.entries(addressFields).forEach(([field, value]) => {
+        if (value) {
+          const fieldNames = [
+            `${field}`,
+            `address.${field}`,
+            `endereco.${field}`,
+            `address${field.charAt(0).toUpperCase() + field.slice(1)}`,
+          ];
 
-        fieldNames.forEach((fieldName) => {
-          if (getIn(values, fieldName) !== undefined) {
-            setFieldValue(fieldName, value);
-          }
-        });
+          fieldNames.forEach((fieldName) => {
+            if (getIn(values, fieldName) !== undefined) {
+              setFieldValue(fieldName, value);
+            }
+          });
+        }
+      });
+
+      // Callback personalizado
+      if (onAddressSelect) {
+        onAddressSelect(suggestion);
       }
-    });
 
-    // Callback personalizado
-    if (onAddressSelect) {
-      onAddressSelect(suggestion);
-    }
-
-    // Fechar teclado
-    inputRef.current?.blur();
-  };
+      // Limpar sugestões após seleção
+      setTimeout(() => {
+        clearSuggestions();
+      }, 500);
+    },
+    [name, setFieldValue, values, onAddressSelect, clearSuggestions]
+  );
 
   /**
    * Renderizar item da sugestão
    */
-  const renderSuggestionItem = ({ item }: { item: AddressSuggestion }) => (
-    <TouchableOpacity
-      style={styles.suggestionItem}
-      onPress={() => handleSelectSuggestion(item)}
-      activeOpacity={0.7}
-    >
-      <MaterialIcons
-        name="location-on"
-        size={20}
-        color={theme.colors.neutral.darkGray}
-        style={styles.suggestionIcon}
+  const renderSuggestionItem = useCallback(
+    ({ item }: { item: AddressSuggestion }) => (
+      <TouchableOpacity
+        style={styles.suggestionItem}
+        onPress={() => handleSelectSuggestion(item)}
+        activeOpacity={0.7}
+      >
+        <MaterialIcons
+          name="location-on"
+          size={24}
+          color={theme.colors.primary.main}
+          style={styles.suggestionIcon}
+        />
+        <View style={styles.suggestionContent}>
+          <Text style={styles.suggestionText} numberOfLines={1}>
+            {item.displayName}
+          </Text>
+          {item.city && item.state && (
+            <Text style={styles.suggestionSubtext} numberOfLines={1}>
+              {item.city}, {item.state}
+            </Text>
+          )}
+        </View>
+        <MaterialIcons
+          name="chevron-right"
+          size={24}
+          color={theme.colors.neutral.mediumGray}
+        />
+      </TouchableOpacity>
+    ),
+    [handleSelectSuggestion]
+  );
+
+  /**
+   * Renderizar backdrop customizado
+   */
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.3}
       />
-      <View style={styles.suggestionContent}>
-        <Typography variant="body" numberOfLines={2}>
-          {item.displayName}
-        </Typography>
-        {item.city && item.state && (
-          <Typography
-            variant="caption"
-            color={theme.colors.neutral.darkGray}
-            style={styles.suggestionLocation}
-          >
-            {item.city}, {item.state}
-          </Typography>
-        )}
-      </View>
-    </TouchableOpacity>
+    ),
+    []
+  );
+
+  /**
+   * Renderizar header do bottom sheet
+   */
+  const renderHeader = () => (
+    <View style={styles.sheetHeader}>
+      <View style={styles.sheetIndicator} />
+      <Text style={styles.sheetTitle}>Selecione o endereço</Text>
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={() => bottomSheetRef.current?.close()}
+      >
+        <MaterialIcons
+          name="close"
+          size={24}
+          color={theme.colors.neutral.darkGray}
+        />
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -191,6 +263,12 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           disabled && styles.inputDisabled,
         ]}
       >
+        <MaterialIcons
+          name="location-on"
+          size={22}
+          color={theme.colors.neutral.darkGray}
+          style={styles.inputIcon}
+        />
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -199,11 +277,6 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           placeholder={placeholder}
           placeholderTextColor={theme.colors.neutral.mediumGray}
           editable={!disabled}
-          onFocus={() => {
-            if (suggestions.length > 0) {
-              setShowSuggestions(true);
-            }
-          }}
         />
 
         {isLoading && (
@@ -224,7 +297,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         )}
       </View>
 
-      {/* Error Message */}
+      {/* Error Messages */}
       {fieldError && (
         <Typography
           variant="caption"
@@ -235,7 +308,6 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         </Typography>
       )}
 
-      {/* Error de busca */}
       {error && (
         <Typography
           variant="caption"
@@ -246,29 +318,34 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         </Typography>
       )}
 
-      {/* Modal com sugestões */}
-      <Modal
-        visible={showSuggestions && suggestions.length > 0}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSuggestions(false)}
+      {/* Bottom Sheet com sugestões */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        keyboardBehavior="interactive"
+        android_keyboardInputMode="adjustResize"
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowSuggestions(false)}
-        >
-          <View style={styles.suggestionsContainer}>
-            <FlatList
-              data={suggestions}
-              renderItem={renderSuggestionItem}
-              keyExtractor={(item) => item.id}
-              style={styles.suggestionsList}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            />
+        {renderHeader()}
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary.main} />
+            <Text style={styles.loadingText}>Buscando endereços...</Text>
           </View>
-        </Pressable>
-      </Modal>
+        ) : (
+          <BottomSheetFlatList
+            data={suggestions}
+            renderItem={renderSuggestionItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.suggestionsList}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
+      </BottomSheet>
     </View>
   );
 };
@@ -300,6 +377,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral.lightGray,
     opacity: 0.6,
   },
+  inputIcon: {
+    marginRight: theme.spacing.s,
+  },
   input: {
     flex: 1,
     fontSize: 16,
@@ -315,38 +395,69 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: theme.spacing.xs,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    justifyContent: "flex-start",
-    paddingTop: 100, // Ajuste conforme necessário
+  sheetHeader: {
+    alignItems: "center",
+    paddingBottom: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.lightGray,
   },
-  suggestionsContainer: {
-    marginHorizontal: theme.spacing.m,
-    backgroundColor: theme.colors.neutral.white,
-    borderRadius: theme.borderRadius.medium,
-    maxHeight: 250,
-    ...theme.shadows.medium,
+  sheetIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 2,
+    marginVertical: theme.spacing.s,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.neutral.black,
+    marginBottom: theme.spacing.xs,
+  },
+  closeButton: {
+    position: "absolute",
+    right: theme.spacing.m,
+    top: theme.spacing.m,
+    padding: theme.spacing.xs,
   },
   suggestionsList: {
-    borderRadius: theme.borderRadius.medium,
+    paddingBottom: theme.spacing.l,
   },
   suggestionItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
+    paddingVertical: theme.spacing.m,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.neutral.lightGray,
   },
   suggestionIcon: {
-    marginRight: theme.spacing.s,
+    marginRight: theme.spacing.m,
   },
   suggestionContent: {
     flex: 1,
+    marginRight: theme.spacing.s,
   },
-  suggestionLocation: {
-    marginTop: 2,
+  suggestionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: theme.colors.neutral.black,
+    marginBottom: 2,
+  },
+  suggestionSubtext: {
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+  },
+  loadingText: {
+    marginTop: theme.spacing.m,
+    fontSize: 16,
+    color: theme.colors.neutral.darkGray,
   },
 });
 

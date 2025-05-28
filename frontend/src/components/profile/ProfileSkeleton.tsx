@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import theme from '../../theme';
+import React, { useEffect, useRef } from "react";
+import { View, StyleSheet, Animated } from "react-native";
+import theme from "../../theme";
 
 /**
  * Componente de skeleton para carregamento da tela de perfil
@@ -37,20 +37,28 @@ const ProfileSkeleton: React.FC = () => {
   const shimmerColor = shimmerValue.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: [
-      'rgba(220, 220, 220, 0.5)',
-      'rgba(240, 240, 240, 0.8)',
-      'rgba(220, 220, 220, 0.5)',
+      "rgba(220, 220, 220, 0.5)",
+      "rgba(240, 240, 240, 0.8)",
+      "rgba(220, 220, 220, 0.5)",
     ],
   });
 
   // Renderiza um item de skeleton
-  const SkeletonItem = ({ width, height, style }: { width: number | string, height: number, style?: any }) => (
-    <Animated.View 
+  const SkeletonItem = ({
+    width,
+    height,
+    style,
+  }: {
+    width: number | string;
+    height: number;
+    style?: any;
+  }) => (
+    <Animated.View
       style={[
         styles.skeletonItem,
         { width, height, backgroundColor: shimmerColor },
-        style
-      ]} 
+        style,
+      ]}
     />
   );
 
@@ -62,7 +70,7 @@ const ProfileSkeleton: React.FC = () => {
           <SkeletonItem width="50%" height={24} />
           <SkeletonItem width={60} height={24} style={{ borderRadius: 12 }} />
         </View>
-        
+
         <View style={styles.contactRow}>
           <SkeletonItem width={24} height={24} style={{ borderRadius: 12 }} />
           <View style={{ marginLeft: theme.spacing.s, flex: 1 }}>
@@ -70,7 +78,7 @@ const ProfileSkeleton: React.FC = () => {
             <SkeletonItem width="70%" height={20} style={{ marginTop: 6 }} />
           </View>
         </View>
-        
+
         <View style={[styles.contactRow, { marginTop: theme.spacing.s }]}>
           <SkeletonItem width={24} height={24} style={{ borderRadius: 12 }} />
           <View style={{ marginLeft: theme.spacing.s, flex: 1 }}>
@@ -86,16 +94,20 @@ const ProfileSkeleton: React.FC = () => {
         <View style={styles.statsRow}>
           {[1, 2, 3].map((_, index) => (
             <View key={index} style={styles.statItem}>
-              <SkeletonItem 
-                width={50} 
-                height={50} 
-                style={{ borderRadius: 25, marginBottom: theme.spacing.xs }} 
+              <SkeletonItem
+                width={50}
+                height={50}
+                style={{ borderRadius: 25, marginBottom: theme.spacing.xs }}
               />
-              <SkeletonItem width={40} height={24} style={{ borderRadius: 4 }} />
-              <SkeletonItem 
-                width={70} 
-                height={16} 
-                style={{ marginTop: 8, borderRadius: 4 }} 
+              <SkeletonItem
+                width={40}
+                height={24}
+                style={{ borderRadius: 4 }}
+              />
+              <SkeletonItem
+                width={70}
+                height={16}
+                style={{ marginTop: 8, borderRadius: 4 }}
               />
             </View>
           ))}
@@ -107,16 +119,16 @@ const ProfileSkeleton: React.FC = () => {
         {[1, 2, 3].map((_, index) => (
           <React.Fragment key={index}>
             <View style={styles.menuItem}>
-              <SkeletonItem 
-                width={40} 
-                height={40} 
-                style={{ borderRadius: 8, marginRight: theme.spacing.s }} 
+              <SkeletonItem
+                width={40}
+                height={40}
+                style={{ borderRadius: 8, marginRight: theme.spacing.s }}
               />
               <SkeletonItem width="60%" height={24} />
-              <SkeletonItem 
-                width={24} 
-                height={24} 
-                style={{ marginLeft: 'auto', borderRadius: 12 }} 
+              <SkeletonItem
+                width={24}
+                height={24}
+                style={{ marginLeft: "auto", borderRadius: 12 }}
               />
             </View>
             {index < 2 && <View style={styles.divider} />}
@@ -125,10 +137,13 @@ const ProfileSkeleton: React.FC = () => {
       </View>
 
       {/* Botão de logout skeleton */}
-      <SkeletonItem 
-        width="100%" 
-        height={50} 
-        style={{ borderRadius: theme.borderRadius.medium, marginTop: theme.spacing.m }} 
+      <SkeletonItem
+        width="100%"
+        height={50}
+        style={{
+          borderRadius: theme.borderRadius.medium,
+          marginTop: theme.spacing.m,
+        }}
       />
     </View>
   );
@@ -149,14 +164,14 @@ const styles = StyleSheet.create({
     ...theme.shadows.medium,
   },
   contactHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.m,
   },
   contactRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   statsCard: {
     backgroundColor: theme.colors.neutral.white,
@@ -166,12 +181,12 @@ const styles = StyleSheet.create({
     ...theme.shadows.medium,
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingVertical: theme.spacing.m,
   },
   statItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   menuCard: {
     backgroundColor: theme.colors.neutral.white,
@@ -180,8 +195,8 @@ const styles = StyleSheet.create({
     ...theme.shadows.medium,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: theme.spacing.m,
     paddingHorizontal: theme.spacing.m,
   },
