@@ -11,6 +11,8 @@ import {
   Animated,
   StatusBar,
   Image,
+  ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,6 +22,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -27,7 +33,9 @@ import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
 import { maskPhone } from "../../utils/authUtils";
-import AddressAutocomplete from "../../components/profile/AddressAutocomplete";
+import AddressAutocomplete, {
+  AddressAutocompleteRef,
+} from "../../components/profile/AddressAutocomplete";
 import { AddressSuggestion } from "../../api/geocoding";
 
 // Esquema de validação
@@ -56,7 +64,7 @@ const RegisterSchema = Yup.object().shape({
     .required("Perfil é obrigatório"),
 });
 
-// Definição dos papéis com ícones
+// Definição dos papéis
 const roles = [
   {
     value: UserRole.DOADOR,
@@ -74,17 +82,28 @@ const RegisterScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { register, isLoading, error, clearErrors } = useAuth();
+
+  // Estados do componente
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAddress, setSelectedAddress] =
     useState<AddressSuggestion | null>(null);
 
-  // Refs para animações
+  // Estados para controle do BottomSheet de endereços
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    AddressSuggestion[]
+  >([]);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [addressInputValue, setAddressInputValue] = useState("");
+
+  // Refs para animações e componentes
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const addressAutocompleteRef = useRef<AddressAutocompleteRef>(null);
 
   // Efeito de animação ao carregar a tela
   useEffect(() => {
@@ -101,6 +120,18 @@ const RegisterScreen: React.FC = () => {
       }),
     ]).start();
   }, []);
+
+  // Controlar BottomSheet baseado nas sugestões
+  useEffect(() => {
+    if (
+      addressInputValue.length >= 3 &&
+      (addressSuggestions.length > 0 || isLoadingAddress)
+    ) {
+      bottomSheetRef.current?.snapToIndex(0);
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [addressSuggestions, addressInputValue, isLoadingAddress]);
 
   // Animação de seleção
   const animateSelection = () => {
@@ -147,10 +178,34 @@ const RegisterScreen: React.FC = () => {
     }
   }, [error]);
 
+  // Callbacks para comunicação com AddressAutocomplete
   const handleAddressSelect = (address: AddressSuggestion) => {
     setSelectedAddress(address);
-    // Você pode adicionar lógica adicional aqui se precisar
-    // Por exemplo, extrair CEP, cidade, estado, etc.
+    console.log("Endereço selecionado:", address);
+  };
+
+  const handleSuggestionsChange = (suggestions: AddressSuggestion[]) => {
+    setAddressSuggestions(suggestions);
+  };
+
+  const handleLoadingChange = (loading: boolean) => {
+    setIsLoadingAddress(loading);
+  };
+
+  const handleInputChange = (value: string) => {
+    setAddressInputValue(value);
+  };
+
+  // Função para selecionar sugestão (chamada do BottomSheet)
+  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+    if (
+      addressAutocompleteRef.current &&
+      "selectAddress" in addressAutocompleteRef.current
+    ) {
+      (addressAutocompleteRef.current as any).selectAddress(suggestion);
+    }
+    bottomSheetRef.current?.close();
+    Keyboard.dismiss();
   };
 
   const handleRegister = async (values: {
@@ -165,17 +220,15 @@ const RegisterScreen: React.FC = () => {
     clearErrors();
     setErrorMessage(null);
 
-    // Remover confirmPassword e campos não esperados pelo backend
     const { confirmPassword, ...registerData } = values;
 
-    // Garantir que os dados estejam no formato correto
     const payload = {
       name: registerData.name.trim(),
       email: registerData.email.trim().toLowerCase(),
       password: registerData.password,
       role: registerData.role,
       phone: registerData.phone,
-      address: registerData.address, // Adicionar o endereço
+      address: registerData.address,
     };
 
     console.log("[RegisterScreen] Dados sendo enviados:", {
@@ -187,15 +240,14 @@ const RegisterScreen: React.FC = () => {
       const success = await register(payload);
 
       if (success) {
-        // Em vez de navegação complexa, use uma abordagem mais simples
-        // Primeiro um delay para garantir que o token está armazenado
         setTimeout(() => {
           // Navegação tipada corretamente
-          return navigation.navigate("Login");
+          navigation.navigate("Login", {
+            email: payload.email,
+            autoLogin: true,
+            password: payload.password,
+          });
         }, 1000);
-      } else {
-        // Resto do código permanece igual
-        // ...
       }
     } catch (err) {
       setErrorMessage(
@@ -203,6 +255,79 @@ const RegisterScreen: React.FC = () => {
       );
     }
   };
+
+  // Renderizar item de sugestão
+  const renderSuggestionItem = (item: AddressSuggestion, index: number) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.suggestionItem,
+        index === addressSuggestions.length - 1 && styles.lastSuggestionItem,
+      ]}
+      onPress={() => handleSelectSuggestion(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.suggestionIconContainer}>
+        <MaterialIcons
+          name="location-on"
+          size={24}
+          color={theme.colors.primary.secondary}
+        />
+      </View>
+
+      <View style={styles.suggestionContent}>
+        <Text style={styles.suggestionMainText} numberOfLines={1}>
+          {item.street && item.number
+            ? `${item.street}, ${item.number}`
+            : item.displayName.split(",")[0]}
+        </Text>
+        <Text style={styles.suggestionSubText} numberOfLines={1}>
+          {item.neighborhood && item.city
+            ? `${item.neighborhood}, ${item.city} - ${item.state}`
+            : `${item.city || ""} - ${item.state || ""}`}
+        </Text>
+      </View>
+
+      <MaterialIcons
+        name="arrow-forward-ios"
+        size={16}
+        color={theme.colors.neutral.mediumGray}
+      />
+    </TouchableOpacity>
+  );
+
+  // Renderizar backdrop
+  const renderBackdrop = React.useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.3}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
+
+  // Renderizar header do bottom sheet
+  const renderHeader = () => (
+    <View style={styles.sheetHeader}>
+      <View style={styles.sheetHandleBar} />
+      <View style={styles.sheetTitleContainer}>
+        <MaterialIcons
+          name="search"
+          size={20}
+          color={theme.colors.primary.main}
+        />
+        <Text style={styles.sheetTitle}>
+          {isLoadingAddress
+            ? "Buscando..."
+            : `${addressSuggestions.length} endereços encontrados`}
+        </Text>
+      </View>
+    </View>
+  );
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -227,6 +352,7 @@ const RegisterScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
           >
             {/* Botão de voltar */}
             <TouchableOpacity
@@ -390,14 +516,18 @@ const RegisterScreen: React.FC = () => {
                       <Text style={styles.validationError}>{errors.phone}</Text>
                     )}
 
-                    {/* Campo de endereço com autocomplete */}
+                    {/* Campo de endereço com autocomplete - COMPONENTE MODULAR */}
                     <View style={styles.addressContainer}>
                       <AddressAutocomplete
+                        ref={addressAutocompleteRef}
                         name="address"
                         label="Endereço"
                         placeholder="Digite seu endereço completo..."
                         required
                         onAddressSelect={handleAddressSelect}
+                        onSuggestionsChange={handleSuggestionsChange}
+                        onLoadingChange={handleLoadingChange}
+                        onInputChange={handleInputChange}
                         countryCode="br"
                       />
                     </View>
@@ -584,6 +714,69 @@ const RegisterScreen: React.FC = () => {
               </TouchableOpacity>
             </Animated.View>
           </ScrollView>
+
+          {/* BottomSheet renderizado no final da tela (fora do ScrollView) */}
+          <BottomSheet
+            ref={bottomSheetRef}
+            index={-1}
+            snapPoints={["25%", "50%", "75%"]}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            keyboardBehavior="interactive"
+            android_keyboardInputMode="adjustResize"
+            handleComponent={null}
+            backgroundStyle={styles.bottomSheetBackground}
+            style={styles.bottomSheetContainer}
+          >
+            {renderHeader()}
+
+            <BottomSheetScrollView
+              contentContainerStyle={styles.scrollViewContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {isLoadingAddress ? (
+                <View style={styles.centeredContainer}>
+                  <ActivityIndicator
+                    size="large"
+                    color={theme.colors.primary.secondary}
+                  />
+                  <Text style={styles.loadingText}>
+                    Procurando endereços...
+                  </Text>
+                </View>
+              ) : addressSuggestions.length > 0 ? (
+                <>
+                  <Text style={styles.instructionText}>
+                    Toque para selecionar ou arraste para ver mais opções
+                  </Text>
+                  {addressSuggestions.map((suggestion, index) =>
+                    renderSuggestionItem(suggestion, index)
+                  )}
+                </>
+              ) : addressInputValue.length >= 3 ? (
+                <View style={styles.centeredContainer}>
+                  <MaterialIcons
+                    name="search-off"
+                    size={48}
+                    color={theme.colors.neutral.mediumGray}
+                  />
+                  <Text style={styles.emptyTitle}>
+                    Nenhum endereço encontrado
+                  </Text>
+                  <Text style={styles.emptySubtitle}>
+                    Tente ser mais específico com o endereço
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.centeredContainer}>
+                  <Text style={styles.placeholderText}>
+                    Digite pelo menos 3 caracteres para buscar endereços
+                  </Text>
+                </View>
+              )}
+            </BottomSheetScrollView>
+          </BottomSheet>
         </LinearGradient>
       </KeyboardAvoidingView>
     </GestureHandlerRootView>
@@ -789,6 +982,132 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: theme.colors.primary.secondary,
     marginLeft: 5,
+  },
+  bottomSheetContainer: {
+    elevation: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  bottomSheetBackground: {
+    backgroundColor: theme.colors.neutral.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.lightGray,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  sheetHandleBar: {
+    position: "absolute",
+    top: 8,
+    left: "50%",
+    marginLeft: -20,
+    width: 40,
+    height: 4,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 2,
+  },
+  sheetTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.primary.main,
+    marginLeft: theme.spacing.xs,
+  },
+  scrollViewContent: {
+    paddingBottom: theme.spacing.xl,
+  },
+  instructionText: {
+    textAlign: "center",
+    color: theme.colors.neutral.darkGray,
+    fontSize: 14,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    backgroundColor: theme.colors.neutral.lightGray,
+    marginBottom: theme.spacing.s,
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.lightGray,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  lastSuggestionItem: {
+    borderBottomWidth: 0,
+  },
+  suggestionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary.secondary + "15",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: theme.spacing.m,
+  },
+  suggestionContent: {
+    flex: 1,
+    marginRight: theme.spacing.s,
+  },
+  suggestionMainText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.neutral.black,
+    marginBottom: 4,
+  },
+  suggestionSubText: {
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.m,
+    minHeight: 150,
+  },
+  loadingText: {
+    marginTop: theme.spacing.m,
+    fontSize: 16,
+    fontWeight: "500",
+    color: theme.colors.primary.main,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.neutral.black,
+    textAlign: "center",
+    marginTop: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: theme.colors.neutral.mediumGray,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });
 
