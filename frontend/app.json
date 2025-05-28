@@ -4,13 +4,14 @@
     "slug": "solidarios",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#64748B"
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF",
+      "imageWidth": 200
     },
     "updates": {
       "fallbackToCacheTimeout": 10000
@@ -21,8 +22,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solidarios.app",
-      "icon": "./assets/icon.png",
+      "icon": "./assets/images/icon.png",
       "buildNumber": "1.0.0",
+      "splash": {
+        "image": "./assets/images/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 200
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Este aplicativo precisa de acesso à câmera para permitir que você tire fotos para seu perfil ou outras funcionalidades.",
         "NSPhotoLibraryUsageDescription": "Este aplicativo precisa de acesso à sua galeria para permitir que você escolha fotos para seu perfil ou outras funcionalidades.",
@@ -32,11 +39,17 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#64748B"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.solidarios.app",
       "edgeToEdgeEnabled": true,
+      "splash": {
+        "image": "./assets/images/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 200
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -49,9 +62,9 @@
       "versionCode": 1
     },
     "web": {
-      "favicon": "./assets/favicon.svg"
+      "favicon": "./assets/images/favicon.svg"
     },
-    "primaryColor": "#64748B",
+    "primaryColor": "#1E88E5",
     "scheme": "solidarios",
     "plugins": [
       [
@@ -65,6 +78,15 @@
           "ios": {
             "deploymentTarget": "15.1"
           }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "imageWidth": 200
         }
       ]
     ]
