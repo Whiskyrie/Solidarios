@@ -1,196 +1,405 @@
-import axios from "axios";
-
-export interface NominatimResponse {
-  place_id: number;
-  licence: string;
-  osm_type: string;
-  osm_id: number;
-  boundingbox: string[];
-  lat: string;
-  lon: string;
-  display_name: string;
-  class: string;
-  type: string;
-  importance: number;
-  address: {
-    house_number?: string;
-    road?: string;
-    suburb?: string;
-    city_district?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    county?: string;
-    state_district?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-    country_code?: string;
-  };
+import axios, { AxiosResponse, CancelTokenSource } from "axios";
+import {
+  NominatimResponse,
+  AddressSuggestion,
+  GeocodingConfig,
+} from "../types/geocode.types";
+interface CacheEntry {
+  data: AddressSuggestion[];
+  timestamp: number;
+  hits: number; // Novo: contador de uso para LRU
 }
 
-// Interface para sugestão de endereço formatada - SIMPLIFICADA
-export interface AddressSuggestion {
-  id: string;
-  displayName: string;
-  street?: string;
-  number?: string;
-  neighborhood?: string;
-  city?: string;
-  coordinates: {
-    lat: number;
-    lon: number;
-  };
+interface RequestMetrics {
+  totalRequests: number;
+  cacheHits: number;
+  errors: number;
+  averageResponseTime: number;
 }
 
 class GeocodingService {
-  private readonly baseUrl = "https://nominatim.openstreetmap.org";
-  private readonly userAgent = "SolidariosApp/1.0";
-
-  // Rate limiting - máximo de 1 requisição por segundo
+  private readonly config: Required<GeocodingConfig>;
   private lastRequestTime = 0;
-  private readonly minInterval = 1000; // 1 segundo
+  private cache = new Map<string, CacheEntry>();
+  private metrics: RequestMetrics = {
+    totalRequests: 0,
+    cacheHits: 0,
+    errors: 0,
+    averageResponseTime: 0,
+  };
+  private cancelTokens = new Map<string, CancelTokenSource>();
+
+  constructor(config: GeocodingConfig = {}) {
+    this.config = {
+      baseUrl: config.baseUrl || "https://nominatim.openstreetmap.org",
+      userAgent: config.userAgent || "SolidariosApp/1.0",
+      rateLimit: config.rateLimit || 1000,
+      timeout: config.timeout || 8000,
+      retryAttempts: config.retryAttempts || 2,
+      retryDelay: config.retryDelay || 1000,
+      defaultCountry: config.defaultCountry || "br",
+      cacheSize: config.cacheSize || 100,
+      cacheExpiry: config.cacheExpiry || 5 * 60 * 1000,
+      enableLogging: config.enableLogging || false,
+    };
+  }
 
   /**
-   * Preparar consulta para melhor precisão
+   * Preparar consulta com melhor normalização
    */
   private prepareQuery(query: string): string {
-    // Limpar e normalizar a consulta
     let cleanQuery = query
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, " ") // Múltiplos espaços por um só
-      .replace(/[,;.]+/g, ",") // Normalizar separadores
-      .replace(
-        /\b(rua|av|avenida|travessa|alameda|praça|largo|estrada)\b/gi,
-        (match) => {
-          const normalized = {
-            rua: "rua",
-            av: "avenida",
-            avenida: "avenida",
-            travessa: "travessa",
-            alameda: "alameda",
-            praça: "praça",
-            largo: "largo",
-            estrada: "estrada",
-          };
-          return (
-            normalized[match.toLowerCase() as keyof typeof normalized] || match
-          );
-        }
-      );
+      .normalize("NFD") // Normalizar acentos
+      .replace(/[\u0300-\u036f]/g, "") // Remover diacríticos
+      .replace(/\s+/g, " ")
+      .replace(/[,;.]+/g, ",");
 
-    // Adicionar contexto do Brasil se não houver referência geográfica
-    if (
-      !cleanQuery.includes("brasil") &&
-      !cleanQuery.includes("brazil") &&
-      !cleanQuery.includes(" sp ") &&
-      !cleanQuery.includes(" rj ") &&
-      !cleanQuery.includes(" mg ") &&
-      !cleanQuery.includes(" pr ") &&
-      !cleanQuery.match(
-        /\b(são paulo|rio de janeiro|minas gerais|paraná|bahia|ceará|pernambuco|rio grande do sul|santa catarina|goiás|maranhão|acre|alagoas|amapá|amazonas|distrito federal|espírito santo|mato grosso|mato grosso do sul|pará|paraíba|piauí|rondônia|roraima|sergipe|tocantins)\b/i
-      )
-    ) {
-      cleanQuery += ", Brasil";
+    // Expandir abreviações comuns
+    const abbreviations: Record<string, string> = {
+      "r.?": "rua",
+      "av.?": "avenida",
+      "al.?": "alameda",
+      "tv.?": "travessa",
+      "pç.?": "praça",
+      "lg.?": "largo",
+      "estr.?": "estrada",
+      "rod.?": "rodovia",
+      "cj.?": "conjunto",
+      "qd.?": "quadra",
+      "lt.?": "lote",
+    };
+
+    for (const [abbrev, full] of Object.entries(abbreviations)) {
+      cleanQuery = cleanQuery.replace(
+        new RegExp(`\\b${abbrev}\\b`, "gi"),
+        full
+      );
+    }
+
+    // Melhorar detecção de contexto geográfico
+    const hasGeographicContext = this.hasGeographicContext(cleanQuery);
+    if (!hasGeographicContext) {
+      cleanQuery += `, ${
+        this.config.defaultCountry === "br" ? "Brasil" : "Brazil"
+      }`;
     }
 
     return cleanQuery;
   }
 
   /**
-   * Buscar endereços usando geocodificação direta
-   * @param query Termo de busca para o endereço
-   * @param countryCode Código do país (padrão: 'br' para Brasil)
-   * @param limit Limite de resultados (padrão: 5)
-   * @returns Lista de sugestões de endereço
+   * Verificar se a query já tem contexto geográfico
    */
-  async searchAddresses(
-    query: string,
-    countryCode: string = "br",
-    limit: number = 8
-  ): Promise<AddressSuggestion[]> {
-    // Rate limiting
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
+  private hasGeographicContext(query: string): boolean {
+    const geographicPatterns = [
+      /\b(brasil|brazil)\b/i,
+      /\b(sp|rj|mg|pr|rs|sc|ba|ce|pe|go|ma|pa|pb|pi|rn|ro|rr|se|to|al|ap|am|df|es|mt|ms|ac)\b/i,
+      /\b(são paulo|rio de janeiro|belo horizonte|salvador|fortaleza|brasília|curitiba|recife|porto alegre|manaus|belém|goiânia|campinas|nova iguaçu|maceió|são luís|duque de caxias|natal|teresina|campo grande|osasco|santo andré|joão pessoa|jaboatão dos guararapes|contagem|são bernardo do campo|uberlândia|sorocaba|aracaju|feira de santana|cuiabá|joinville|juiz de fora|londrina|aparecida de goiânia|niterói|porto velho|serra|caxias do sul|campina grande|mauá|carapicuíba|olinda|são josé do rio preto|ribeirão preto|betim|diadema|jundiaí|franca|guarulhos|osasco|piracicaba|cariacica|itaquaquecetuba|taubaté|sumaré|taboão da serra|bauru|limeira|petrópolis|embu das artes|suzano|nova friburgo|governador valadares|volta redonda|petrolina|americana|cabo de santo agostinho|são vicente|pelotas|montes claros|são josé dos campos|anápolis|caucaia|vitória da conquista|itabuna|paulista|cascavel|marília|taubate|são carlos|presidente prudente|canoas|araraquara|jacareí|parnaíba|araçatuba|blumenau|são josé|praia grande|vila velha|guarujá|caruaru|itapevi|maringá|rio branco|vitória|nossa senhora do socorro|magé|santarém|paranaguá|rio grande|passo fundo|santa maria|lauro de freitas|mossoró|novo hamburgo|dourados|são leopoldo|palmas|cachoeirinha|angra dos reis|sapucaia do sul|juazeiro do norte|rio das ostras|jequié|viamão|boa vista|macapá|rio branco|porto velho|palmas|boa vista|macapá)\b/i,
+    ];
 
-    if (timeSinceLastRequest < this.minInterval) {
-      const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
+    return geographicPatterns.some((pattern) => pattern.test(query));
+  }
 
-    const preparedQuery = this.prepareQuery(query);
-
+  /**
+   * Implementar retry com backoff exponencial
+   */
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    attempt: number = 0
+  ): Promise<T> {
     try {
-      const response = await axios.get<NominatimResponse[]>(
-        `${this.baseUrl}/search`,
-        {
-          params: {
-            q: preparedQuery,
-            format: "json",
-            addressdetails: 1,
-            limit,
-            countrycodes: countryCode,
-            "accept-language": "pt-BR,pt,en",
-            dedupe: 1, // Remover duplicatas
-            extratags: 1, // Tags extras para melhor contexto
-            namedetails: 1, // Detalhes do nome
-            bounded: 0, // Não limitar à área específica
-            exclude_place_ids: "", // Não excluir lugares
-          },
-          headers: {
-            "User-Agent": this.userAgent,
-          },
-          timeout: 8000, // Aumentar timeout
-        }
-      );
-
-      this.lastRequestTime = Date.now();
-
-      // Filtrar e ordenar resultados por relevância
-      const formatted = response.data
-        .map(this.formatAddressSuggestion)
-        .filter(this.filterRelevantResults)
-        .sort(this.sortByRelevance);
-
-      return formatted.slice(0, limit);
+      return await operation();
     } catch (error) {
-      console.error("Erro ao buscar endereços:", error);
-      throw new Error("Não foi possível buscar sugestões de endereço");
+      if (attempt >= this.config.retryAttempts) {
+        throw error;
+      }
+
+      const delay = this.config.retryDelay * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      if (this.config.enableLogging) {
+        console.warn(`Retry attempt ${attempt + 1} after ${delay}ms`);
+      }
+
+      return this.retryWithBackoff(operation, attempt + 1);
     }
   }
 
   /**
-   * Filtrar resultados relevantes - FOCO NO ESSENCIAL
+   * Gerenciar cache com estratégia LRU
+   */
+  private manageCache(): void {
+    if (this.cache.size <= this.config.cacheSize) return;
+
+    // Encontrar entrada menos recentemente usada
+    let lruKey: string | null = null;
+    let minHits = Infinity;
+    let oldestTime = Infinity;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (
+        entry.hits < minHits ||
+        (entry.hits === minHits && entry.timestamp < oldestTime)
+      ) {
+        lruKey = key;
+        minHits = entry.hits;
+        oldestTime = entry.timestamp;
+      }
+    }
+
+    if (lruKey) {
+      this.cache.delete(lruKey);
+    }
+  }
+
+  /**
+   * Calcular score de confiança baseado em completude
+   */
+  private calculateConfidence(
+    suggestion: AddressSuggestion,
+    original: NominatimResponse
+  ): number {
+    let score = 0;
+
+    // Fatores de confiança
+    if (suggestion.number) score += 0.3;
+    if (suggestion.street) score += 0.4;
+    if (suggestion.neighborhood) score += 0.2;
+    if (suggestion.city) score += 0.1;
+
+    // Penalizar por falta de informações críticas
+    if (!suggestion.street) score -= 0.3;
+    if (!suggestion.city) score -= 0.2;
+
+    // Ajustar baseado na importância do Nominatim
+    const importanceBonus = Math.min(original.importance * 0.2, 0.2);
+    score += importanceBonus;
+
+    return Math.max(0, Math.min(1, score));
+  }
+
+  /**
+   * Determinar tipo de match
+   */
+  private determineMatchType(
+    suggestion: AddressSuggestion
+  ): AddressSuggestion["type"] {
+    if (suggestion.number && suggestion.street) return "exact";
+    if (suggestion.street) return "street";
+    if (suggestion.city) return "city";
+    return "approximate";
+  }
+
+  /**
+   * Buscar endereços com melhorias de performance e resiliência
+   */
+  async searchAddresses(
+    query: string,
+    countryCode: string = this.config.defaultCountry,
+    limit: number = 8
+  ): Promise<AddressSuggestion[]> {
+    const startTime = Date.now();
+    this.metrics.totalRequests++;
+
+    // Validação de entrada
+    if (!query || query.trim().length < 2) {
+      throw new Error("Query deve ter pelo menos 2 caracteres");
+    }
+
+    const cleanQuery = this.prepareQuery(query);
+    const cacheKey = `${cleanQuery}:${countryCode}:${limit}`;
+
+    // Verificar cache
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.config.cacheExpiry) {
+      cached.hits++;
+      this.metrics.cacheHits++;
+      return cached.data;
+    }
+
+    // Cancelar requisição anterior se existir
+    const existingCancel = this.cancelTokens.get(cacheKey);
+    if (existingCancel) {
+      existingCancel.cancel("Nova busca iniciada");
+    }
+
+    // Criar novo cancel token
+    const cancelToken = axios.CancelToken.source();
+    this.cancelTokens.set(cacheKey, cancelToken);
+
+    try {
+      // Rate limiting melhorado
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      if (timeSinceLastRequest < this.config.rateLimit) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.config.rateLimit - timeSinceLastRequest)
+        );
+      }
+
+      const results = await this.retryWithBackoff(async () => {
+        const response: AxiosResponse<NominatimResponse[]> = await axios.get(
+          `${this.config.baseUrl}/search`,
+          {
+            params: {
+              q: cleanQuery,
+              format: "json",
+              addressdetails: 1,
+              limit: Math.min(limit * 2, 20), // Buscar mais para filtrar melhor
+              countrycodes: countryCode,
+              "accept-language": "pt-BR,pt,en",
+              dedupe: 1,
+              extratags: 1,
+              namedetails: 1,
+              bounded: 0,
+            },
+            headers: {
+              "User-Agent": this.config.userAgent,
+            },
+            timeout: this.config.timeout,
+            cancelToken: cancelToken.token,
+          }
+        );
+
+        // Validar resposta
+        if (!Array.isArray(response.data)) {
+          throw new Error("Resposta inválida da API");
+        }
+
+        return response.data;
+      });
+
+      this.lastRequestTime = Date.now();
+
+      // Processar e formatar resultados
+      const formatted = results
+        .map((item) => {
+          const suggestion = this.formatAddressSuggestion(item);
+          suggestion.confidence = this.calculateConfidence(suggestion, item);
+          suggestion.type = this.determineMatchType(suggestion);
+          return suggestion;
+        })
+        .filter(this.filterRelevantResults)
+        .sort(this.sortByRelevance)
+        .slice(0, limit);
+
+      // Salvar no cache
+      this.manageCache();
+      this.cache.set(cacheKey, {
+        data: formatted,
+        timestamp: Date.now(),
+        hits: 1,
+      });
+
+      // Atualizar métricas
+      const responseTime = Date.now() - startTime;
+      this.metrics.averageResponseTime =
+        (this.metrics.averageResponseTime + responseTime) / 2;
+
+      return formatted;
+    } catch (error: any) {
+      this.metrics.errors++;
+
+      if (axios.isCancel(error)) {
+        throw new Error("Busca cancelada");
+      }
+
+      if (this.config.enableLogging) {
+        console.error("Erro na geocodificação:", error);
+      }
+
+      throw new Error("Não foi possível buscar sugestões de endereço");
+    } finally {
+      this.cancelTokens.delete(cacheKey);
+    }
+  }
+
+  /**
+   * Geocodificação reversa (coordenadas -> endereço)
+   */
+  async reverseGeocode(
+    lat: number,
+    lon: number
+  ): Promise<AddressSuggestion | null> {
+    try {
+      const response = await axios.get<NominatimResponse>(
+        `${this.config.baseUrl}/reverse`,
+        {
+          params: {
+            lat,
+            lon,
+            format: "json",
+            addressdetails: 1,
+            "accept-language": "pt-BR,pt,en",
+          },
+          headers: {
+            "User-Agent": this.config.userAgent,
+          },
+          timeout: this.config.timeout,
+        }
+      );
+
+      const suggestion = this.formatAddressSuggestion(response.data);
+      suggestion.confidence = this.calculateConfidence(
+        suggestion,
+        response.data
+      );
+      suggestion.type = this.determineMatchType(suggestion);
+
+      return suggestion;
+    } catch (error) {
+      if (this.config.enableLogging) {
+        console.error("Erro na geocodificação reversa:", error);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Filtrar resultados com critérios mais rigorosos
    */
   private filterRelevantResults = (suggestion: AddressSuggestion): boolean => {
-    // Deve ter pelo menos rua E cidade
-    if (!suggestion.street || !suggestion.city) return false;
+    // Deve ter pelo menos cidade
+    if (!suggestion.city) return false;
 
-    // Preferir endereços com bairro
+    // Preferir resultados com maior confiança
+    if (suggestion.confidence < 0.3) return false;
+
+    // Filtrar tipos de lugares irrelevantes poderia ser adicionado aqui
     return true;
   };
 
   /**
-   * Ordenar por relevância - PRIORIZAR COMPLETUDE
+   * Ordenação melhorada com múltiplos critérios
    */
   private sortByRelevance = (
     a: AddressSuggestion,
     b: AddressSuggestion
   ): number => {
-    // Priorizar endereços com número
-    if (a.number && !b.number) return -1;
-    if (!a.number && b.number) return 1;
+    // 1. Por confiança (mais importante)
+    const confidenceDiff = b.confidence - a.confidence;
+    if (Math.abs(confidenceDiff) > 0.1) return confidenceDiff;
 
-    // Priorizar endereços com bairro
-    if (a.neighborhood && !b.neighborhood) return -1;
-    if (!a.neighborhood && b.neighborhood) return 1;
+    // 2. Por tipo de match
+    const typeOrder = { exact: 4, street: 3, city: 2, approximate: 1 };
+    const typeDiff = typeOrder[b.type] - typeOrder[a.type];
+    if (typeDiff !== 0) return typeDiff;
 
-    return 0;
+    // 3. Por completude de informações
+    const aCompleteness = [a.number, a.street, a.neighborhood, a.city].filter(
+      Boolean
+    ).length;
+    const bCompleteness = [b.number, b.street, b.neighborhood, b.city].filter(
+      Boolean
+    ).length;
+
+    return bCompleteness - aCompleteness;
   };
 
   /**
-   * Formatar resposta do Nominatim - APENAS CAMPOS ESSENCIAIS
+   * Formatação aprimorada
    */
   private formatAddressSuggestion = (
     item: NominatimResponse
@@ -204,12 +413,47 @@ class GeocodingService {
       number: address.house_number,
       neighborhood: address.suburb || address.city_district,
       city: address.city || address.town || address.village,
+      state: address.state || address.state_district,
+      postcode: address.postcode,
       coordinates: {
         lat: parseFloat(item.lat),
         lon: parseFloat(item.lon),
       },
+      confidence: 0, // Será calculado depois
+      type: "approximate", // Será determinado depois
     };
   };
+
+  /**
+   * Obter métricas de performance
+   */
+  getMetrics(): RequestMetrics & { cacheSize: number } {
+    return {
+      ...this.metrics,
+      cacheSize: this.cache.size,
+    };
+  }
+
+  /**
+   * Limpar cache manualmente
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Pré-carregar endereços populares (pode ser útil)
+   */
+  async preloadPopularAddresses(addresses: string[]): Promise<void> {
+    const promises = addresses.map(
+      (address) =>
+        this.searchAddresses(address, this.config.defaultCountry, 3).catch(
+          () => []
+        ) // Ignorar erros no preload
+    );
+
+    await Promise.allSettled(promises);
+  }
 }
 
-export default new GeocodingService();
+export default GeocodingService;
