@@ -205,8 +205,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logo: {
-    width: 160, // Reduzido de 220px para melhor proporção
-    height: 160,
+    width: 100, // Reduzido de 220px para melhor proporção
+    height: 100,
   },
   skipIndicator: {
     position: "absolute",
