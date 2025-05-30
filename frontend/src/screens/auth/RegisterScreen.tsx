@@ -102,6 +102,9 @@ const RegisterScreen: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const addressAutocompleteRef = useRef<AddressAutocompleteRef>(null);
 
+  // Estado para controlar a altura do teclado
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   // Efeito de animação ao carregar a tela
   useEffect(() => {
     Animated.parallel([
@@ -309,11 +312,46 @@ const RegisterScreen: React.FC = () => {
     </View>
   );
 
+  // Listener para mudanças do teclado
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (event) => {
+        setKeyboardHeight(event.endCoordinates.height);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Ajustar snap points baseado na altura do teclado
+  const getSnapPoints = useCallback(() => {
+    if (keyboardHeight > 0) {
+      const availableHeight = 100 - (keyboardHeight / 1000) * 100; // Convertendo para porcentagem
+      return [
+        `${Math.min(availableHeight * 0.4, 40)}%`,
+        `${Math.min(availableHeight * 0.7, 70)}%`,
+      ];
+    }
+    return ["25%", "50%", "75%"];
+  }, [keyboardHeight]);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <StatusBar
           barStyle="dark-content"
@@ -692,18 +730,24 @@ const RegisterScreen: React.FC = () => {
             </Animated.View>
           </ScrollView>
 
-          {/* BottomSheet renderizado no final da tela (fora do ScrollView) */}
+          {/* BottomSheet com ajuste para teclado */}
           <BottomSheet
             ref={bottomSheetRef}
             index={-1}
-            snapPoints={["25%", "50%", "75%"]}
+            snapPoints={getSnapPoints()}
             enablePanDownToClose
             backdropComponent={renderBackdrop}
             keyboardBehavior="interactive"
+            keyboardBlurBehavior="restore"
             android_keyboardInputMode="adjustResize"
             handleComponent={null}
             backgroundStyle={styles.bottomSheetBackground}
-            style={styles.bottomSheetContainer}
+            style={[
+              styles.bottomSheetContainer,
+              keyboardHeight > 0 && {
+                marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
+              },
+            ]}
           >
             {renderHeader()}
 
@@ -711,6 +755,7 @@ const RegisterScreen: React.FC = () => {
               contentContainerStyle={styles.scrollViewContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
             >
               {isLoadingAddress ? (
                 <View style={styles.centeredContainer}>
