@@ -9,6 +9,7 @@ import {
   UpdateUserDto,
   UsersPage,
   UserRole,
+  UserStats,
 } from "../types/users.types";
 import { PageOptionsDto } from "../types/common.types";
 
@@ -17,6 +18,7 @@ export const useUsers = () => {
   // Estados locais
   const [users, setUsers] = useState<User[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<{
@@ -67,6 +69,23 @@ export const useUsers = () => {
       return data;
     } catch (err: any) {
       setError(err.message || "Erro ao buscar usuário");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Função para obter estatísticas do usuário
+  const fetchUserStats = useCallback(async (id: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const data = await UsersService.getStats(id);
+      setUserStats(data);
+      return data;
+    } catch (err: any) {
+      setError(err.message || "Erro ao buscar estatísticas do usuário");
       return null;
     } finally {
       setIsLoading(false);
@@ -186,6 +205,7 @@ export const useUsers = () => {
     // Estado
     users,
     user,
+    userStats,
     isLoading,
     error,
     pagination,
@@ -193,6 +213,7 @@ export const useUsers = () => {
     // Ações
     fetchUsers,
     fetchUserById,
+    fetchUserStats,
     createUser,
     updateUser,
     removeUser,

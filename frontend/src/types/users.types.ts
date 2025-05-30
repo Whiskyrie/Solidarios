@@ -55,3 +55,12 @@ export interface PageDto<T> {
 
 // Tipo para usuários paginados
 export type UsersPage = PageDto<User>;
+
+// Tipo para estatísticas do usuário
+export interface UserStats {
+  userId: string;
+  totalDonations: number;
+  peopleHelped: number;
+  impactScore: number;
+  lastUpdated: string;
+}

@@ -30,6 +30,7 @@ import {
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { User } from './entities/user.entity';
+import { UserStatsDto } from './dto/user-stats.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -97,5 +98,66 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({
+    summary: 'Obter estatísticas de doações de um usuário',
+    description:
+      'Retorna métricas agregadas das doações do usuário: total de doações, pessoas ajudadas e pontuação de impacto',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estatísticas do usuário retornadas com sucesso.',
+    type: UserStatsDto,
+    schema: {
+      example: {
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        totalDonations: 25,
+        peopleHelped: 150,
+        impactScore: 200,
+        lastUpdated: '2023-12-01T10:30:00Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID do usuário inválido (formato UUID inválido).',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'Validation failed (uuid is expected)',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuário não encontrado.',
+    schema: {
+      example: {
+        statusCode: 404,
+        message:
+          'Usuário com ID a1b2c3d4-e5f6-7890-abcd-ef1234567890 não encontrado',
+        error: 'Not Found',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Erro interno do servidor.',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Erro interno do servidor',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  async getUserStats(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<UserStatsDto> {
+    return this.usersService.getUserStats(id);
   }
 }
