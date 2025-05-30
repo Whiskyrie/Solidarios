@@ -15,6 +15,7 @@ import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 import * as bcrypt from 'bcrypt';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
+import { UserStatsDto } from './dto/user-stats.dto';
 
 @Injectable()
 export class UsersService {
@@ -203,6 +204,56 @@ export class UsersService {
     } catch (error) {
       this.logger.error(
         `Erro ao remover usuário: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  @LogMethod()
+  async getUserStats(userId: string): Promise<UserStatsDto> {
+    this.logger.log(`Calculando estatísticas para o usuário: ${userId}`);
+
+    try {
+      // Verificar se o usuário existe
+
+      // Query para buscar estatísticas das doações
+      // Assumindo que existe uma tabela 'items' com 'donorId' e campos relacionados
+      const statsQuery = `
+        SELECT 
+          COALESCE(COUNT(DISTINCT i.id), 0) as total_donations,
+          COALESCE(SUM(CASE 
+            WHEN d.id IS NOT NULL THEN 1 
+            ELSE 0 
+          END), 0) as people_helped
+        FROM items i
+        LEFT JOIN distributions_items_items dii ON dii."itemsId" = i.id
+        LEFT JOIN distributions d ON d.id = dii."distributionsId"
+        WHERE i."donorId" = $1
+      `;
+
+      const result = await this.usersRepository.query(statsQuery, [userId]);
+
+      const totalDonations = parseInt(result[0]?.total_donations || '0');
+      const peopleHelped = parseInt(result[0]?.people_helped || '0');
+      const impactScore = totalDonations * 2 + peopleHelped;
+
+      const stats: UserStatsDto = {
+        userId,
+        totalDonations,
+        peopleHelped,
+        impactScore,
+        lastUpdated: new Date(),
+      };
+
+      this.logger.log(
+        `Estatísticas calculadas para usuário ${userId}: ${totalDonations} doações, ${peopleHelped} pessoas ajudadas, impacto ${impactScore}`,
+      );
+
+      return stats;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao calcular estatísticas do usuário ${userId}: ${error.message}`,
         error.stack,
       );
       throw error;

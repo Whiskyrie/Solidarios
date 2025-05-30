@@ -33,6 +33,7 @@ import MenuItem from "../../components/profile/MenuItem";
 
 // Hooks
 import { useAuth } from "../../hooks/useAuth";
+import { useUsers } from "../../hooks/useUsers";
 import { useMemo } from "react";
 
 // Tipos
@@ -56,6 +57,7 @@ const ProfileScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<DoadorProfileStackParamList>>();
   const { user, logout } = useAuth();
+  const { fetchUserStats } = useUsers();
 
   // Estado para as estatísticas do usuário
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -99,41 +101,33 @@ const ProfileScreen: React.FC = () => {
   /**
    * Busca as estatísticas do usuário da API
    */
-  const fetchUserStats = useCallback(async () => {
+  const fetchUserStatsData = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Simulação de chamada à API
-      // Em um cenário real, isso seria uma chamada de API:
-      // const response = await api.get(`/users/${user.id}/stats`);
-      // const data = response.data;
-
-      // Simulando delay de rede
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Dados simulados - no app real viriam da API
-      const data = {
-        totalDonations: Math.floor(Math.random() * 30),
-        peopleHelped: Math.floor(Math.random() * 100),
-        impactScore: Math.floor(Math.random() * 500),
-      };
-
-      setUserStats(data);
+      const data = await fetchUserStats(user.id);
+      if (data) {
+        setUserStats({
+          totalDonations: data.totalDonations,
+          peopleHelped: data.peopleHelped,
+          impactScore: data.impactScore,
+        });
+      }
       setError(null);
     } catch (err) {
       console.error("Erro ao buscar estatísticas:", err);
       setError("Não foi possível carregar suas estatísticas.");
     }
-  }, [user]);
+  }, [user, fetchUserStats]);
 
   /**
    * Função para realizar pull-to-refresh
    */
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchUserStats();
+    await fetchUserStatsData();
     setRefreshing(false);
-  }, [fetchUserStats]);
+  }, [fetchUserStatsData]);
 
   /**
    * Efeito para carregar os dados iniciais e animar a entrada da tela
@@ -158,7 +152,7 @@ const ProfileScreen: React.FC = () => {
 
       // Buscar dados do usuário
       const loadData = async () => {
-        await fetchUserStats();
+        await fetchUserStatsData();
         setIsLoading(false);
       };
 
@@ -169,7 +163,7 @@ const ProfileScreen: React.FC = () => {
         fadeAnim.setValue(0);
         slideAnim.setValue(30);
       };
-    }, [fetchUserStats, fadeAnim, slideAnim])
+    }, [fetchUserStatsData, fadeAnim, slideAnim])
   );
 
   /**
@@ -435,7 +429,7 @@ const ProfileScreen: React.FC = () => {
                   title="Não foi possível carregar estatísticas"
                   description={error}
                   actionLabel="Tentar novamente"
-                  onAction={fetchUserStats}
+                  onAction={fetchUserStatsData}
                 />
               </View>
             ) : (
