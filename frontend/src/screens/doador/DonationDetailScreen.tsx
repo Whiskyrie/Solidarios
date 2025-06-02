@@ -1,5 +1,5 @@
-// src/screens/doador/DonationDetailScreen.tsx
-import React, { useState, useCallback } from "react";
+// DonationDetailScreen.tsx - Versão Redesenhada
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,11 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  Dimensions,
+  StatusBar,
+  Platform,
+  Animated,
+  RefreshControl,
 } from "react-native";
 import {
   RouteProp,
@@ -15,15 +20,14 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { LinearGradient } from "expo-linear-gradient";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { DoadorStackParamList } from "../../navigation/types";
 
 // Componentes
 import {
   Typography,
-  Header,
-  StatusIndicator,
   Badge,
-  Card,
   Divider,
   Button,
   EmptyState,
@@ -42,29 +46,267 @@ import { DOADOR_ROUTES } from "../../navigation/routes";
 import { formatDate } from "../../utils/formatters";
 import { ItemType } from "../../types/items.types";
 
+// Dimensões da tela
+const { width: screenWidth } = Dimensions.get("window");
+
 // Interface para a rota
 type DonationDetailScreenRouteProp = RouteProp<
   DoadorStackParamList,
   typeof DOADOR_ROUTES.DONATION_DETAIL
 >;
 
+// Skeleton Loading Component
+const DonationDetailSkeleton: React.FC = () => {
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const opacity = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <View style={styles.skeletonContainer}>
+      <Animated.View style={[styles.skeletonImage, { opacity }]} />
+      <View style={styles.skeletonContent}>
+        <Animated.View
+          style={[styles.skeletonLine, { opacity, width: "60%" }]}
+        />
+        <Animated.View
+          style={[styles.skeletonLine, { opacity, width: "40%" }]}
+        />
+        <Animated.View style={[styles.skeletonBlock, { opacity }]} />
+      </View>
+    </View>
+  );
+};
+
+// Componente de Timeline Animado
+const AnimatedTimeline: React.FC<{
+  status: "disponivel" | "reservado" | "distribuido";
+  receivedDate: string;
+}> = ({ status, receivedDate }) => {
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const dotsScale = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+
+  useEffect(() => {
+    const progress =
+      status === "disponivel" ? 33 : status === "reservado" ? 66 : 100;
+
+    Animated.parallel([
+      Animated.timing(progressAnim, {
+        toValue: progress,
+        duration: 1000,
+        useNativeDriver: false,
+      }),
+      ...dotsScale.map((anim, index) =>
+        Animated.sequence([
+          Animated.delay(index * 200),
+          Animated.spring(anim, {
+            toValue:
+              (status === "disponivel" && index === 0) ||
+              (status === "reservado" && index <= 1) ||
+              status === "distribuido"
+                ? 1
+                : 0,
+            tension: 50,
+            friction: 5,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ]).start();
+  }, [status]);
+
+  const steps = [
+    {
+      title: "Doação Recebida",
+      description: formatDate(receivedDate),
+      icon: "volunteer-activism",
+      active: true,
+    },
+    {
+      title: "Reservado",
+      description:
+        status !== "disponivel"
+          ? "Item reservado para beneficiário"
+          : "Aguardando reserva",
+      icon: "bookmark",
+      active: status === "reservado" || status === "distribuido",
+    },
+    {
+      title: "Entregue",
+      description:
+        status === "distribuido"
+          ? "Doação entregue com sucesso!"
+          : "Aguardando entrega",
+      icon: "done-all",
+      active: status === "distribuido",
+    },
+  ];
+
+  return (
+    <View style={styles.timelineContainer}>
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBarBackground} />
+        <Animated.View
+          style={[
+            styles.progressBar,
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 100],
+                outputRange: ["0%", "100%"],
+              }),
+            },
+          ]}
+        />
+      </View>
+
+      {steps.map((step, index) => (
+        <View key={index} style={styles.timelineStep}>
+          <Animated.View
+            style={[
+              styles.stepDot,
+              step.active && styles.stepDotActive,
+              { transform: [{ scale: dotsScale[index] }] },
+            ]}
+          >
+            <MaterialIcons
+              name={step.icon}
+              size={16}
+              color={step.active ? "#fff" : theme.colors.neutral.mediumGray}
+            />
+          </Animated.View>
+          <View style={styles.stepContent}>
+            <Typography
+              variant="bodySecondary"
+              style={[styles.stepTitle, step.active && styles.stepTitleActive]}
+            >
+              {step.title}
+            </Typography>
+            <Typography variant="small" color={theme.colors.neutral.darkGray}>
+              {step.description}
+            </Typography>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// Componente de Galeria de Imagens
+const ImageGallery: React.FC<{
+  images: string[];
+}> = ({ images }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const handleScroll = (event: any) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = event.nativeEvent.contentOffset.x / slideSize;
+    const roundIndex = Math.round(index);
+    setActiveIndex(roundIndex);
+  };
+
+  if (!images || images.length === 0) {
+    return (
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        style={styles.noImageContainer}
+      >
+        <MaterialIcons
+          name="image-not-supported"
+          size={48}
+          color={theme.colors.neutral.white}
+        />
+        <Typography
+          variant="body"
+          color={theme.colors.neutral.white}
+          style={{ marginTop: 8 }}
+        >
+          Sem imagens disponíveis
+        </Typography>
+      </LinearGradient>
+    );
+  }
+
+  return (
+    <Animated.View style={[styles.galleryContainer, { opacity: fadeAnim }]}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        scrollEventThrottle={16}
+      >
+        {images.map((image, index) => (
+          <TouchableOpacity
+            key={index}
+            activeOpacity={0.9}
+            style={styles.imageWrapper}
+          >
+            <Image
+              source={{ uri: image }}
+              style={styles.galleryImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {images.length > 1 && (
+        <View style={styles.indicatorContainer}>
+          {images.map((_, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                styles.indicator,
+                index === activeIndex && styles.indicatorActive,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </Animated.View>
+  );
+};
+
+// Componente Principal
 const DonationDetailScreen: React.FC = () => {
   // Navegação e parâmetros
   const route = useRoute<DonationDetailScreenRouteProp>();
   const id = route.params?.id;
   const navigation = useNavigation<StackNavigationProp<DoadorStackParamList>>();
-
-  // Verificar se temos um ID válido
-  if (!id) {
-    return (
-      <EmptyState
-        title="Doação não encontrada"
-        description="O ID da doação é inválido ou não foi fornecido."
-        actionLabel="Voltar para minhas doações"
-        onAction={() => navigation.goBack()}
-      />
-    );
-  }
 
   // Estado
   const { user } = useAuth();
@@ -77,7 +319,8 @@ const DonationDetailScreen: React.FC = () => {
     error,
     clearError,
   } = useItems();
-  const [currentImage, setCurrentImage] = useState<number>(0);
+
+  const [refreshing, setRefreshing] = useState(false);
   const [notification, setNotification] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -89,10 +332,55 @@ const DonationDetailScreen: React.FC = () => {
     message: "",
   });
 
+  // Animações
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // Verificar se temos um ID válido
+  if (!id) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={["#173F5F", "#006E58"]}
+          style={styles.headerGradient}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </LinearGradient>
+        <EmptyState
+          title="Doação não encontrada"
+          description="O ID da doação é inválido ou não foi fornecido."
+          actionLabel="Voltar para minhas doações"
+          onAction={() => navigation.goBack()}
+        />
+      </View>
+    );
+  }
+
   // Carregar detalhes da doação
   const loadDonationDetails = useCallback(async () => {
     await fetchItemById(id);
   }, [fetchItemById, id]);
+
+  // Animação de entrada
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Carregar dados ao focar na tela
   useFocusEffect(
@@ -100,6 +388,13 @@ const DonationDetailScreen: React.FC = () => {
       loadDonationDetails();
     }, [loadDonationDetails])
   );
+
+  // Refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadDonationDetails();
+    setRefreshing(false);
+  };
 
   // Cancelar doação
   const handleCancelDonation = () => {
@@ -141,48 +436,7 @@ const DonationDetailScreen: React.FC = () => {
     );
   };
 
-  // Renderizar loading state
-  if (isLoading && !item) {
-    return (
-      <Loading
-        visible={true}
-        message="Carregando detalhes da doação..."
-        overlay
-      />
-    );
-  }
-
-  // Renderizar erro
-  if (error) {
-    return (
-      <ErrorState
-        title="Erro ao carregar detalhes"
-        description={error}
-        actionLabel="Tentar novamente"
-        onAction={() => {
-          clearError();
-          loadDonationDetails();
-        }}
-      />
-    );
-  }
-
-  // Se o item não foi carregado
-  if (!item) {
-    return (
-      <EmptyState
-        title="Doação não encontrada"
-        description="A doação que você está procurando não está disponível."
-        actionLabel="Voltar para minhas doações"
-        onAction={() => navigation.goBack()}
-      />
-    );
-  }
-
-  // Verificar se o usuário logado é o doador do item
-  const isOwner = user?.id === item.donorId;
-
-  // Mapeamento de tipos de itens para rótulos
+  // Mapeamento de tipos
   const itemTypeLabels: Record<ItemType, string> = {
     [ItemType.ROUPA]: "Roupa",
     [ItemType.CALCADO]: "Calçado",
@@ -190,14 +444,35 @@ const DonationDetailScreen: React.FC = () => {
     [ItemType.OUTRO]: "Outro",
   };
 
+  // Verificar se o usuário é o doador
+  const isOwner = user?.id === item?.donorId;
+
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
-      <Header
-        title="Detalhes da Doação"
-        onBackPress={() => navigation.goBack()}
-        backgroundColor={theme.colors.primary.secondary}
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
       />
+
+      {/* Header Gradiente */}
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Typography variant="h2" color="#fff" style={styles.headerTitle}>
+            Detalhes da Doação
+          </Typography>
+          <View style={{ width: 40 }} />
+        </View>
+      </LinearGradient>
 
       {/* Notificação */}
       <NotificationBanner
@@ -208,309 +483,414 @@ const DonationDetailScreen: React.FC = () => {
         onClose={() => setNotification({ ...notification, visible: false })}
       />
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Galeria de imagens */}
-        <View style={styles.imageContainer}>
-          {item.photos && item.photos.length > 0 ? (
-            <>
-              <Image
-                source={{ uri: item.photos[currentImage] }}
-                style={styles.mainImage}
-                resizeMode="cover"
-              />
-              {item.photos.length > 1 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.thumbnailContainer}
-                >
-                  {item.photos.map((photo, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => setCurrentImage(index)}
-                      style={[
-                        styles.thumbnail,
-                        currentImage === index && styles.selectedThumbnail,
-                      ]}
-                    >
-                      <Image
-                        source={{ uri: photo }}
-                        style={styles.thumbnailImage}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </>
-          ) : (
-            <View style={styles.noImageContainer}>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Sem imagens disponíveis
-              </Typography>
-            </View>
-          )}
-        </View>
-
-        {/* Informações básicas */}
-        <Card style={styles.card}>
-          <View style={styles.headerRow}>
-            <Badge
-              label={itemTypeLabels[item.type]}
-              variant="info"
-              size="medium"
+      {/* Conteúdo */}
+      {isLoading && !item ? (
+        <DonationDetailSkeleton />
+      ) : error ? (
+        <ErrorState
+          title="Erro ao carregar detalhes"
+          description={error}
+          actionLabel="Tentar novamente"
+          onAction={() => {
+            clearError();
+            loadDonationDetails();
+          }}
+        />
+      ) : !item ? (
+        <EmptyState
+          title="Doação não encontrada"
+          description="A doação que você está procurando não está disponível."
+          actionLabel="Voltar para minhas doações"
+          onAction={() => navigation.goBack()}
+        />
+      ) : (
+        <Animated.ScrollView
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary.secondary]}
+              tintColor={theme.colors.primary.secondary}
             />
-            <StatusIndicator status={item.status} showLabel />
-          </View>
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Galeria de Imagens */}
+          <ImageGallery images={item.photos || []} />
 
-          <Typography variant="h3" style={styles.title}>
-            {item.description}
-          </Typography>
-
-          <Divider spacing={theme.spacing.s} />
-
-          {/* Detalhes do item */}
-          <View style={styles.detailsContainer}>
-            {item.size && (
-              <View style={styles.detailRow}>
-                <Typography
-                  variant="bodySecondary"
-                  color={theme.colors.neutral.darkGray}
-                >
-                  Tamanho:
-                </Typography>
-                <Typography variant="body">{item.size}</Typography>
-              </View>
-            )}
-
-            {item.conservationState && (
-              <View style={styles.detailRow}>
-                <Typography
-                  variant="bodySecondary"
-                  color={theme.colors.neutral.darkGray}
-                >
-                  Estado de conservação:
-                </Typography>
-                <Typography variant="body">{item.conservationState}</Typography>
-              </View>
-            )}
-
-            <View style={styles.detailRow}>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Data de doação:
-              </Typography>
-              <Typography variant="body">
-                {formatDate(item.receivedDate)}
-              </Typography>
-            </View>
-
-            {item.category && (
-              <View style={styles.detailRow}>
-                <Typography
-                  variant="bodySecondary"
-                  color={theme.colors.neutral.darkGray}
-                >
-                  Categoria:
-                </Typography>
-                <Badge label={item.category.name} variant="info" size="small" />
-              </View>
-            )}
-          </View>
-        </Card>
-
-        {/* Status da doação */}
-        <Card title="Status da Doação" style={styles.card}>
-          <View style={styles.statusTimeline}>
-            <View style={styles.statusItem}>
-              <View style={[styles.statusDot, styles.statusDotActive]} />
-              <View style={styles.statusContent}>
-                <Typography variant="bodySecondary" style={styles.statusTitle}>
-                  Doação Recebida
-                </Typography>
+          {/* Card Principal */}
+          <View style={styles.mainCard}>
+            <View style={styles.cardHeader}>
+              <Badge
+                label={itemTypeLabels[item.type]}
+                variant="info"
+                size="medium"
+              />
+              <View style={styles.statusBadge}>
+                <MaterialIcons
+                  name={
+                    item.status === "disponivel"
+                      ? "check-circle"
+                      : item.status === "reservado"
+                      ? "schedule"
+                      : "volunteer-activism"
+                  }
+                  size={16}
+                  color={
+                    item.status === "disponivel"
+                      ? theme.colors.status.success
+                      : item.status === "reservado"
+                      ? theme.colors.status.warning
+                      : theme.colors.status.info
+                  }
+                />
                 <Typography
                   variant="small"
-                  color={theme.colors.neutral.darkGray}
+                  color={
+                    item.status === "disponivel"
+                      ? theme.colors.status.success
+                      : item.status === "reservado"
+                      ? theme.colors.status.warning
+                      : theme.colors.status.info
+                  }
+                  style={{ marginLeft: 4, fontWeight: "600" }}
                 >
-                  {formatDate(item.receivedDate)}
+                  {item.status === "disponivel"
+                    ? "Disponível"
+                    : item.status === "reservado"
+                    ? "Reservado"
+                    : "Distribuído"}
                 </Typography>
               </View>
             </View>
 
-            <View style={styles.statusItem}>
-              <View
-                style={[
-                  styles.statusDot,
-                  item.status !== "disponivel" && styles.statusDotActive,
-                ]}
-              />
-              <View style={styles.statusContent}>
-                <Typography variant="bodySecondary" style={styles.statusTitle}>
-                  {item.status === "reservado" || item.status === "distribuido"
-                    ? "Reservado para Beneficiário"
-                    : "Aguardando Reserva"}
-                </Typography>
-                {(item.status === "reservado" ||
-                  item.status === "distribuido") && (
-                  <Typography
-                    variant="small"
-                    color={theme.colors.neutral.darkGray}
-                  >
-                    Item reservado para distribuição
-                  </Typography>
-                )}
-              </View>
-            </View>
+            <Typography variant="h3" style={styles.itemTitle}>
+              {item.description}
+            </Typography>
 
-            <View style={styles.statusItem}>
-              <View
-                style={[
-                  styles.statusDot,
-                  item.status === "distribuido" && styles.statusDotActive,
-                ]}
-              />
-              <View style={styles.statusContent}>
-                <Typography variant="bodySecondary" style={styles.statusTitle}>
-                  {item.status === "distribuido"
-                    ? "Entregue ao Beneficiário"
-                    : "Aguardando Entrega"}
-                </Typography>
-                {item.status === "distribuido" && (
+            <Divider spacing={theme.spacing.m} />
+
+            {/* Detalhes */}
+            <View style={styles.detailsGrid}>
+              {item.size && (
+                <View style={styles.detailItem}>
+                  <MaterialIcons
+                    name="straighten"
+                    size={20}
+                    color={theme.colors.primary.secondary}
+                  />
+                  <View style={styles.detailText}>
+                    <Typography
+                      variant="small"
+                      color={theme.colors.neutral.darkGray}
+                    >
+                      Tamanho
+                    </Typography>
+                    <Typography variant="body">{item.size}</Typography>
+                  </View>
+                </View>
+              )}
+
+              {item.conservationState && (
+                <View style={styles.detailItem}>
+                  <MaterialIcons
+                    name="star"
+                    size={20}
+                    color={theme.colors.primary.secondary}
+                  />
+                  <View style={styles.detailText}>
+                    <Typography
+                      variant="small"
+                      color={theme.colors.neutral.darkGray}
+                    >
+                      Conservação
+                    </Typography>
+                    <Typography variant="body">
+                      {item.conservationState}
+                    </Typography>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.detailItem}>
+                <MaterialIcons
+                  name="event"
+                  size={20}
+                  color={theme.colors.primary.secondary}
+                />
+                <View style={styles.detailText}>
                   <Typography
                     variant="small"
                     color={theme.colors.neutral.darkGray}
                   >
-                    Sua doação foi entregue a quem precisava!
+                    Data de doação
                   </Typography>
-                )}
+                  <Typography variant="body">
+                    {formatDate(item.receivedDate)}
+                  </Typography>
+                </View>
               </View>
+
+              {item.category && (
+                <View style={styles.detailItem}>
+                  <MaterialIcons
+                    name="category"
+                    size={20}
+                    color={theme.colors.primary.secondary}
+                  />
+                  <View style={styles.detailText}>
+                    <Typography
+                      variant="small"
+                      color={theme.colors.neutral.darkGray}
+                    >
+                      Categoria
+                    </Typography>
+                    <Typography variant="body">{item.category.name}</Typography>
+                  </View>
+                </View>
+              )}
             </View>
           </View>
-        </Card>
 
-        {/* Ações disponíveis */}
-        {isOwner && item.status === "disponivel" && (
-          <Button
-            title="Cancelar Doação"
-            onPress={handleCancelDonation}
-            variant="secondary"
-            style={styles.actionButton}
-          />
-        )}
-      </ScrollView>
+          {/* Timeline de Status */}
+          <View style={styles.timelineCard}>
+            <Typography variant="h3" style={styles.sectionTitle}>
+              Acompanhe sua Doação
+            </Typography>
+            <AnimatedTimeline
+              status={item.status}
+              receivedDate={item.receivedDate}
+            />
+          </View>
+
+          {/* Ações */}
+          {isOwner && item.status === "disponivel" && (
+            <Button
+              title="Cancelar Doação"
+              onPress={handleCancelDonation}
+              variant="secondary"
+              style={styles.cancelButton}
+            />
+          )}
+        </Animated.ScrollView>
+      )}
     </View>
   );
 };
 
+// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.neutral.white,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  headerGradient: {
+    paddingTop:
+      Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: theme.spacing.m,
+    ...theme.shadows.strong,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.m,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontWeight: "bold",
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: theme.spacing.s,
     paddingBottom: theme.spacing.xxl,
   },
-  imageContainer: {
-    marginBottom: theme.spacing.s,
+  // Skeleton
+  skeletonContainer: {
+    flex: 1,
+    padding: theme.spacing.m,
+  },
+  skeletonImage: {
+    height: 300,
+    backgroundColor: theme.colors.neutral.mediumGray,
     borderRadius: theme.borderRadius.medium,
-    overflow: "hidden",
-    backgroundColor: theme.colors.neutral.lightGray,
+    marginBottom: theme.spacing.m,
   },
-  mainImage: {
-    width: "100%",
-    height: 250,
-    backgroundColor: theme.colors.neutral.lightGray,
+  skeletonContent: {
+    backgroundColor: theme.colors.neutral.white,
+    borderRadius: theme.borderRadius.medium,
+    padding: theme.spacing.m,
   },
-  thumbnailContainer: {
-    flexDirection: "row",
-    padding: theme.spacing.xs,
-    backgroundColor: theme.colors.neutral.lightGray,
-  },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    marginRight: theme.spacing.xs,
+  skeletonLine: {
+    height: 16,
+    backgroundColor: theme.colors.neutral.mediumGray,
     borderRadius: theme.borderRadius.small,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "transparent",
+    marginBottom: theme.spacing.s,
   },
-  selectedThumbnail: {
-    borderColor: theme.colors.primary.secondary,
+  skeletonBlock: {
+    height: 100,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: theme.borderRadius.medium,
+    marginTop: theme.spacing.m,
   },
-  thumbnailImage: {
+  // Galeria
+  galleryContainer: {
+    height: 300,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  imageWrapper: {
+    width: screenWidth,
+    height: 300,
+  },
+  galleryImage: {
     width: "100%",
     height: "100%",
   },
   noImageContainer: {
-    width: "100%",
-    height: 200,
-    backgroundColor: theme.colors.neutral.lightGray,
+    height: 300,
     justifyContent: "center",
     alignItems: "center",
   },
-  card: {
-    marginBottom: theme.spacing.s,
+  indicatorContainer: {
+    position: "absolute",
+    bottom: theme.spacing.m,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerRow: {
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    marginHorizontal: 4,
+  },
+  indicatorActive: {
+    width: 24,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  // Card Principal
+  mainCard: {
+    backgroundColor: theme.colors.neutral.white,
+    margin: theme.spacing.m,
+    borderRadius: theme.borderRadius.medium,
+    padding: theme.spacing.m,
+    ...theme.shadows.medium,
+  },
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.m,
   },
-  title: {
-    marginBottom: theme.spacing.xs,
-  },
-  detailsContainer: {
-    marginTop: theme.spacing.xs,
-  },
-  detailRow: {
+  statusBadge: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.xs,
-  },
-  statusTimeline: {
-    padding: theme.spacing.xs,
-  },
-  statusItem: {
-    flexDirection: "row",
-    marginBottom: theme.spacing.s,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.large,
     backgroundColor: theme.colors.neutral.lightGray,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral.mediumGray,
-    marginTop: 4,
-    marginRight: theme.spacing.xs,
   },
-  statusDotActive: {
-    backgroundColor: theme.colors.status.success,
-    borderColor: theme.colors.status.success,
+  itemTitle: {
+    color: theme.colors.primary.main,
+    marginBottom: theme.spacing.s,
   },
-  statusContent: {
+  detailsGrid: {
+    marginTop: theme.spacing.s,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.m,
+  },
+  detailText: {
+    marginLeft: theme.spacing.s,
     flex: 1,
   },
-  statusTitle: {
-    fontWeight: "bold",
+  // Timeline
+  timelineCard: {
+    backgroundColor: theme.colors.neutral.white,
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    borderRadius: theme.borderRadius.medium,
+    padding: theme.spacing.m,
+    ...theme.shadows.medium,
   },
-  actionButton: {
-    marginTop: theme.spacing.s,
+  sectionTitle: {
+    color: theme.colors.primary.main,
+    marginBottom: theme.spacing.m,
+  },
+  timelineContainer: {
+    position: "relative",
+  },
+  progressBarContainer: {
+    position: "absolute",
+    left: 20,
+    top: 20,
+    bottom: 20,
+    width: 2,
+  },
+  progressBarBackground: {
+    position: "absolute",
+    width: 2,
+    height: "100%",
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  progressBar: {
+    position: "absolute",
+    width: 2,
+    backgroundColor: theme.colors.status.success,
+  },
+  timelineStep: {
+    flexDirection: "row",
+    marginBottom: theme.spacing.l,
+  },
+  stepDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.neutral.lightGray,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: theme.spacing.m,
+  },
+  stepDotActive: {
+    backgroundColor: theme.colors.status.success,
+  },
+  stepContent: {
+    flex: 1,
+    paddingTop: theme.spacing.xs,
+  },
+  stepTitle: {
+    marginBottom: theme.spacing.xs,
+  },
+  stepTitleActive: {
+    color: theme.colors.primary.main,
+    fontWeight: "600",
+  },
+  // Botões
+  cancelButton: {
+    marginHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+    borderColor: theme.colors.status.error,
   },
 });
 
