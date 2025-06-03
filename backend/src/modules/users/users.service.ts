@@ -16,6 +16,7 @@ import * as bcrypt from 'bcrypt';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
 import { UserStatsDto } from './dto/user-stats.dto';
+import { UserRole } from './entities/user-role.enum';
 
 @Injectable()
 export class UsersService {
@@ -258,5 +259,42 @@ export class UsersService {
       );
       throw error;
     }
+  }
+
+  @LogMethod()
+  async findByRole(
+    role: UserRole,
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    this.logger.debug(`Buscando usuários com perfil: ${role}`);
+
+    try {
+      const queryBuilder = this.usersRepository
+        .createQueryBuilder('user')
+        .where('user.role = :role', { role })
+        .andWhere('user.isActive = :isActive', { isActive: true }) // Apenas usuários ativos
+        .orderBy('user.name', pageOptionsDto.order)
+        .skip(pageOptionsDto.skip)
+        .take(pageOptionsDto.take);
+
+      const itemCount = await queryBuilder.getCount();
+      const users = await queryBuilder.getMany();
+
+      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+      return new PageDto(users, pageMetaDto);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar usuários por perfil: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  @LogMethod()
+  async findBeneficiaries(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    return this.findByRole(UserRole.BENEFICIARIO, pageOptionsDto);
   }
 }

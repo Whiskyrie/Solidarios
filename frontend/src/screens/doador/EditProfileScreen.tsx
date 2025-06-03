@@ -369,7 +369,7 @@ const EditProfileScreen: React.FC = () => {
                       style={styles.buttonCancel}
                     />
                     <Button
-                      title="Salvar Alterações"
+                      title="Salvar"
                       onPress={() => handleSubmit()}
                       loading={isLoading}
                       style={styles.buttonSubmit}
@@ -503,14 +503,18 @@ const styles = StyleSheet.create({
   },
   buttonCancel: {
     flex: 1,
-    paddingVertical: theme.spacing.s,
-    borderRadius: 12,
+    paddingVertical: theme.spacing.xs, // Reduzido de theme.spacing.s
+    paddingHorizontal: theme.spacing.s,
+    borderRadius: 8, // Reduzido de 12
+    minHeight: 44, // Altura mínima para acessibilidade
   },
   buttonSubmit: {
     flex: 1,
     backgroundColor: theme.colors.primary.secondary,
-    paddingVertical: theme.spacing.s,
-    borderRadius: 12,
+    paddingVertical: theme.spacing.xs, // Reduzido de theme.spacing.s
+    paddingHorizontal: theme.spacing.s,
+    borderRadius: 8, // Reduzido de 12
+    minHeight: 44, // Altura mínima para acessibilidade
   },
 });
 

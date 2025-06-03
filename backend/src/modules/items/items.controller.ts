@@ -13,6 +13,7 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -27,6 +28,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
@@ -34,7 +36,7 @@ import { Item } from './entities/item.entity';
 
 @ApiTags('items')
 @Controller('items')
-@UseGuards(JwtAuthGuard, RolesGuard) // Proteger todas as rotas e verificar roles
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth() // Indica que precisa de token JWT para todos os endpoints
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
@@ -69,22 +71,42 @@ export class ItemsController {
   }
 
   @Get('donor/:donorId')
-  @ApiOperation({ summary: 'Listar itens por doador com paginação' })
+  @ApiOperation({ summary: 'Buscar itens por doador' })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de itens do doador retornada com sucesso.',
-    type: PageDto,
+    description: 'Itens do doador encontrados com sucesso.',
+    type: PageDto<Item>,
+  })
+  @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
+  @ApiParam({
+    name: 'donorId',
+    description: 'ID do doador',
+    type: 'string',
+    format: 'uuid',
   })
   @ApiQuery({
-    type: PageOptionsDto,
+    name: 'page',
     required: false,
-    description: 'Opções de paginação',
+    description: 'Número da página (padrão: 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    description: 'Quantidade de itens por página (padrão: 10)',
+    type: 'number',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
-  getByDonor(
+  async findByDonor(
     @Param('donorId', ParseUUIDPipe) donorId: string,
     @Query() pageOptionsDto: PageOptionsDto,
+    @Request() req,
   ): Promise<PageDto<Item>> {
+    // Verificar se é o próprio doador ou admin/funcionário
+    if (req.user.role === UserRole.DOADOR && req.user.id !== donorId) {
+      throw new ForbiddenException('Você só pode acessar seus próprios itens');
+    }
+
     return this.itemsService.findByDonorPaginated(donorId, pageOptionsDto);
   }
 
