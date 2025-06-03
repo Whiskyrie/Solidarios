@@ -10,8 +10,9 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
-  Query,
   UseGuards,
+  Request,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,6 +27,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
@@ -36,6 +38,7 @@ import { UserStatsDto } from './dto/user-stats.dto';
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
+// NÃO adicionar @UseInterceptors aqui pois já está global
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -159,5 +162,67 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserStatsDto> {
     return this.usersService.getUserStats(id);
+  }
+
+  @Get('role/:role')
+  @ApiOperation({ summary: 'Buscar usuários por perfil/role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usuários encontrados com sucesso.',
+    type: PageDto<User>,
+  })
+  @ApiResponse({ status: 400, description: 'Role inválido.' })
+  @ApiParam({
+    name: 'role',
+    description: 'Perfil do usuário',
+    enum: UserRole,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número da página (padrão: 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    description: 'Quantidade de usuários por página (padrão: 10)',
+    type: 'number',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  async findByRole(
+    @Param('role') role: UserRole,
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    // Validar se o role é válido
+    if (!Object.values(UserRole).includes(role)) {
+      throw new BadRequestException('Role inválido');
+    }
+
+    return this.usersService.findByRole(role, pageOptionsDto);
+  }
+
+  @Get('beneficiaries')
+  @ApiOperation({ summary: 'Buscar apenas beneficiários (atalho)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Beneficiários encontrados com sucesso.',
+    type: PageDto<User>,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número da página (padrão: 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    description: 'Quantidade de beneficiários por página (padrão: 10)',
+    type: 'number',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  findBeneficiaries(@Query() pageOptionsDto: PageOptionsDto): PageDto<User> {
+    return this.usersService.findByRole(UserRole.BENEFICIARIO, pageOptionsDto);
   }
 }

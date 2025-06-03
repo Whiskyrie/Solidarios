@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -122,15 +123,25 @@ export class ItemsService {
     donorId: string,
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
-    this.logger.debug(`Buscando itens do doador ${donorId}`);
+    this.logger.debug(`Buscando itens do doador: ${donorId}`);
 
     try {
+      // Verificar se o doador existe
+      const donor = await this.usersService.findOne(donorId);
+      if (!donor) {
+        throw new NotFoundException('Doador não encontrado');
+      }
+
+      if (donor.role !== UserRole.DOADOR) {
+        throw new BadRequestException('Usuário informado não é um doador');
+      }
+
       const queryBuilder = this.itemsRepository
         .createQueryBuilder('item')
-        .leftJoinAndSelect('item.donor', 'donor')
         .leftJoinAndSelect('item.category', 'category')
+        .leftJoinAndSelect('item.donor', 'donor')
         .where('item.donorId = :donorId', { donorId })
-        .orderBy('item.receivedDate', pageOptionsDto.order)
+        .orderBy('item.createdAt', pageOptionsDto.order)
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
 
@@ -138,11 +149,10 @@ export class ItemsService {
       const items = await queryBuilder.getMany();
 
       const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-
       return new PageDto(items, pageMetaDto);
     } catch (error) {
       this.logger.error(
-        `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
+        `Erro ao buscar itens do doador: ${error.message}`,
         error.stack,
       );
       throw error;
