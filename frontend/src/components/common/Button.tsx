@@ -1,19 +1,19 @@
-import React from 'react';
-import { 
-  StyleSheet, 
-  TouchableOpacity, 
-  Text, 
+import React from "react";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Text,
   ActivityIndicator,
   TouchableOpacityProps,
   View,
   StyleProp,
   ViewStyle,
-  TextStyle
-} from 'react-native';
-import theme from '../../theme';
+  TextStyle,
+} from "react-native";
+import theme from "../../theme";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'accent';
-export type ButtonSize = 'small' | 'medium' | 'large';
+export type ButtonVariant = "primary" | "secondary" | "accent";
+export type ButtonSize = "small" | "medium" | "large";
 
 export interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -24,23 +24,28 @@ export interface ButtonProps extends TouchableOpacityProps {
   disabled?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  icon?: React.ReactNode; // Nova propriedade adicionada
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 }
 
 const Button: React.FC<ButtonProps> = ({
   title,
-  variant = 'primary',
-  size = 'medium',
+  variant = "primary",
+  size = "medium",
   fullWidth = false,
   loading = false,
   disabled = false,
   leftIcon,
   rightIcon,
+  icon, // Nova propriedade
   style,
   textStyle,
   ...rest
 }) => {
+  // Se a propriedade icon for fornecida, usamos como leftIcon
+  const effectiveLeftIcon = icon || leftIcon;
+
   const buttonStyles = [
     styles.base,
     styles[variant],
@@ -66,18 +71,26 @@ const Button: React.FC<ButtonProps> = ({
       {...rest}
     >
       <View style={styles.contentContainer}>
-        {leftIcon && !loading && <View style={styles.leftIcon}>{leftIcon}</View>}
-        
+        {effectiveLeftIcon && !loading && (
+          <View style={styles.leftIcon}>{effectiveLeftIcon}</View>
+        )}
+
         {loading ? (
-          <ActivityIndicator 
-            color={variant === 'secondary' ? theme.colors.primary.main : theme.colors.neutral.white} 
-            size="small" 
+          <ActivityIndicator
+            color={
+              variant === "secondary"
+                ? theme.colors.primary.main
+                : theme.colors.neutral.white
+            }
+            size="small"
           />
         ) : (
           <Text style={textStyles}>{title}</Text>
         )}
-        
-        {rightIcon && !loading && <View style={styles.rightIcon}>{rightIcon}</View>}
+
+        {rightIcon && !loading && (
+          <View style={styles.rightIcon}>{rightIcon}</View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -86,19 +99,19 @@ const Button: React.FC<ButtonProps> = ({
 const styles = StyleSheet.create({
   base: {
     borderRadius: theme.borderRadius.medium,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   contentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   primary: {
     backgroundColor: theme.colors.primary.secondary, // Verde Turquesa
   },
   secondary: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: theme.colors.primary.main, // Azul Marinho
   },
@@ -121,14 +134,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   fullWidth: {
-    width: '100%',
+    width: "100%",
   },
   disabled: {
     opacity: 0.5,
   },
   text: {
     fontFamily: theme.fontFamily.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   primaryText: {
     color: theme.colors.neutral.white,
