@@ -13,6 +13,7 @@ import {
   UseGuards,
   Request,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -222,7 +223,9 @@ export class UsersController {
     type: 'number',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
-  findBeneficiaries(@Query() pageOptionsDto: PageOptionsDto): PageDto<User> {
+  async findBeneficiaries(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
     return this.usersService.findByRole(UserRole.BENEFICIARIO, pageOptionsDto);
   }
 }

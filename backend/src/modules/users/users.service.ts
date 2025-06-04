@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
@@ -16,7 +16,6 @@ import * as bcrypt from 'bcrypt';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
 import { UserStatsDto } from './dto/user-stats.dto';
-import { UserRole } from './entities/user-role.enum';
 
 @Injectable()
 export class UsersService {
