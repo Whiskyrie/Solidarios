@@ -44,9 +44,9 @@ export class LoggingService implements LoggerService {
               const userId = this.getUserId();
               const contextInfo = context || this.context;
 
-              let logMessage = `${timestamp} [${level}]`;
+              let logMessage = `${timestamp} [${String(level)}]`;
               if (contextInfo) {
-                logMessage += ` [${contextInfo}]`;
+                logMessage += ` [${typeof contextInfo === 'string' ? contextInfo : JSON.stringify(contextInfo)}]`;
               }
               if (requestId) {
                 logMessage += ` [ReqID:${requestId}]`;
@@ -55,7 +55,7 @@ export class LoggingService implements LoggerService {
                 logMessage += ` [UserID:${userId}]`;
               }
 
-              logMessage += `: ${message}`;
+              logMessage += `: ${typeof message === 'string' ? message : JSON.stringify(message)}`;
 
               if (Object.keys(meta).length > 0) {
                 logMessage += ` - ${JSON.stringify(this.sanitizeData(meta))}`;

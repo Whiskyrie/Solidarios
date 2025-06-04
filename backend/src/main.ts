@@ -6,6 +6,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { SanitizeInputInterceptor } from './common/interceptors/sanitize.interceptor';
+import { ConfigService } from '@nestjs/config';
+import { useContainer } from 'typeorm';
+import {
+  createCorsConfig,
+  corsSecurityHeaders,
+} from './common/config/cors.config';
+import { LoggingService } from './common/logging/logging.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

@@ -7,6 +7,8 @@ import {
   Request,
   UsePipes,
   ValidationPipe,
+  HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
