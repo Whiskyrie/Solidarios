@@ -4,7 +4,7 @@ import { API_ENVIRONMENT } from "@env";
 
 // URLs disponíveis
 const API_URLS = {
-  CLOUD: "https://solidarios-app-dwus7.ondigitalocean.app/api",
+  CLOUD: "https://walrus-app-tyhbw.ondigitalocean.app/api",
   LOCAL: "http://10.0.2.2:3000", // Para emuladores Android
   // LOCAL: "http://localhost:3000", // Para web ou iOS
 };

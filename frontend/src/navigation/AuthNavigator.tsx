@@ -11,7 +11,11 @@ import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
 // Definição de rotas
 export type AuthStackParamList = {
   Welcome: undefined;
-  Login: undefined;
+  Login: {
+    email?: string;
+    autoLogin?: boolean;
+    password?: string;
+  } | undefined;
   Register: undefined;
   ForgotPassword: undefined;
 };

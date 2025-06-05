@@ -14,7 +14,7 @@ import {
   Image,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Formik } from "formik";
 import * as Yup from "yup";
@@ -40,9 +40,18 @@ Dimensions.get("window");
 const LoginScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const route = useRoute();
   const { login, isLoading, error, clearErrors } = useAuth();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const autoLoginData = route.params as
+    | {
+        email?: string;
+        autoLogin?: boolean;
+        password?: string;
+      }
+    | undefined;
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -94,6 +103,22 @@ const LoginScreen: React.FC = () => {
       ]).start();
     }
   }, [error]);
+
+  // Efeito para auto-login
+  useEffect(() => {
+    if (
+      autoLoginData?.autoLogin &&
+      autoLoginData.email &&
+      autoLoginData.password
+    ) {
+      // Se recebeu dados de auto-login do registro, faz login automaticamente
+      console.log("[LoginScreen] Realizando auto-login após registro");
+      handleLogin({
+        email: autoLoginData.email,
+        password: autoLoginData.password,
+      });
+    }
+  }, []);
 
   const handleLogin = async (values: { email: string; password: string }) => {
     clearErrors();
@@ -166,7 +191,7 @@ const LoginScreen: React.FC = () => {
             ]}
           >
             <Image
-              source={require("../../../assets/icon.png")}
+              source={require("../../../assets/images/icon.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -413,8 +438,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 85,
+    height: 85,
   },
   headerTextContainer: {
     alignItems: "center",

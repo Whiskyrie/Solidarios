@@ -10,8 +10,15 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
+<<<<<<< HEAD
   Query,
   UseGuards,
+=======
+  UseGuards,
+  Request,
+  Query,
+  BadRequestException,
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,15 +33,27 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+<<<<<<< HEAD
+=======
+  ApiParam,
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { User } from './entities/user.entity';
+<<<<<<< HEAD
+=======
+import { UserStatsDto } from './dto/user-stats.dto';
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 
 @ApiTags('users')
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
+<<<<<<< HEAD
+=======
+// NÃO adicionar @UseInterceptors aqui pois já está global
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -98,4 +117,132 @@ export class UsersController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }
+<<<<<<< HEAD
+=======
+
+  @Get(':id/stats')
+  @ApiOperation({
+    summary: 'Obter estatísticas de doações de um usuário',
+    description:
+      'Retorna métricas agregadas das doações do usuário: total de doações, pessoas ajudadas e pontuação de impacto',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estatísticas do usuário retornadas com sucesso.',
+    type: UserStatsDto,
+    schema: {
+      example: {
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        totalDonations: 25,
+        peopleHelped: 150,
+        impactScore: 200,
+        lastUpdated: '2023-12-01T10:30:00Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID do usuário inválido (formato UUID inválido).',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'Validation failed (uuid is expected)',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuário não encontrado.',
+    schema: {
+      example: {
+        statusCode: 404,
+        message:
+          'Usuário com ID a1b2c3d4-e5f6-7890-abcd-ef1234567890 não encontrado',
+        error: 'Not Found',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Erro interno do servidor.',
+    schema: {
+      example: {
+        statusCode: 500,
+        message: 'Erro interno do servidor',
+        error: 'Internal Server Error',
+      },
+    },
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  async getUserStats(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<UserStatsDto> {
+    return this.usersService.getUserStats(id);
+  }
+
+  @Get('role/:role')
+  @ApiOperation({ summary: 'Buscar usuários por perfil/role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usuários encontrados com sucesso.',
+    type: PageDto<User>,
+  })
+  @ApiResponse({ status: 400, description: 'Role inválido.' })
+  @ApiParam({
+    name: 'role',
+    description: 'Perfil do usuário',
+    enum: UserRole,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número da página (padrão: 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    description: 'Quantidade de usuários por página (padrão: 10)',
+    type: 'number',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  async findByRole(
+    @Param('role') role: UserRole,
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    // Validar se o role é válido
+    if (!Object.values(UserRole).includes(role)) {
+      throw new BadRequestException('Role inválido');
+    }
+
+    return this.usersService.findByRole(role, pageOptionsDto);
+  }
+
+  @Get('beneficiaries')
+  @ApiOperation({ summary: 'Buscar apenas beneficiários (atalho)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Beneficiários encontrados com sucesso.',
+    type: PageDto<User>,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número da página (padrão: 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    description: 'Quantidade de beneficiários por página (padrão: 10)',
+    type: 'number',
+  })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  async findBeneficiaries(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<User>> {
+    return this.usersService.findByRole(UserRole.BENEFICIARIO, pageOptionsDto);
+  }
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 }

@@ -165,7 +165,7 @@ const ForgotPasswordScreen: React.FC = () => {
             ]}
           >
             <Image
-              source={require("../../../assets/icon.png")}
+              source={require("../../../assets/images/icon.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 85,
-    height: 85,
+    width: 70,
+    height: 70,
   },
   headerTextContainer: {
     alignItems: "center",

@@ -3,6 +3,10 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+<<<<<<< HEAD
+=======
+  BadRequestException,
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -122,6 +126,7 @@ export class ItemsService {
     donorId: string,
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
+<<<<<<< HEAD
     this.logger.debug(`Buscando itens do doador ${donorId}`);
 
     try {
@@ -131,6 +136,27 @@ export class ItemsService {
         .leftJoinAndSelect('item.category', 'category')
         .where('item.donorId = :donorId', { donorId })
         .orderBy('item.receivedDate', pageOptionsDto.order)
+=======
+    this.logger.debug(`Buscando itens do doador: ${donorId}`);
+
+    try {
+      // Verificar se o doador existe
+      const donor = await this.usersService.findOne(donorId);
+      if (!donor) {
+        throw new NotFoundException('Doador não encontrado');
+      }
+
+      if (donor.role !== UserRole.DOADOR) {
+        throw new BadRequestException('Usuário informado não é um doador');
+      }
+
+      const queryBuilder = this.itemsRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.category', 'category')
+        .leftJoinAndSelect('item.donor', 'donor')
+        .where('item.donorId = :donorId', { donorId })
+        .orderBy('item.createdAt', pageOptionsDto.order)
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
 
@@ -138,11 +164,18 @@ export class ItemsService {
       const items = await queryBuilder.getMany();
 
       const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+<<<<<<< HEAD
 
       return new PageDto(items, pageMetaDto);
     } catch (error) {
       this.logger.error(
         `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
+=======
+      return new PageDto(items, pageMetaDto);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar itens do doador: ${error.message}`,
+>>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
         error.stack,
       );
       throw error;

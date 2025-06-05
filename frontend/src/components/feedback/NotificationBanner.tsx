@@ -29,35 +29,60 @@ export interface NotificationBannerProps {
   };
 }
 
-// Componentes de ícones definidos antes do uso
+// Componente de ícone X (close) usando Views
 const CloseIcon = ({ color = "#000000" }: { color?: string }) => (
   <View style={closeIconStyles.container}>
-    <View style={[closeIconStyles.line1, { backgroundColor: color }]} />
-    <View style={[closeIconStyles.line2, { backgroundColor: color }]} />
+    <View
+      style={[
+        closeIconStyles.line,
+        closeIconStyles.line1,
+        { backgroundColor: color },
+      ]}
+    />
+    <View
+      style={[
+        closeIconStyles.line,
+        closeIconStyles.line2,
+        { backgroundColor: color },
+      ]}
+    />
   </View>
 );
 
+// Componente de ícone Check usando Views
 const SuccessIcon = () => (
-  <View style={commonIconStyles.container}>
-    <View style={commonIconStyles.check} />
+  <View style={iconStyles.container}>
+    <View style={iconStyles.checkContainer}>
+      <View style={iconStyles.checkShort} />
+      <View style={iconStyles.checkLong} />
+    </View>
   </View>
 );
 
+// Componente de ícone de exclamação usando Views
 const ErrorIcon = () => (
-  <View style={commonIconStyles.container}>
-    <View style={commonIconStyles.exclamation} />
+  <View style={iconStyles.container}>
+    <View style={iconStyles.exclamationLine} />
+    <View style={iconStyles.exclamationDot} />
   </View>
 );
 
+// Componente de ícone de aviso (triângulo com exclamação)
 const WarningIcon = () => (
-  <View style={commonIconStyles.container}>
-    <View style={commonIconStyles.exclamation} />
+  <View style={iconStyles.container}>
+    <View style={iconStyles.triangleContainer}>
+      <View style={iconStyles.triangle} />
+      <View style={iconStyles.warningExclamationLine} />
+      <View style={iconStyles.warningExclamationDot} />
+    </View>
   </View>
 );
 
+// Componente de ícone de informação usando Views
 const InfoIcon = () => (
-  <View style={commonIconStyles.container}>
-    <View style={commonIconStyles.info} />
+  <View style={iconStyles.container}>
+    <View style={iconStyles.infoDot} />
+    <View style={iconStyles.infoLine} />
   </View>
 );
 
@@ -287,7 +312,7 @@ const NotificationBanner: React.FC<NotificationBannerProps> = ({
   );
 };
 
-// Estilos para os ícones
+// Estilos para o ícone de fechar (X)
 const closeIconStyles = StyleSheet.create({
   container: {
     width: 16,
@@ -295,46 +320,116 @@ const closeIconStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  line1: {
-    width: 16,
-    height: 2,
+  line: {
+    width: 12,
+    height: 1.5,
     position: "absolute",
+    borderRadius: 1,
+  },
+  line1: {
     transform: [{ rotate: "45deg" }],
   },
   line2: {
-    width: 16,
-    height: 2,
-    position: "absolute",
     transform: [{ rotate: "-45deg" }],
   },
 });
 
-const commonIconStyles = StyleSheet.create({
+// Estilos para os ícones de notificação
+const iconStyles = StyleSheet.create({
   container: {
     width: 14,
     height: 14,
     justifyContent: "center",
     alignItems: "center",
   },
-  check: {
-    width: 7,
-    height: 10,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: "#FFFFFF",
-    transform: [{ rotate: "45deg" }],
+  // Check (Success)
+  checkContainer: {
+    width: 10,
+    height: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  exclamation: {
-    width: 2,
-    height: 10,
+  checkShort: {
+    position: "absolute",
+    width: 4,
+    height: 2,
     backgroundColor: "#FFFFFF",
     borderRadius: 1,
+    transform: [{ rotate: "45deg" }, { translateX: -3 }, { translateY: 1 }],
   },
-  info: {
-    width: 2,
-    height: 10,
+  checkLong: {
+    position: "absolute",
+    width: 8,
+    height: 2,
     backgroundColor: "#FFFFFF",
     borderRadius: 1,
+    transform: [{ rotate: "-45deg" }, { translateX: 1 }, { translateY: -1 }],
+  },
+  // Exclamation (Error)
+  exclamationLine: {
+    width: 2,
+    height: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    marginBottom: 2,
+  },
+  exclamationDot: {
+    width: 2,
+    height: 2,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    position: "absolute",
+    bottom: 1,
+  },
+  // Warning (Triangle)
+  triangleContainer: {
+    width: 14,
+    height: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  triangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 12,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#FFFFFF",
+  },
+  warningExclamationLine: {
+    position: "absolute",
+    width: 1.5,
+    height: 5,
+    backgroundColor: theme.colors.notifications.warning.icon,
+    borderRadius: 1,
+    top: 3,
+  },
+  warningExclamationDot: {
+    position: "absolute",
+    width: 1.5,
+    height: 1.5,
+    backgroundColor: theme.colors.notifications.warning.icon,
+    borderRadius: 1,
+    bottom: 2,
+  },
+  // Info
+  infoDot: {
+    width: 2,
+    height: 2,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    position: "absolute",
+    top: 1,
+  },
+  infoLine: {
+    width: 2,
+    height: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    position: "absolute",
+    bottom: 1,
   },
 });
 

@@ -7,6 +7,7 @@ import {
   CreateUserDto,
   UpdateUserDto,
   UsersPage,
+  UserStats,
 } from "../types/users.types";
 import { PageOptionsDto } from "../types/common.types";
 
@@ -90,6 +91,16 @@ const UsersService = {
     const response = await api.patch<User>(`/users/${id}/status`, {
       isActive,
     });
+    return response.data;
+  },
+
+  /**
+   * Obter estatísticas de doações do usuário
+   * @param id ID do usuário
+   * @returns Estatísticas do usuário
+   */
+  getStats: async (id: string): Promise<UserStats> => {
+    const response = await api.get<UserStats>(`/users/${id}/stats`);
     return response.data;
   },
 };

@@ -1,14 +1,14 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
-  Get,
   UseGuards,
   Request,
   UsePipes,
   ValidationPipe,
-  HttpCode,
   HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';

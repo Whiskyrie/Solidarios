@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Animated,
   StatusBar,
   Image,
+  ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -19,12 +21,22 @@ import * as Yup from "yup";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 
 import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
 import { UserRole } from "../../types/users.types";
+import { maskPhone } from "../../utils/authUtils";
+import AddressAutocomplete, {
+  AddressAutocompleteRef,
+} from "../../components/profile/AddressAutocomplete";
+import { AddressSuggestion } from "../../types/geocode.types";
 
 // Esquema de validação
 const RegisterSchema = Yup.object().shape({
@@ -34,8 +46,8 @@ const RegisterSchema = Yup.object().shape({
   email: Yup.string().email("Email inválido").required("Email é obrigatório"),
   phone: Yup.string()
     .matches(
-      /^\(?[1-9]{2}\)? ?(?:9[1-9]|[2-9])[0-9]{3}-?[0-9]{4}$/,
-      "Formato de telefone inválido"
+      /^\(\d{2}\) \d{5}-\d{4}$/,
+      "Formato de telefone inválido. Use: (99) 99999-9999"
     )
     .required("Telefone é obrigatório"),
   address: Yup.string()
@@ -52,7 +64,7 @@ const RegisterSchema = Yup.object().shape({
     .required("Perfil é obrigatório"),
 });
 
-// Definição dos papéis com ícones
+// Definição dos papéis
 const roles = [
   {
     value: UserRole.DOADOR,
@@ -70,15 +82,28 @@ const RegisterScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { register, isLoading, error, clearErrors } = useAuth();
+
+  // Estados do componente
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Refs para animações
+  // Estados simplificados para controle do BottomSheet
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    AddressSuggestion[]
+  >([]);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+
+  // Refs para animações e componentes
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const addressAutocompleteRef = useRef<AddressAutocompleteRef>(null);
+
+  // Estado para controlar a altura do teclado
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Efeito de animação ao carregar a tela
   useEffect(() => {
@@ -95,6 +120,15 @@ const RegisterScreen: React.FC = () => {
       }),
     ]).start();
   }, []);
+
+  // Controlar BottomSheet baseado nas sugestões
+  useEffect(() => {
+    if (addressSuggestions.length > 0 || isLoadingAddress) {
+      bottomSheetRef.current?.snapToIndex(0);
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [addressSuggestions, isLoadingAddress]);
 
   // Animação de seleção
   const animateSelection = () => {
@@ -141,6 +175,24 @@ const RegisterScreen: React.FC = () => {
     }
   }, [error]);
 
+  // Callback simplificado para mudanças nas sugestões
+  const handleSuggestionsChange = useCallback(
+    (suggestions: AddressSuggestion[], loading: boolean) => {
+      setAddressSuggestions(suggestions);
+      setIsLoadingAddress(loading);
+    },
+    []
+  );
+
+  // Função para selecionar sugestão (chamada do BottomSheet)
+  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+    if (addressAutocompleteRef.current) {
+      addressAutocompleteRef.current.selectAddress(suggestion);
+    }
+    bottomSheetRef.current?.close();
+    Keyboard.dismiss();
+  };
+
   const handleRegister = async (values: {
     name: string;
     email: string;
@@ -153,44 +205,34 @@ const RegisterScreen: React.FC = () => {
     clearErrors();
     setErrorMessage(null);
 
-    // Remover confirmPassword do objeto antes de enviar para a API
     const { confirmPassword, ...registerData } = values;
 
+    const payload = {
+      name: registerData.name.trim(),
+      email: registerData.email.trim().toLowerCase(),
+      password: registerData.password,
+      role: registerData.role,
+      phone: registerData.phone,
+      address: registerData.address,
+    };
+
+    console.log("[RegisterScreen] Dados sendo enviados:", {
+      ...payload,
+      password: "***HIDDEN***",
+    });
+
     try {
-      const success = await register(registerData);
+      const success = await register(payload);
 
       if (success) {
         setTimeout(() => {
-          if (registerData.role === UserRole.DOADOR) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "DoadorApp" as never }],
-            });
-          } else if (registerData.role === UserRole.BENEFICIARIO) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "BeneficiarioApp" as never }],
-            });
-          }
-        }, 500);
-      } else {
-        let friendlyError = error;
-
-        if (error?.includes("Bad Request")) {
-          friendlyError =
-            "Os dados fornecidos são inválidos. Verifique o formato dos campos.";
-        } else if (
-          error?.includes("duplicate") ||
-          error?.includes("already exists")
-        ) {
-          friendlyError =
-            "Este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.";
-        } else if (!friendlyError) {
-          friendlyError =
-            "Não foi possível completar seu cadastro. Tente novamente.";
-        }
-
-        setErrorMessage(friendlyError);
+          // Navegação tipada corretamente
+          navigation.navigate("Login", {
+            email: payload.email,
+            autoLogin: true,
+            password: payload.password,
+          });
+        }, 1000);
       }
     } catch (err) {
       setErrorMessage(
@@ -199,383 +241,554 @@ const RegisterScreen: React.FC = () => {
     }
   };
 
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+  // Renderizar item de sugestão - SIMPLIFICADO
+  const renderSuggestionItem = (item: AddressSuggestion, index: number) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.suggestionItem,
+        index === addressSuggestions.length - 1 && styles.lastSuggestionItem,
+      ]}
+      onPress={() => handleSelectSuggestion(item)}
+      activeOpacity={0.7}
     >
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="transparent"
-        translucent
+      <View style={styles.suggestionIconContainer}>
+        <MaterialIcons
+          name="location-on"
+          size={24}
+          color={theme.colors.primary.secondary}
+        />
+      </View>
+
+      <View style={styles.suggestionContent}>
+        <Text style={styles.suggestionMainText} numberOfLines={1}>
+          {item.street && item.number
+            ? `${item.street}, ${item.number}`
+            : item.street || "Endereço"}
+        </Text>
+        <Text style={styles.suggestionSubText} numberOfLines={1}>
+          {[item.neighborhood, item.city].filter(Boolean).join(" - ") ||
+            "Localização"}
+        </Text>
+      </View>
+
+      <MaterialIcons
+        name="arrow-forward-ios"
+        size={16}
+        color={theme.colors.neutral.mediumGray}
       />
+    </TouchableOpacity>
+  );
 
-      <LinearGradient
-        colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
-        locations={[0, 0.6, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradientBackground}
+  // Renderizar backdrop
+  const renderBackdrop = React.useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.3}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
+
+  // Renderizar header do bottom sheet
+  const renderHeader = () => (
+    <View style={styles.sheetHeader}>
+      <View style={styles.sheetHandleBar} />
+      <View style={styles.sheetTitleContainer}>
+        <MaterialIcons
+          name="search"
+          size={20}
+          color={theme.colors.primary.main}
+        />
+        <Text style={styles.sheetTitle}>
+          {isLoadingAddress
+            ? "Buscando..."
+            : `${addressSuggestions.length} endereços encontrados`}
+        </Text>
+      </View>
+    </View>
+  );
+
+  // Listener para mudanças do teclado
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (event) => {
+        setKeyboardHeight(event.endCoordinates.height);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Ajustar snap points baseado na altura do teclado
+  const getSnapPoints = useCallback(() => {
+    if (keyboardHeight > 0) {
+      const availableHeight = 100 - (keyboardHeight / 1000) * 100; // Convertendo para porcentagem
+      return [
+        `${Math.min(availableHeight * 0.4, 40)}%`,
+        `${Math.min(availableHeight * 0.7, 70)}%`,
+      ];
+    }
+    return ["25%", "50%", "75%"];
+  }, [keyboardHeight]);
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="transparent"
+          translucent
+        />
+
+        <LinearGradient
+          colors={["#b0e6f2", "#e3f7ff", "#ffffff"]}
+          locations={[0, 0.6, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}
         >
-          {/* Botão de voltar */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
           >
-            <Ionicons
-              name="arrow-undo"
-              size={22}
-              color={theme.colors.primary.main}
-            />
-          </TouchableOpacity>
-
-          {/* Logo animada */}
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Image
-              source={require("../../../assets/icon.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
-
-          {/* Título e subtítulo animados */}
-          <Animated.View
-            style={[
-              styles.headerTextContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.welcomeText}>Crie sua conta</Text>
-            <Text style={styles.subtitle}>
-              Preencha os campos abaixo para começar
-            </Text>
-          </Animated.View>
-
-          {/* Formulário de registro */}
-          <Animated.View
-            style={[
-              styles.formContainer,
-              {
-                opacity: fadeAnim,
-                transform: [
-                  { translateY: slideAnim },
-                  { translateX: shakeAnim },
-                ],
-              },
-            ]}
-          >
-            {errorMessage && (
-              <View style={styles.errorContainer}>
-                <MaterialIcons name="error-outline" size={20} color="#FF3B30" />
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            )}
-
-            <Formik
-              initialValues={{
-                name: "",
-                email: "",
-                phone: "",
-                address: "",
-                password: "",
-                confirmPassword: "",
-                role: UserRole.DOADOR,
-              }}
-              validationSchema={RegisterSchema}
-              onSubmit={handleRegister}
+            {/* Botão de voltar */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
             >
-              {({
-                handleChange,
-                handleBlur,
-                handleSubmit,
-                setFieldValue,
-                values,
-                errors,
-                touched,
-              }) => (
-                <>
-                  {/* Campo de nome */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="person"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Nome completo"
-                      placeholderTextColor="#999"
-                      value={values.name}
-                      onChangeText={handleChange("name")}
-                      onBlur={handleBlur("name")}
-                    />
-                  </View>
-                  {touched.name && errors.name && (
-                    <Text style={styles.validationError}>{errors.name}</Text>
-                  )}
+              <Ionicons
+                name="arrow-undo"
+                size={22}
+                color={theme.colors.primary.main}
+              />
+            </TouchableOpacity>
 
-                  {/* Campo de email */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="email"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Email"
-                      placeholderTextColor="#999"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={values.email}
-                      onChangeText={handleChange("email")}
-                      onBlur={handleBlur("email")}
-                    />
-                  </View>
-                  {touched.email && errors.email && (
-                    <Text style={styles.validationError}>{errors.email}</Text>
-                  )}
+            {/* Logo animada */}
+            <Animated.View
+              style={[
+                styles.logoContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Image
+                source={require("../../../assets/images/icon.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </Animated.View>
 
-                  {/* Campo de telefone */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="phone"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Telefone (ex: 11 99999-9999)"
-                      placeholderTextColor="#999"
-                      keyboardType="phone-pad"
-                      value={values.phone}
-                      onChangeText={handleChange("phone")}
-                      onBlur={handleBlur("phone")}
-                    />
-                  </View>
-                  {touched.phone && errors.phone && (
-                    <Text style={styles.validationError}>{errors.phone}</Text>
-                  )}
+            {/* Título e subtítulo animados */}
+            <Animated.View
+              style={[
+                styles.headerTextContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={styles.welcomeText}>Crie sua conta</Text>
+              <Text style={styles.subtitle}>
+                Preencha os campos abaixo para começar
+              </Text>
+            </Animated.View>
 
-                  {/* Campo de endereço */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="location-on"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Endereço completo"
-                      placeholderTextColor="#999"
-                      value={values.address}
-                      onChangeText={handleChange("address")}
-                      onBlur={handleBlur("address")}
-                    />
-                  </View>
-                  {touched.address && errors.address && (
-                    <Text style={styles.validationError}>{errors.address}</Text>
-                  )}
+            {/* Formulário de registro */}
+            <Animated.View
+              style={[
+                styles.formContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    { translateY: slideAnim },
+                    { translateX: shakeAnim },
+                  ],
+                },
+              ]}
+            >
+              {errorMessage && (
+                <View style={styles.errorContainer}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={20}
+                    color="#FF3B30"
+                  />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
 
-                  {/* Campo de senha */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="lock"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Senha"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!passwordVisible}
-                      value={values.password}
-                      onChangeText={handleChange("password")}
-                      onBlur={handleBlur("password")}
-                    />
-                    <TouchableOpacity
-                      style={styles.passwordToggle}
-                      onPress={() => setPasswordVisible(!passwordVisible)}
-                    >
+              <Formik
+                initialValues={{
+                  name: "",
+                  email: "",
+                  phone: "",
+                  address: "",
+                  password: "",
+                  confirmPassword: "",
+                  role: UserRole.DOADOR,
+                }}
+                validationSchema={RegisterSchema}
+                onSubmit={handleRegister}
+              >
+                {({
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                  setFieldValue,
+                  values,
+                  errors,
+                  touched,
+                }) => (
+                  <>
+                    {/* Campo de nome */}
+                    <View style={styles.inputContainer}>
                       <MaterialIcons
-                        name={passwordVisible ? "visibility" : "visibility-off"}
+                        name="person"
                         size={22}
                         color="#666"
+                        style={styles.inputIcon}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  {touched.password && errors.password && (
-                    <Text style={styles.validationError}>
-                      {errors.password}
-                    </Text>
-                  )}
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Nome completo"
+                        placeholderTextColor="#999"
+                        value={values.name}
+                        onChangeText={handleChange("name")}
+                        onBlur={handleBlur("name")}
+                      />
+                    </View>
+                    {touched.name && errors.name && (
+                      <Text style={styles.validationError}>{errors.name}</Text>
+                    )}
 
-                  {/* Campo de confirmação de senha */}
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons
-                      name="lock"
-                      size={22}
-                      color="#666"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirmar senha"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!confirmPasswordVisible}
-                      value={values.confirmPassword}
-                      onChangeText={handleChange("confirmPassword")}
-                      onBlur={handleBlur("confirmPassword")}
-                    />
-                    <TouchableOpacity
-                      style={styles.passwordToggle}
-                      onPress={() =>
-                        setConfirmPasswordVisible(!confirmPasswordVisible)
-                      }
-                    >
+                    {/* Campo de email */}
+                    <View style={styles.inputContainer}>
                       <MaterialIcons
-                        name={
-                          confirmPasswordVisible
-                            ? "visibility"
-                            : "visibility-off"
-                        }
+                        name="email"
                         size={22}
                         color="#666"
+                        style={styles.inputIcon}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  {touched.confirmPassword && errors.confirmPassword && (
-                    <Text style={styles.validationError}>
-                      {errors.confirmPassword}
-                    </Text>
-                  )}
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        placeholderTextColor="#999"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={values.email}
+                        onChangeText={handleChange("email")}
+                        onBlur={handleBlur("email")}
+                      />
+                    </View>
+                    {touched.email && errors.email && (
+                      <Text style={styles.validationError}>{errors.email}</Text>
+                    )}
 
-                  {/* Seleção de papel com cards */}
-                  <View style={styles.roleContainer}>
-                    <Text style={styles.roleLabel}>Você quer:</Text>
+                    {/* Campo de telefone */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="phone"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Telefone (ex: 11 99999-9999)"
+                        placeholderTextColor="#999"
+                        keyboardType="phone-pad"
+                        value={values.phone}
+                        onChangeText={(text) => {
+                          const formattedPhone = maskPhone(text);
+                          setFieldValue("phone", formattedPhone);
+                        }}
+                        onBlur={handleBlur("phone")}
+                      />
+                    </View>
+                    {touched.phone && errors.phone && (
+                      <Text style={styles.validationError}>{errors.phone}</Text>
+                    )}
 
-                    <View style={styles.roleRow}>
-                      {roles.map((role) => {
-                        const isSelected = values.role === role.value;
-                        return (
-                          <Animated.View
-                            key={role.value}
-                            style={{
-                              transform: [
-                                { scale: isSelected ? scaleAnim : 1 },
-                              ],
-                              flex: 1,
-                              maxWidth: "48%",
-                            }}
-                          >
-                            <TouchableOpacity
-                              activeOpacity={0.8}
-                              style={[
-                                styles.roleCard,
-                                isSelected && styles.roleCardSelected,
-                              ]}
-                              onPress={() => {
-                                setFieldValue("role", role.value);
-                                animateSelection();
-                              }}
-                            >
-                              <View style={styles.roleIconContainer}>
-                                <MaterialIcons
-                                  name={role.icon}
-                                  size={24}
-                                  color={isSelected ? "#006E58" : "#666"}
-                                />
-                              </View>
-                              <Text
-                                style={[
-                                  styles.roleText,
-                                  isSelected && styles.roleTextSelected,
-                                ]}
-                              >
-                                {role.label}
-                              </Text>
-                            </TouchableOpacity>
-                          </Animated.View>
-                        );
-                      })}
+                    {/* Campo de endereço com autocomplete - COMPONENTE SIMPLIFICADO */}
+                    <View style={styles.addressContainer}>
+                      <AddressAutocomplete
+                        ref={addressAutocompleteRef}
+                        name="address"
+                        label="Endereço"
+                        placeholder="Digite seu endereço completo..."
+                        required
+                        onSuggestionsChange={handleSuggestionsChange}
+                        countryCode="br"
+                      />
                     </View>
 
-                    {touched.role && errors.role && (
-                      <Text style={styles.validationError}>{errors.role}</Text>
+                    {/* Campo de senha */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="lock"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Senha"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!passwordVisible}
+                        value={values.password}
+                        onChangeText={handleChange("password")}
+                        onBlur={handleBlur("password")}
+                      />
+                      <TouchableOpacity
+                        style={styles.passwordToggle}
+                        onPress={() => setPasswordVisible(!passwordVisible)}
+                      >
+                        <MaterialIcons
+                          name={
+                            passwordVisible ? "visibility" : "visibility-off"
+                          }
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {touched.password && errors.password && (
+                      <Text style={styles.validationError}>
+                        {errors.password}
+                      </Text>
                     )}
-                  </View>
 
-                  {/* Botão de registro */}
-                  <TouchableOpacity
-                    style={styles.registerButtonContainer}
-                    onPress={() => handleSubmit()}
-                    activeOpacity={0.8}
-                    disabled={isLoading}
-                  >
-                    <LinearGradient
-                      colors={["#173F5F", "#006E58"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.registerButton}
-                    >
-                      {isLoading ? (
-                        <View style={styles.loadingIndicator} />
-                      ) : (
-                        <Text style={styles.registerButtonText}>Cadastrar</Text>
+                    {/* Campo de confirmação de senha */}
+                    <View style={styles.inputContainer}>
+                      <MaterialIcons
+                        name="lock"
+                        size={22}
+                        color="#666"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Confirmar senha"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!confirmPasswordVisible}
+                        value={values.confirmPassword}
+                        onChangeText={handleChange("confirmPassword")}
+                        onBlur={handleBlur("confirmPassword")}
+                      />
+                      <TouchableOpacity
+                        style={styles.passwordToggle}
+                        onPress={() =>
+                          setConfirmPasswordVisible(!confirmPasswordVisible)
+                        }
+                      >
+                        <MaterialIcons
+                          name={
+                            confirmPasswordVisible
+                              ? "visibility"
+                              : "visibility-off"
+                          }
+                          size={22}
+                          color="#666"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {touched.confirmPassword && errors.confirmPassword && (
+                      <Text style={styles.validationError}>
+                        {errors.confirmPassword}
+                      </Text>
+                    )}
+
+                    {/* Seleção de papel com cards */}
+                    <View style={styles.roleContainer}>
+                      <Text style={styles.roleLabel}>Você quer:</Text>
+
+                      <View style={styles.roleRow}>
+                        {roles.map((role) => {
+                          const isSelected = values.role === role.value;
+                          return (
+                            <Animated.View
+                              key={role.value}
+                              style={{
+                                transform: [
+                                  { scale: isSelected ? scaleAnim : 1 },
+                                ],
+                                flex: 1,
+                                maxWidth: "48%",
+                              }}
+                            >
+                              <TouchableOpacity
+                                activeOpacity={0.8}
+                                style={[
+                                  styles.roleCard,
+                                  isSelected && styles.roleCardSelected,
+                                ]}
+                                onPress={() => {
+                                  setFieldValue("role", role.value);
+                                  animateSelection();
+                                }}
+                              >
+                                <View style={styles.roleIconContainer}>
+                                  <MaterialIcons
+                                    name={role.icon}
+                                    size={24}
+                                    color={isSelected ? "#006E58" : "#666"}
+                                  />
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.roleText,
+                                    isSelected && styles.roleTextSelected,
+                                  ]}
+                                >
+                                  {role.label}
+                                </Text>
+                              </TouchableOpacity>
+                            </Animated.View>
+                          );
+                        })}
+                      </View>
+
+                      {touched.role && errors.role && (
+                        <Text style={styles.validationError}>
+                          {errors.role}
+                        </Text>
                       )}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Formik>
-          </Animated.View>
+                    </View>
 
-          {/* Link para login */}
-          <Animated.View
+                    {/* Botão de registro */}
+                    <TouchableOpacity
+                      style={styles.registerButtonContainer}
+                      onPress={() => handleSubmit()}
+                      activeOpacity={0.8}
+                      disabled={isLoading}
+                    >
+                      <LinearGradient
+                        colors={["#173F5F", "#006E58"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.registerButton}
+                      >
+                        {isLoading ? (
+                          <View style={styles.loadingIndicator} />
+                        ) : (
+                          <Text style={styles.registerButtonText}>
+                            Cadastrar
+                          </Text>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </Formik>
+            </Animated.View>
+
+            {/* Link para login */}
+            <Animated.View
+              style={[
+                styles.loginContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={styles.loginText}>Já tem uma conta?</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate(
+                    AUTH_ROUTES.LOGIN as keyof AuthStackParamList
+                  )
+                }
+              >
+                <Text style={styles.loginLink}>Faça login</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
+
+          {/* BottomSheet com ajuste para teclado */}
+          <BottomSheet
+            ref={bottomSheetRef}
+            index={-1}
+            snapPoints={getSnapPoints()}
+            enablePanDownToClose
+            backdropComponent={renderBackdrop}
+            keyboardBehavior="interactive"
+            keyboardBlurBehavior="restore"
+            android_keyboardInputMode="adjustResize"
+            handleComponent={null}
+            backgroundStyle={styles.bottomSheetBackground}
             style={[
-              styles.loginContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
+              styles.bottomSheetContainer,
+              keyboardHeight > 0 && {
+                marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
               },
             ]}
           >
-            <Text style={styles.loginText}>Já tem uma conta?</Text>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate(
-                  AUTH_ROUTES.LOGIN as keyof AuthStackParamList
-                )
-              }
+            {renderHeader()}
+
+            <BottomSheetScrollView
+              contentContainerStyle={styles.scrollViewContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
             >
-              <Text style={styles.loginLink}>Faça login</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </ScrollView>
-      </LinearGradient>
-    </KeyboardAvoidingView>
+              {isLoadingAddress ? (
+                <View style={styles.centeredContainer}>
+                  <ActivityIndicator
+                    size="large"
+                    color={theme.colors.primary.secondary}
+                  />
+                  <Text style={styles.loadingText}>
+                    Procurando endereços...
+                  </Text>
+                </View>
+              ) : addressSuggestions.length > 0 ? (
+                <>
+                  <Text style={styles.instructionText}>
+                    Toque para selecionar ou arraste para ver mais opções
+                  </Text>
+                  {addressSuggestions.map((suggestion, index) =>
+                    renderSuggestionItem(suggestion, index)
+                  )}
+                </>
+              ) : (
+                <View style={styles.centeredContainer}>
+                  <Text style={styles.placeholderText}>
+                    Digite pelo menos 3 caracteres para buscar endereços
+                  </Text>
+                </View>
+              )}
+            </BottomSheetScrollView>
+          </BottomSheet>
+        </LinearGradient>
+      </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -607,8 +820,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 50,
+    height: 50,
   },
   headerTextContainer: {
     alignItems: "center",
@@ -673,6 +886,9 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
     marginLeft: 2,
+  },
+  addressContainer: {
+    marginBottom: 12,
   },
   roleContainer: {
     marginVertical: 16,
@@ -775,6 +991,132 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: theme.colors.primary.secondary,
     marginLeft: 5,
+  },
+  bottomSheetContainer: {
+    elevation: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  bottomSheetBackground: {
+    backgroundColor: theme.colors.neutral.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.lightGray,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  sheetHandleBar: {
+    position: "absolute",
+    top: 8,
+    left: "50%",
+    marginLeft: -20,
+    width: 40,
+    height: 4,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 2,
+  },
+  sheetTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.primary.main,
+    marginLeft: theme.spacing.xs,
+  },
+  scrollViewContent: {
+    paddingBottom: theme.spacing.xl,
+  },
+  instructionText: {
+    textAlign: "center",
+    color: theme.colors.neutral.darkGray,
+    fontSize: 14,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    backgroundColor: theme.colors.neutral.lightGray,
+    marginBottom: theme.spacing.s,
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral.lightGray,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  lastSuggestionItem: {
+    borderBottomWidth: 0,
+  },
+  suggestionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary.secondary + "15",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: theme.spacing.m,
+  },
+  suggestionContent: {
+    flex: 1,
+    marginRight: theme.spacing.s,
+  },
+  suggestionMainText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.neutral.black,
+    marginBottom: 4,
+  },
+  suggestionSubText: {
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.m,
+    minHeight: 150,
+  },
+  loadingText: {
+    marginTop: theme.spacing.m,
+    fontSize: 16,
+    fontWeight: "500",
+    color: theme.colors.primary.main,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.neutral.black,
+    textAlign: "center",
+    marginTop: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.neutral.darkGray,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: theme.colors.neutral.mediumGray,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });
 

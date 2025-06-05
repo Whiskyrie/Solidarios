@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -35,144 +35,275 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
 }) => {
   // Estado para acompanhar a seleção atual quando é múltipla
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [hasLoadedCategories, setHasLoadedCategories] = useState(false);
 
   // Formik context para integração com formulários
   const { values, setFieldValue, touched, errors } = useFormikContext<any>();
   const value = getIn(values, name);
   const error = getIn(touched, name) && getIn(errors, name);
 
-  // Hook para buscar as categorias
+  // Hook otimizado para buscar as categorias
   const {
     categories,
     fetchCategories,
     isLoading,
     error: categoriesError,
+    isCacheValid,
   } = useCategories();
 
-  useEffect(() => {
-    // Carregar categorias ao montar o componente
-    fetchCategories();
-  }, [fetchCategories]);
+  // CORREÇÃO: Garantir que categories seja sempre um array
+  const safeCategories = useMemo(() => {
+    return Array.isArray(categories) ? categories : [];
+  }, [categories]);
 
+  // Carregar categorias apenas uma vez, ou se não houver cache válido
   useEffect(() => {
-    // Sincronizar o estado local com o valor do Formik para seleção múltipla
+    const loadCategories = async () => {
+      // Verificar se já tentou carregar ou se já tem dados
+      if (hasLoadedCategories) {
+        return;
+      }
+
+      // Se não tem cache válido e não tem categorias, carregar
+      if (!isCacheValid && safeCategories.length === 0) {
+        console.log("[CategoryPicker] Carregando categorias pela primeira vez");
+        try {
+          await fetchCategories();
+        } catch (error) {
+          console.error("[CategoryPicker] Erro ao carregar categorias:", error);
+        } finally {
+          setHasLoadedCategories(true);
+        }
+      } else if (safeCategories.length > 0) {
+        // Se já tem categorias, marcar como carregado
+        setHasLoadedCategories(true);
+      }
+    };
+
+    loadCategories();
+  }, [
+    fetchCategories,
+    hasLoadedCategories,
+    isCacheValid,
+    safeCategories.length,
+  ]);
+
+  // Sincronizar o estado local com o valor do Formik para seleção múltipla
+  useEffect(() => {
     if (multiple && Array.isArray(value)) {
       setSelectedIds(value);
     }
   }, [value, multiple]);
 
   // Manipulador de seleção de categoria
-  const handleSelectCategory = (category: Category) => {
-    if (multiple) {
-      // Se já estiver selecionado, remover; caso contrário, adicionar
-      const newSelectedIds = selectedIds.includes(category.id)
-        ? selectedIds.filter((id) => id !== category.id)
-        : [...selectedIds, category.id];
+  const handleSelectCategory = useCallback(
+    (category: Category) => {
+      if (multiple) {
+        setSelectedIds((prevIds) => {
+          const newSelectedIds = prevIds.includes(category.id)
+            ? prevIds.filter((id) => id !== category.id)
+            : [...prevIds, category.id];
 
-      setSelectedIds(newSelectedIds);
-      setFieldValue(name, newSelectedIds);
-    } else {
-      // Seleção única
-      setFieldValue(name, category.id);
-    }
-  };
+          setFieldValue(name, newSelectedIds);
+          return newSelectedIds;
+        });
+      } else {
+        setFieldValue(name, category.id);
+      }
+    },
+    [multiple, name, setFieldValue]
+  );
 
   // Verificar se uma categoria está selecionada
-  const isCategorySelected = (categoryId: string) => {
-    if (multiple) {
-      return selectedIds.includes(categoryId);
-    }
-    return value === categoryId;
-  };
-
-  // Renderizar item de categoria
-  const renderCategoryItem = ({ item }: { item: Category }) => {
-    const isSelected = isCategorySelected(item.id);
-
-    return (
-      <TouchableOpacity
-        style={[styles.categoryItem, isSelected && styles.selectedCategoryItem]}
-        onPress={() => handleSelectCategory(item)}
-        activeOpacity={0.7}
-      >
-        <Typography
-          variant="body"
-          color={
-            isSelected
-              ? theme.colors.primary.secondary
-              : theme.colors.neutral.black
-          }
-        >
-          {item.name}
-        </Typography>
-
-        {item.description && (
-          <Typography
-            variant="small"
-            color={
-              isSelected
-                ? theme.colors.primary.secondary
-                : theme.colors.neutral.darkGray
-            }
-            numberOfLines={1}
-          >
-            {item.description}
-          </Typography>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const isCategorySelected = useCallback(
+    (categoryId: string) => {
+      if (multiple) {
+        return selectedIds.includes(categoryId);
+      }
+      return value === categoryId;
+    },
+    [multiple, selectedIds, value]
+  );
 
   // Encontrar as categorias selecionadas para exibir os badges
-  const getSelectedCategories = (): Category[] => {
+  const selectedCategories = useMemo(() => {
     if (multiple) {
-      return categories.filter((category) => selectedIds.includes(category.id));
+      return safeCategories.filter((category) =>
+        selectedIds.includes(category.id)
+      );
     }
 
-    const selectedCategory = categories.find(
+    const selectedCategory = safeCategories.find(
       (category) => category.id === value
     );
     return selectedCategory ? [selectedCategory] : [];
-  };
+  }, [safeCategories, multiple, selectedIds, value]);
 
-  if (isLoading) {
-    return <Loading message="Carregando categorias..." />;
+  // Renderizar item de categoria
+  const renderCategoryItem = useCallback(
+    ({ item }: { item: Category }) => {
+      const isSelected = isCategorySelected(item.id);
+
+      return (
+        <TouchableOpacity
+          style={[
+            styles.categoryItem,
+            isSelected && styles.selectedCategoryItem,
+          ]}
+          onPress={() => handleSelectCategory(item)}
+          activeOpacity={0.7}
+        >
+          <Typography
+            variant="body"
+            color={
+              isSelected
+                ? theme.colors.primary.secondary
+                : theme.colors.neutral.black
+            }
+          >
+            {item.name}
+          </Typography>
+
+          {item.description && (
+            <Typography
+              variant="small"
+              color={
+                isSelected
+                  ? theme.colors.primary.secondary
+                  : theme.colors.neutral.darkGray
+              }
+              numberOfLines={1}
+            >
+              {item.description}
+            </Typography>
+          )}
+        </TouchableOpacity>
+      );
+    },
+    [isCategorySelected, handleSelectCategory]
+  );
+
+  // CORREÇÃO: Melhor renderização condicional baseada no estado
+  if (isLoading && safeCategories.length === 0 && !hasLoadedCategories) {
+    return (
+      <View style={[styles.container, style]}>
+        {label && (
+          <View style={styles.labelContainer}>
+            <Typography variant="bodySecondary" style={styles.label}>
+              {label}
+            </Typography>
+            {required && (
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.status.error}
+              >
+                *
+              </Typography>
+            )}
+          </View>
+        )}
+        <View style={styles.loadingContainer}>
+          <Loading message="Carregando categorias..." size="small" />
+        </View>
+      </View>
+    );
   }
 
-  if (categoriesError) {
+  if (categoriesError && safeCategories.length === 0 && hasLoadedCategories) {
     return (
-      <ErrorState
-        title="Erro ao carregar categorias"
-        description="Não foi possível carregar a lista de categorias."
-        actionLabel="Tentar novamente"
-        onAction={fetchCategories}
-        error={categoriesError}
-      />
+      <View style={[styles.container, style]}>
+        {label && (
+          <View style={styles.labelContainer}>
+            <Typography variant="bodySecondary" style={styles.label}>
+              {label}
+            </Typography>
+            {required && (
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.status.error}
+              >
+                *
+              </Typography>
+            )}
+          </View>
+        )}
+        <ErrorState
+          title="Erro ao carregar categorias"
+          description="Não foi possível carregar a lista de categorias."
+          actionLabel="Tentar novamente"
+          onAction={() => {
+            setHasLoadedCategories(false);
+            fetchCategories(undefined, true);
+          }}
+          error={categoriesError}
+        />
+      </View>
+    );
+  }
+
+  // Se não tem categorias e não está carregando, mostrar estado vazio
+  if (safeCategories.length === 0 && hasLoadedCategories && !isLoading) {
+    return (
+      <View style={[styles.container, style]}>
+        {label && (
+          <View style={styles.labelContainer}>
+            <Typography variant="bodySecondary" style={styles.label}>
+              {label}
+            </Typography>
+            {required && (
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.status.error}
+              >
+                *
+              </Typography>
+            )}
+          </View>
+        )}
+        <View style={styles.emptyContainer}>
+          <Typography
+            variant="bodySecondary"
+            color={theme.colors.neutral.darkGray}
+            style={styles.emptyText}
+          >
+            Nenhuma categoria disponível
+          </Typography>
+        </View>
+      </View>
     );
   }
 
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.labelContainer}>
-        <Typography variant="bodySecondary" style={styles.label}>
-          {label}
-        </Typography>
-
-        {required && (
-          <Typography variant="bodySecondary" color={theme.colors.status.error}>
-            *
+      {label && (
+        <View style={styles.labelContainer}>
+          <Typography variant="bodySecondary" style={styles.label}>
+            {label}
           </Typography>
-        )}
-      </View>
+          {required && (
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.status.error}
+            >
+              *
+            </Typography>
+          )}
+        </View>
+      )}
 
-      <FlatList
-        data={categories}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCategoryItem}
-        horizontal={false}
-        style={styles.categoryList}
-        contentContainerStyle={styles.categoryListContent}
-      />
+      {safeCategories.length > 0 && (
+        <FlatList
+          data={safeCategories}
+          keyExtractor={(item) => item.id}
+          renderItem={renderCategoryItem}
+          style={styles.categoryList}
+          contentContainerStyle={styles.categoryListContent}
+          scrollEnabled={safeCategories.length > 3} // Só habilita scroll se tiver mais de 3 categorias
+          nestedScrollEnabled={true} // Permite scroll aninhado
+          extraData={selectedIds} // Força re-render quando seleção muda
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {error && (
         <Typography
@@ -184,14 +315,14 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
         </Typography>
       )}
 
-      {showBadge && getSelectedCategories().length > 0 && (
+      {showBadge && selectedCategories.length > 0 && (
         <View style={styles.selectedContainer}>
           <Typography variant="small" style={styles.selectedLabel}>
             Selecionadas:
           </Typography>
 
           <View style={styles.badgesContainer}>
-            {getSelectedCategories().map((category) => (
+            {selectedCategories.map((category) => (
               <Badge
                 key={category.id}
                 label={category.name}
@@ -217,6 +348,27 @@ const styles = StyleSheet.create({
   },
   label: {
     marginRight: theme.spacing.xxs,
+  },
+  loadingContainer: {
+    padding: theme.spacing.m,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.mediumGray,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  emptyContainer: {
+    padding: theme.spacing.m,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.mediumGray,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  emptyText: {
+    textAlign: "center",
   },
   categoryList: {
     maxHeight: 200,

@@ -64,23 +64,34 @@ const BeneficiariesScreen: React.FC = () => {
 
   // Aplicar filtros de busca
   useEffect(() => {
-    if (!users) return;
-
-    let result = [...users];
-
-    // Aplicar busca
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (user) =>
-          user.name.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query) ||
-          user.phone?.toLowerCase().includes(query) ||
-          user.address?.toLowerCase().includes(query)
-      );
+    // CORREÇÃO: Verificação robusta antes de usar spread operator
+    if (!users || !Array.isArray(users)) {
+      console.log("[BeneficiariesScreen] Users não é um array válido");
+      setFilteredBeneficiaries([]);
+      return;
     }
 
-    setFilteredBeneficiaries(result);
+    try {
+      // CORREÇÃO: Usar Array.from para garantir cópia segura
+      let result = Array.from(users);
+
+      // Aplicar busca
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        result = result.filter(
+          (user) =>
+            user?.name?.toLowerCase().includes(query) ||
+            user?.email?.toLowerCase().includes(query) ||
+            user?.phone?.toLowerCase().includes(query) ||
+            user?.address?.toLowerCase().includes(query)
+        );
+      }
+
+      setFilteredBeneficiaries(result);
+    } catch (error) {
+      console.error("[BeneficiariesScreen] Erro ao filtrar users:", error);
+      setFilteredBeneficiaries([]);
+    }
   }, [users, searchQuery]);
 
   // Função para pull-to-refresh
