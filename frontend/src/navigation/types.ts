@@ -2,7 +2,7 @@
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { BENEFICIARIO_ROUTES, DOADOR_ROUTES, ADMIN_ROUTES } from "./routes";
+import { BENEFICIARIO_ROUTES, DOADOR_ROUTES } from "./routes";
 
 // Tipos para AuthNavigator
 export type AuthStackParamList = {
