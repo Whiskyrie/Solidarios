@@ -1,5 +1,5 @@
 // ProfileScreen.tsx
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -205,7 +205,7 @@ const ProfileScreen: React.FC = () => {
                   "error"
                 );
               }
-            } catch {
+            } catch (error) {
               showNotification(
                 "Erro ao sair da conta. Tente novamente.",
                 "error"

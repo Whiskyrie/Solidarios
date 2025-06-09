@@ -13,9 +13,6 @@ import {
   UseGuards,
   Request,
   Query,
-  ForbiddenException,
-  BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -30,7 +27,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-  ApiParam,
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
@@ -38,7 +34,7 @@ import { Item } from './entities/item.entity';
 
 @ApiTags('items')
 @Controller('items')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard) // Proteger todas as rotas e verificar roles
 @ApiBearerAuth() // Indica que precisa de token JWT para todos os endpoints
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
@@ -73,83 +69,23 @@ export class ItemsController {
   }
 
   @Get('donor/:donorId')
-  @ApiOperation({ summary: 'Buscar itens por doador' })
+  @ApiOperation({ summary: 'Listar itens por doador com paginação' })
   @ApiResponse({
     status: 200,
-    description: 'Itens do doador encontrados com sucesso.',
-    type: PageDto<Item>,
-  })
-  @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
-  @ApiResponse({ status: 400, description: 'Dados inválidos.' })
-  @ApiResponse({ status: 403, description: 'Acesso negado.' })
-  @ApiResponse({ status: 500, description: 'Erro interno do servidor.' })
-  @ApiParam({
-    name: 'donorId',
-    description: 'ID do doador',
-    type: 'string',
-    format: 'uuid',
+    description: 'Lista paginada de itens do doador retornada com sucesso.',
+    type: PageDto,
   })
   @ApiQuery({
-    name: 'page',
+    type: PageOptionsDto,
     required: false,
-    description: 'Número da página (padrão: 1)',
-    type: 'number',
-  })
-  @ApiQuery({
-    name: 'take',
-    required: false,
-    description: 'Quantidade de itens por página (padrão: 10)',
-    type: 'number',
+    description: 'Opções de paginação',
   })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
-  async findByDonor(
+  getByDonor(
     @Param('donorId', ParseUUIDPipe) donorId: string,
     @Query() pageOptionsDto: PageOptionsDto,
-    @Request() req,
   ): Promise<PageDto<Item>> {
-    try {
-      // Verificar se é o próprio doador ou admin/funcionário
-      if (req.user.role === UserRole.DOADOR && req.user.id !== donorId) {
-        throw new ForbiddenException(
-          'Você só pode acessar seus próprios itens',
-        );
-      }
-
-      // Validar parâmetros de paginação
-      if (pageOptionsDto.page && pageOptionsDto.page < 1) {
-        throw new BadRequestException(
-          'O número da página deve ser maior que 0',
-        );
-      }
-
-      if (
-        pageOptionsDto.take &&
-        (pageOptionsDto.take < 1 || pageOptionsDto.take > 100)
-      ) {
-        throw new BadRequestException(
-          'O número de itens por página deve estar entre 1 e 100',
-        );
-      }
-
-      return await this.itemsService.findByDonorPaginated(
-        donorId,
-        pageOptionsDto,
-      );
-    } catch (error) {
-      if (
-        error instanceof ForbiddenException ||
-        error instanceof BadRequestException ||
-        error.status === 404
-      ) {
-        throw error;
-      }
-
-      // Log do erro interno e relançar como InternalServerErrorException
-      console.error('Erro interno no endpoint findByDonor:', error);
-      throw new InternalServerErrorException(
-        'Erro interno do servidor ao buscar itens do doador',
-      );
-    }
+    return this.itemsService.findByDonorPaginated(donorId, pageOptionsDto);
   }
 
   @Get(':id')

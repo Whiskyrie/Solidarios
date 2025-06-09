@@ -7,6 +7,7 @@ import {
   User,
   CreateUserDto,
   UpdateUserDto,
+  UsersPage,
   UserRole,
   UserStats,
 } from "../types/users.types";

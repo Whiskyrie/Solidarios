@@ -32,6 +32,8 @@ import {
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
+// Hooks
+import { useAuth } from "../../hooks/useAuth";
 import { useDistributions } from "../../hooks/useDistributions";
 
 // Tipos e rotas
@@ -52,6 +54,7 @@ const ReceiptDetailScreen: React.FC = () => {
     useNavigation<StackNavigationProp<BeneficiarioStackParamList>>();
 
   // Estado
+  const { user } = useAuth();
   const { distribution, fetchDistributionById, isLoading, error, clearError } =
     useDistributions();
 

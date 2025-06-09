@@ -205,7 +205,7 @@ const RegisterScreen: React.FC = () => {
     clearErrors();
     setErrorMessage(null);
 
-    const { confirmPassword: _confirmPassword, ...registerData } = values;
+    const { confirmPassword, ...registerData } = values;
 
     const payload = {
       name: registerData.name.trim(),
@@ -233,7 +233,7 @@ const RegisterScreen: React.FC = () => {
           });
         }, 1000);
       }
-    } catch {
+    } catch (err) {
       setErrorMessage(
         "Ocorreu um erro inesperado. Tente novamente mais tarde."
       );

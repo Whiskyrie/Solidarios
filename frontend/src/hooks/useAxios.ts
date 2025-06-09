@@ -4,8 +4,8 @@
  */
 import { useState, useCallback } from "react";
 import { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
+import apiClient from "../api/client";
 import { ApiError } from "../types/common.types";
-import api from "../api/api";
 
 interface UseAxiosState<T> {
   data: T | null;
@@ -41,7 +41,7 @@ function useAxios<T = any>(
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
-        const response = await api.request<T>(config);
+        const response = await apiClient.request<T>(config);
         setState({
           data: response.data,
           loading: false,

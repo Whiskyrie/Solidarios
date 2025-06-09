@@ -23,6 +23,7 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import theme from "../../theme";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import { AUTH_ROUTES } from "../../navigation/routes";
+import AuthService from "../../api/auth";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 // Validação do formulário
@@ -90,7 +91,7 @@ const ForgotPasswordScreen: React.FC = () => {
   }, [errorMessage]);
 
   // Função para lidar com o pedido de recuperação de senha
-  const handleForgotPassword = async () => {
+  const handleForgotPassword = async (values: { email: string }) => {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -109,7 +110,7 @@ const ForgotPasswordScreen: React.FC = () => {
           navigation.navigate(AUTH_ROUTES.LOGIN as keyof AuthStackParamList);
         }, 3000);
       }, 1500);
-    } catch {
+    } catch (error) {
       setErrorMessage(
         "Não foi possível enviar instruções de recuperação. Tente novamente."
       );

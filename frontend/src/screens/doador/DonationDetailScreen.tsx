@@ -31,6 +31,7 @@ import {
   Divider,
   Button,
   EmptyState,
+  Loading,
   ErrorState,
   NotificationBanner,
 } from "../../components/barrelComponents";
@@ -309,8 +310,15 @@ const DonationDetailScreen: React.FC = () => {
 
   // Estado
   const { user } = useAuth();
-  const { item, fetchItemById, removeItem, isLoading, error, clearError } =
-    useItems();
+  const {
+    item,
+    fetchItemById,
+    updateItem,
+    removeItem,
+    isLoading,
+    error,
+    clearError,
+  } = useItems();
 
   const [refreshing, setRefreshing] = useState(false);
   const [notification, setNotification] = useState<{

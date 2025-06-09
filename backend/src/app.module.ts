@@ -1,4 +1,4 @@
-// backend/src/app.module.ts
+// src/app.module.ts (Modificado para incluir o módulo de logging)
 import {
   Module,
   NestModule,
@@ -6,14 +6,11 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-// ✅ IMPORTAR AppDataSource
-import { AppDataSource } from './config/typeorm.config';
-
-// Outros imports...
+// Módulos existentes...
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/categories.module';
@@ -21,16 +18,12 @@ import { ItemsModule } from './modules/items/items.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { DistributionsModule } from './modules/distributions/distributions.module';
 
-// Guards, Filters, Middleware...
+// Guards e Providers
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
-import { LoggingModule } from './common/logging/logging.module';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { TypeOrmLoggerService } from './common/logging/typeorm-logger';
-import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 
-// Middleware imports...
+// Middleware de segurança
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import { SecurityHeadersLoggerMiddleware } from './common/middleware/security-headers-logger.middleware';
 import {
@@ -39,47 +32,87 @@ import {
   SameOriginMiddleware,
 } from './common/middleware/csrf.middleware';
 
+// Novo Módulo de Logging e Filtros
+import { LoggingModule } from './common/logging/logging.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { TypeOrmLoggerService } from './common/logging/typeorm-logger';
+import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
+
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
 @Module({
   imports: [
+    // Configuração do ambiente
     ConfigModule.forRoot({
       isGlobal: true,
     }),
 
-    // ✅ CORRIGIDO: Usar AppDataSource em vez de configuração inline
+    // Configuração do TypeORM com banco de dados
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule, LoggingModule],
       inject: [ConfigService, TypeOrmLoggerService],
       useFactory: (
         configService: ConfigService,
         typeOrmLogger: TypeOrmLoggerService,
-      ) => {
-        // ✅ Usar as opções do AppDataSource
-        const dataSourceOptions = {
-          ...AppDataSource.options,
-          logger: typeOrmLogger,
-          autoLoadEntities: true, // ✅ Para compatibilidade com NestJS
+      ): TypeOrmModuleOptions => {
+        // Configurações existentes...
+        const databaseUrl = configService.get<string>('DATABASE_URL');
 
-          // ✅ Sobrescrever configurações específicas se necessário
+        // Verificar se o SSL deve ser usado
+        const useSSL = configService.get<string>('DB_SSL', 'true') === 'true';
+
+        // Configuração SSL condicional baseada na variável de ambiente
+        const sslConfig = useSSL
+          ? {
+              ssl: true,
+              extra: {
+                ssl: {
+                  rejectUnauthorized: false,
+                },
+              },
+            }
+          : {};
+
+        // Adicionar o logger personalizado à configuração
+        const baseConfig = {
           logging: configService.get<boolean>('DB_LOGGING', true),
-          synchronize: false, // ✅ SEMPRE false quando usando migrações
-          migrationsRun: configService.get<boolean>('MIGRATIONS_RUN', false),
+          logger: typeOrmLogger,
         };
 
-        return dataSourceOptions;
+        if (databaseUrl) {
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            entities: [__dirname + '/**/*.entity{.ts,.js}'],
+            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+            ...baseConfig,
+            ...sslConfig,
+          };
+        }
+
+        return {
+          type: 'postgres',
+          host: configService.get<string>('DB_HOST', 'localhost'),
+          port: configService.get<number>('DB_PORT', 5432),
+          username: configService.get<string>('DB_USERNAME', 'postgres'),
+          password: configService.get<string>('DB_PASSWORD', 'postgres'),
+          database: configService.get<string>('DB_DATABASE', 'solidarios'),
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+          ...baseConfig,
+          ...sslConfig,
+        };
       },
     }),
 
-    // Outros módulos
+    // Outros módulos da aplicação
     UsersModule,
     AuthModule,
     CategoriesModule,
     ItemsModule,
     InventoryModule,
     DistributionsModule,
-    LoggingModule,
   ],
   controllers: [AppController],
   providers: [
@@ -92,6 +125,7 @@ import helmet from 'helmet';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+    // Registrar o filtro global de exceções com o serviço de logging
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
@@ -102,8 +136,10 @@ export class AppModule implements NestModule {
   constructor(private configService: ConfigService) {}
 
   configure(consumer: MiddlewareConsumer) {
+    // Aplicar o middleware de logging primeiro para capturar todas as requisições
     consumer.apply(RequestLoggingMiddleware).forRoutes('*');
 
+    // Outros middlewares existentes...
     consumer
       .apply(
         helmet(),
@@ -118,6 +154,7 @@ export class AppModule implements NestModule {
       )
       .forRoutes('*');
 
+    // Middlewares de CSRF e Same Origin permanecem iguais...
     const shouldCheckOrigin = this.configService.get('CHECK_ORIGIN') === 'true';
     if (shouldCheckOrigin) {
       consumer
@@ -136,6 +173,8 @@ export class AppModule implements NestModule {
         );
     }
 
+    // Desabilitar CSRF para API mobile
+    // Geração de token CSRF opcional apenas para web
     const shouldGenerateCsrf =
       this.configService.get('GENERATE_CSRF') === 'true';
     if (shouldGenerateCsrf) {
@@ -144,6 +183,7 @@ export class AppModule implements NestModule {
         .forRoutes({ path: '*', method: RequestMethod.GET });
     }
 
+    // Validação de CSRF também opcional
     const shouldValidateCsrf =
       this.configService.get('VALIDATE_CSRF') === 'true';
     if (shouldValidateCsrf) {
@@ -154,6 +194,7 @@ export class AppModule implements NestModule {
           { path: 'auth/register', method: RequestMethod.POST },
           { path: 'auth/refresh', method: RequestMethod.POST },
           { path: 'auth/profile', method: RequestMethod.GET },
+          // Excluir rotas de API mobile da verificação CSRF
           { path: 'api/*', method: RequestMethod.POST },
           { path: 'api/*', method: RequestMethod.PUT },
           { path: 'api/*', method: RequestMethod.PATCH },

@@ -4,7 +4,6 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -19,23 +18,16 @@ import { Item, ItemStatus } from '../items/entities/item.entity';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
-import { LogMethod } from '../../common/logging/logger.decorator';
-import { LoggingService } from '../../common/logging/logging.service';
 
 @Injectable()
 export class DistributionsService {
-  private readonly logger: LoggingService;
-
   constructor(
     @InjectRepository(Distribution)
     private distributionsRepository: Repository<Distribution>,
     private usersService: UsersService,
     private itemsService: ItemsService,
     private inventoryService: InventoryService,
-    loggingService: LoggingService,
-  ) {
-    this.logger = loggingService.setContext('DistributionsService');
-  }
+  ) {}
 
   async create(
     createDistributionDto: CreateDistributionDto,
@@ -155,51 +147,32 @@ export class DistributionsService {
     return distribution;
   }
 
-  @LogMethod()
+  // Modificado para suportar paginação
   async findByBeneficiary(
     beneficiaryId: string,
-    pageOptionsDto: PageOptionsDto,
-  ): Promise<PageDto<Distribution>> {
-    this.logger.debug(
-      `Buscando distribuições do beneficiário: ${beneficiaryId}`,
-    );
-
-    try {
-      // Verificar se o beneficiário existe
-      const beneficiary = await this.usersService.findOne(beneficiaryId);
-      if (!beneficiary) {
-        throw new NotFoundException('Beneficiário não encontrado');
-      }
-
-      if (beneficiary.role !== UserRole.BENEFICIARIO) {
-        throw new BadRequestException(
-          'Usuário informado não é um beneficiário',
-        );
-      }
-
-      const queryBuilder = this.distributionsRepository
-        .createQueryBuilder('distribution')
-        .leftJoinAndSelect('distribution.beneficiary', 'beneficiary')
-        .leftJoinAndSelect('distribution.employee', 'employee')
-        .leftJoinAndSelect('distribution.items', 'items')
-        .leftJoinAndSelect('items.category', 'category')
-        .where('distribution.beneficiaryId = :beneficiaryId', { beneficiaryId })
-        .orderBy('distribution.date', pageOptionsDto.order)
-        .skip(pageOptionsDto.skip)
-        .take(pageOptionsDto.take);
-
-      const itemCount = await queryBuilder.getCount();
-      const distributions = await queryBuilder.getMany();
-
-      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-      return new PageDto(distributions, pageMetaDto);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar distribuições do beneficiário: ${error.message}`,
-        error.stack,
-      );
-      throw error;
+    pageOptionsDto?: PageOptionsDto,
+  ): Promise<Distribution[] | PageDto<Distribution>> {
+    // Se não houver pageOptionsDto, retorna sem paginação (para compatibilidade)
+    if (!pageOptionsDto) {
+      return this.distributionsRepository.find({ where: { beneficiaryId } });
     }
+
+    // Com paginação
+    const queryBuilder = this.distributionsRepository
+      .createQueryBuilder('distribution')
+      .leftJoinAndSelect('distribution.beneficiary', 'beneficiary')
+      .leftJoinAndSelect('distribution.employee', 'employee')
+      .leftJoinAndSelect('distribution.items', 'items')
+      .where('distribution.beneficiaryId = :beneficiaryId', { beneficiaryId })
+      .orderBy('distribution.date', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const distributions = await queryBuilder.getMany();
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+    return new PageDto(distributions, pageMetaDto);
   }
 
   async update(

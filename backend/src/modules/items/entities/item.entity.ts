@@ -1,5 +1,3 @@
-// backend/src/modules/items/entities/item.entity.ts
-
 import {
   Entity,
   Column,
@@ -7,10 +5,10 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
-  Index,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Category } from 'src/modules/categories/entities/category.entity';
+// import { Category } from './category.entity'; // Será criada depois
 
 export enum ItemType {
   ROUPA = 'roupa',
@@ -26,11 +24,6 @@ export enum ItemStatus {
 }
 
 @Entity('items')
-// Indexes compostos para queries mais comuns
-@Index('IDX_DONOR_STATUS', ['donorId', 'status']) // Para buscar doações por doador e status
-@Index('IDX_CATEGORY_STATUS', ['categoryId', 'status']) // Para filtrar por categoria disponível
-@Index('IDX_STATUS_DATE', ['status', 'receivedDate']) // Para relatórios por período
-@Index('IDX_TYPE_STATUS', ['type', 'status']) // Para buscar tipos específicos disponíveis
 export class Item {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -39,39 +32,35 @@ export class Item {
     type: 'enum',
     enum: ItemType,
   })
-  @Index('IDX_ITEM_TYPE') // Index simples para filtros por tipo
   type: ItemType;
 
   @Column()
   description: string;
 
   @Column({ nullable: true })
-  conservationState: string;
+  conservationState: string; // Estado de conservação
 
   @Column({ nullable: true })
-  size: string;
+  size: string; // Tamanho (quando aplicável)
 
   @CreateDateColumn()
-  @Index('IDX_RECEIVED_DATE') // Para ordenação e filtros temporais
-  receivedDate: Date;
+  receivedDate: Date; // Data de recebimento
 
   @Column({
     type: 'enum',
     enum: ItemStatus,
     default: ItemStatus.DISPONIVEL,
   })
-  @Index('IDX_ITEM_STATUS') // Index para filtros de status
   status: ItemStatus;
 
   @Column('text', { array: true, nullable: true })
-  photos: string[];
+  photos: string[]; // URLs das fotos
 
-  @ManyToOne(() => User, { eager: true })
+  @ManyToOne(() => User, { eager: true }) // Eager loading para buscar o doador junto
   @JoinColumn({ name: 'donorId' })
   donor: User;
 
   @Column()
-  @Index('IDX_DONOR_ID') // Para buscar doações por doador
   donorId: string;
 
   @ManyToOne(() => Category, { eager: true })
@@ -79,6 +68,5 @@ export class Item {
   category: Category;
 
   @Column({ nullable: true })
-  @Index('IDX_CATEGORY_ID') // Para filtros por categoria
   categoryId: string;
 }

@@ -109,6 +109,7 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
    */
   const updateMetrics = useCallback(
     (fromCache: boolean = false) => {
+      const responseTime = Date.now() - searchStartTimeRef.current;
       const serviceMetrics = geocodingService.getMetrics();
 
       setState((prev) => ({
@@ -129,7 +130,7 @@ export const useGeocoding = (options: UseGeocodingOptions = {}) => {
    * Buscar sugestões de endereço
    */
   const searchAddresses = useCallback(
-    async (query: string, _immediate: boolean = false) => {
+    async (query: string, immediate: boolean = false) => {
       if (query.length < minQueryLength) {
         setState((prev) => ({
           ...prev,

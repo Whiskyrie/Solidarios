@@ -7,6 +7,7 @@ import {
   Inventory,
   CreateInventoryDto,
   UpdateInventoryDto,
+  InventoryPage,
 } from "../types/inventory.types";
 import { PageOptionsDto } from "../types/common.types";
 

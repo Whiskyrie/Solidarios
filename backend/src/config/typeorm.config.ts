@@ -7,12 +7,7 @@ import { join } from 'path';
 dotenv.config();
 
 // Configuração para as entidades
-// Em desenvolvimento, usar arquivos .ts; em produção, usar arquivos .js compilados
-// Usar caminhos específicos para maior robustez
-const entitiesPath =
-  process.env.NODE_ENV === 'production'
-    ? join(__dirname, '..', 'modules', '**', 'entities', '*.entity.js')
-    : join(__dirname, '..', 'modules', '**', 'entities', '*.entity{.ts,.js}');
+const entitiesPath = join(__dirname, '..', '**', '*.entity{.ts,.js}');
 
 // Configuração para as migrações
 const migrationsPath = join(
@@ -57,13 +52,6 @@ export const AppDataSource = new DataSource({
   // Usar a variável de ambiente DB_SYNCHRONIZE em vez de baseado no ambiente
   synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging: process.env.DB_LOGGING === 'true',
-  migrationsRun: process.env.MIGRATIONS_RUN === 'true', // ✅ Ativar migrações
-  dropSchema: false,
-  cache: false,
+  migrationsRun: false, // Impede a execução automática de migrações
+  migrationsTableName: 'migrations',
 });
-export const initializeDataSource = async () => {
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
-  return AppDataSource;
-};

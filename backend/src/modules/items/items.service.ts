@@ -3,8 +3,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -124,73 +122,30 @@ export class ItemsService {
     donorId: string,
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
-    this.logger.debug(`Iniciando busca de itens para doador: ${donorId}`);
-    this.logger.debug(`Opções de paginação: ${JSON.stringify(pageOptionsDto)}`);
+    this.logger.debug(`Buscando itens do doador ${donorId}`);
 
     try {
-      // Verificar se o doador existe
-      this.logger.debug(`Verificando se doador ${donorId} existe...`);
-      const donor = await this.usersService.findOne(donorId);
-
-      if (!donor) {
-        this.logger.warn(`Doador ${donorId} não encontrado`);
-        throw new NotFoundException('Doador não encontrado');
-      }
-
-      if (donor.role !== UserRole.DOADOR) {
-        this.logger.warn(
-          `Usuário ${donorId} não é um doador, role: ${donor.role}`,
-        );
-        throw new BadRequestException('Usuário informado não é um doador');
-      }
-
-      this.logger.debug(`Doador válido encontrado: ${donor.name}`);
-
-      // CORREÇÃO: Simplificar a query e tratar relações opcionais
       const queryBuilder = this.itemsRepository
         .createQueryBuilder('item')
         .leftJoinAndSelect('item.donor', 'donor')
-        .leftJoinAndSelect('item.category', 'category') // Tornar opcional
+        .leftJoinAndSelect('item.category', 'category')
         .where('item.donorId = :donorId', { donorId })
-        .orderBy('item.receivedDate', pageOptionsDto.order) // Usar receivedDate em vez de createdAt
+        .orderBy('item.receivedDate', pageOptionsDto.order)
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
 
-      this.logger.debug(`SQL Query: ${queryBuilder.getQuery()}`);
-
       const itemCount = await queryBuilder.getCount();
-      this.logger.debug(`Total de itens encontrados: ${itemCount}`);
-
       const items = await queryBuilder.getMany();
-      this.logger.debug(`Itens carregados: ${items.length}`);
 
       const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-      const result = new PageDto(items, pageMetaDto);
 
-      this.logger.debug(`Retornando resultado com ${items.length} itens`);
-      return result;
+      return new PageDto(items, pageMetaDto);
     } catch (error) {
       this.logger.error(
-        `Erro detalhado ao buscar itens do doador ${donorId}:`,
+        `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
         error.stack,
-        'ItemsService',
-        {
-          message: error.message,
-          pageOptions: pageOptionsDto,
-        },
       );
-
-      // Re-throw conhecido errors, wrap unknown ones
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException(
-        'Erro interno ao buscar itens do doador',
-      );
+      throw error;
     }
   }
 

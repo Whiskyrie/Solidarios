@@ -41,11 +41,12 @@ const CreateItemSchema = Yup.object().shape({
   conservationState: Yup.string().required(
     "Estado de conservação é obrigatório"
   ),
-  size: Yup.string().when("type", ([type], schema) => {
-    if (type === ItemType.ROUPA || type === ItemType.CALCADO) {
-      return schema.required("Tamanho é obrigatório para roupas e calçados");
-    }
-    return schema.notRequired();
+  size: Yup.string().when("type", {
+    is: (value: ItemType) =>
+      value === ItemType.ROUPA || value === ItemType.CALCADO,
+    then: (schema) =>
+      schema.required("Tamanho é obrigatório para roupas e calçados"),
+    otherwise: (schema) => schema.notRequired(),
   }),
   categoryId: Yup.string().required("Categoria é obrigatória"),
 });
@@ -102,7 +103,7 @@ const CreateItemScreen: React.FC = () => {
           navigation.goBack();
         }, 1500);
       }
-    } catch {
+    } catch (err) {
       setNotification({
         visible: true,
         type: "error",

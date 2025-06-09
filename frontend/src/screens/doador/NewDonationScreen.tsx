@@ -30,6 +30,7 @@ import {
   Typography,
   TextField,
   Select,
+  Button,
   CategoryPicker,
   NotificationBanner,
 } from "../../components/barrelComponents";
@@ -41,8 +42,23 @@ import { useItems } from "../../hooks/useItems";
 import { useCategories } from "../../hooks/useCategories";
 
 // Tipos e rotas
-import { ItemType } from "../../types/items.types";
+import { CreateItemDto, ItemType } from "../../types/items.types";
+import { DOADOR_ROUTES } from "../../navigation/routes";
 import { DoadorNewDonationStackParamList } from "../../navigation/types";
+
+// Definindo interface para valores do formulário
+interface DonationFormValues {
+  type: ItemType;
+  description: string;
+  conservationState: string;
+  size: string;
+  categoryId: string;
+  photos: Array<{
+    uri: string;
+    name: string;
+    type: string;
+  }>;
+}
 
 // Interface para notificação
 interface NotificationState {
@@ -121,7 +137,11 @@ const NewDonationScreen: React.FC = () => {
     useNavigation<StackNavigationProp<DoadorNewDonationStackParamList>>();
   const { user } = useAuth();
   const { createItem, isLoading, error, clearError, items } = useItems();
-  const { fetchCategories, categories } = useCategories();
+  const {
+    fetchCategories,
+    categories,
+    isLoading: categoriesLoading,
+  } = useCategories();
 
   // Estados
   const [notification, setNotification] = useState<NotificationState>({
@@ -130,6 +150,7 @@ const NewDonationScreen: React.FC = () => {
     message: "",
   });
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [currentStep, setCurrentStep] = useState(1);
 
   // Refs para animações e Formik
   const fadeAnim = useRef(new Animated.Value(0)).current;
