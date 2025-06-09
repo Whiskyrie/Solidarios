@@ -12,7 +12,6 @@ import {
   Dimensions,
   StatusBar,
   Image,
-  Alert,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -137,7 +136,7 @@ const LoginScreen: React.FC = () => {
         }
         setErrorMessage(friendlyError);
       }
-    } catch (err) {
+    } catch {
       setErrorMessage(
         "Ocorreu um erro inesperado. Tente novamente mais tarde."
       );
