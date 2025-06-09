@@ -129,12 +129,18 @@ export class ItemsService {
       // Verificar se o doador existe
       const donor = await this.usersService.findOne(donorId);
       if (!donor) {
+        this.logger.warn(`Doador não encontrado: ${donorId}`);
         throw new NotFoundException('Doador não encontrado');
       }
 
       if (donor.role !== UserRole.DOADOR) {
+        this.logger.warn(
+          `Usuário ${donorId} não é um doador, role: ${donor.role}`,
+        );
         throw new BadRequestException('Usuário informado não é um doador');
       }
+
+      this.logger.debug(`Doador encontrado: ${donor.name} (${donor.email})`);
 
       const queryBuilder = this.itemsRepository
         .createQueryBuilder('item')
@@ -145,14 +151,29 @@ export class ItemsService {
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
 
+      this.logger.debug(`Query SQL: ${queryBuilder.getQuery()}`);
+      this.logger.debug(`Parâmetros: ${JSON.stringify({ donorId })}`);
+
       const itemCount = await queryBuilder.getCount();
+      this.logger.debug(`Total de itens encontrados: ${itemCount}`);
+
       const items = await queryBuilder.getMany();
+      this.logger.debug(`Itens retornados: ${items.length}`);
 
       const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-      return new PageDto(items, pageMetaDto);
+      const result = new PageDto(items, pageMetaDto);
+
+      this.logger.debug(
+        `Resultado final: ${JSON.stringify({
+          dataLength: result.data.length,
+          meta: result.meta,
+        })}`,
+      );
+
+      return result;
     } catch (error) {
       this.logger.error(
-        `Erro ao buscar itens do doador: ${error.message}`,
+        `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
         error.stack,
       );
       throw error;

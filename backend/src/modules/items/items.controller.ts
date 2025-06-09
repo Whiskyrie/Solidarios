@@ -14,6 +14,8 @@ import {
   Request,
   Query,
   ForbiddenException,
+  BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -78,6 +80,9 @@ export class ItemsController {
     type: PageDto<Item>,
   })
   @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos.' })
+  @ApiResponse({ status: 403, description: 'Acesso negado.' })
+  @ApiResponse({ status: 500, description: 'Erro interno do servidor.' })
   @ApiParam({
     name: 'donorId',
     description: 'ID do doador',
@@ -102,12 +107,49 @@ export class ItemsController {
     @Query() pageOptionsDto: PageOptionsDto,
     @Request() req,
   ): Promise<PageDto<Item>> {
-    // Verificar se é o próprio doador ou admin/funcionário
-    if (req.user.role === UserRole.DOADOR && req.user.id !== donorId) {
-      throw new ForbiddenException('Você só pode acessar seus próprios itens');
-    }
+    try {
+      // Verificar se é o próprio doador ou admin/funcionário
+      if (req.user.role === UserRole.DOADOR && req.user.id !== donorId) {
+        throw new ForbiddenException(
+          'Você só pode acessar seus próprios itens',
+        );
+      }
 
-    return this.itemsService.findByDonorPaginated(donorId, pageOptionsDto);
+      // Validar parâmetros de paginação
+      if (pageOptionsDto.page && pageOptionsDto.page < 1) {
+        throw new BadRequestException(
+          'O número da página deve ser maior que 0',
+        );
+      }
+
+      if (
+        pageOptionsDto.take &&
+        (pageOptionsDto.take < 1 || pageOptionsDto.take > 100)
+      ) {
+        throw new BadRequestException(
+          'O número de itens por página deve estar entre 1 e 100',
+        );
+      }
+
+      return await this.itemsService.findByDonorPaginated(
+        donorId,
+        pageOptionsDto,
+      );
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException ||
+        error.status === 404
+      ) {
+        throw error;
+      }
+
+      // Log do erro interno e relançar como InternalServerErrorException
+      console.error('Erro interno no endpoint findByDonor:', error);
+      throw new InternalServerErrorException(
+        'Erro interno do servidor ao buscar itens do doador',
+      );
+    }
   }
 
   @Get(':id')

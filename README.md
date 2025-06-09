@@ -16,6 +16,7 @@
 - [Funcionalidades Principais](#-funcionalidades-principais)
 - [Arquitetura](#-arquitetura)
 - [API Documentation](#-api-documentation)
+- [Troubleshooting](#-troubleshooting)
 - [Contribuição](#-contribuição)
 - [Licença](#-licença)
 
@@ -310,6 +311,35 @@ O frontend utiliza uma arquitetura baseada em componentes com React Native e Exp
 A documentação da API está disponível através do Swagger após iniciar o servidor backend:
 
 http://localhost:3000/api
+
+## 🔧 Troubleshooting
+
+### Problemas Comuns
+
+#### Erro 500 no endpoint `/items/donor/:donorId`
+
+Se você encontrar erro 500 ao buscar itens por doador:
+
+1. **Verificar logs do backend**: Execute `npm run start:dev` no backend e monitore os logs
+2. **Verificar conexão com banco**: Certifique-se de que o PostgreSQL está rodando
+3. **Verificar migrações**: Execute `npm run migration:run` no backend
+4. **Verificar variáveis de ambiente**: Confirme se o arquivo `.env` está configurado corretamente
+
+```bash
+# No backend
+npm run start:dev
+
+# Em caso de problemas com banco
+docker-compose down
+docker-compose up -d
+npm run migration:run
+```
+
+#### Problemas de conexão entre Frontend e Backend
+
+1. **Verificar URL da API**: Confirme se a URL no frontend aponta para o backend correto
+2. **Verificar CORS**: Certifique-se de que o CORS está configurado para aceitar requisições do frontend
+3. **Verificar autenticação**: Verifique se o token JWT está sendo enviado corretamente
 
 ## 👥 Contribuição
 
