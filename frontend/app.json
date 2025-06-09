@@ -1,0 +1,94 @@
+{
+  "expo": {
+    "name": "Solidarios",
+    "slug": "solidarios",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF",
+      "imageWidth": 200
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 10000
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.solidarios.app",
+      "icon": "./assets/images/icon.png",
+      "buildNumber": "1.0.0",
+      "splash": {
+        "image": "./assets/images/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 200
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Este aplicativo precisa de acesso à câmera para permitir que você tire fotos para seu perfil ou outras funcionalidades.",
+        "NSPhotoLibraryUsageDescription": "Este aplicativo precisa de acesso à sua galeria para permitir que você escolha fotos para seu perfil ou outras funcionalidades.",
+        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa de acesso à sua localização para fornecer informações baseadas na sua geolocalização.",
+        "NSContactsUsageDescription": "Este aplicativo precisa de acesso aos seus contatos para facilitar o compartilhamento ou convite de amigos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.solidarios.app",
+      "edgeToEdgeEnabled": true,
+      "splash": {
+        "image": "./assets/images/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 200
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_CONTACTS",
+        "WRITE_CONTACTS"
+      ],
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.svg"
+    },
+    "primaryColor": "#1E88E5",
+    "scheme": "solidarios",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "imageWidth": 200
+        }
+      ]
+    ]
+  }
+}
