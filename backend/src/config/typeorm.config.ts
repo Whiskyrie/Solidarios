@@ -7,7 +7,12 @@ import { join } from 'path';
 dotenv.config();
 
 // Configuração para as entidades
-const entitiesPath = join(__dirname, '..', '**', '*.entity{.ts,.js}');
+// Em desenvolvimento, usar arquivos .ts; em produção, usar arquivos .js compilados
+// Usar caminhos específicos para maior robustez
+const entitiesPath =
+  process.env.NODE_ENV === 'production'
+    ? join(__dirname, '..', 'modules', '**', 'entities', '*.entity.js')
+    : join(__dirname, '..', 'modules', '**', 'entities', '*.entity{.ts,.js}');
 
 // Configuração para as migrações
 const migrationsPath = join(
