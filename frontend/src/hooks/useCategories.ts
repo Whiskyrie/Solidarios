@@ -106,7 +106,7 @@ export const useCategories = () => {
             updateCategoriesState(result.data);
           }
           return result;
-        } catch (err) {
+        } catch {
           // Se a requisição em andamento falhar, tentar novamente
           console.log(
             "[useCategories] Requisição em andamento falhou, tentando novamente"
@@ -166,7 +166,7 @@ export const useCategories = () => {
 
       try {
         return await globalLoadingPromise;
-      } catch (err) {
+      } catch {
         return null;
       }
     },

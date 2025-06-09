@@ -19,13 +19,9 @@ import { Item, ItemStatus } from '../items/entities/item.entity';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
-import { LogMethod } from '../../common/logging/logger.decorator';
-import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class DistributionsService {
-  private readonly logger = new Logger(DistributionsService.name);
-
   constructor(
     @InjectRepository(Distribution)
     private distributionsRepository: Repository<Distribution>,

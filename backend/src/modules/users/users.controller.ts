@@ -11,7 +11,6 @@ import {
   ValidationPipe,
   ParseUUIDPipe,
   UseGuards,
-  Request,
   Query,
   BadRequestException,
 } from '@nestjs/common';

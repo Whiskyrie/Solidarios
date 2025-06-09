@@ -2,7 +2,6 @@
 import React, { useEffect } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
-import { ActivityIndicator, View } from "react-native";
 
 // Navegadores
 import AuthNavigator from "./AuthNavigator";
@@ -19,7 +18,7 @@ export type MainStackParamList = {
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const MainNavigator: React.FC = () => {
-  const { isAuthenticated, isLoading, getProfile } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   // Carregar perfil do usuário ao iniciar, mas somente uma vez
   useEffect(() => {

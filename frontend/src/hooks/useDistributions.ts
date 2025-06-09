@@ -7,7 +7,6 @@ import {
   Distribution,
   CreateDistributionDto,
   UpdateDistributionDto,
-  DistributionsPage,
 } from "../types/distributions.types";
 import { PageOptionsDto } from "../types/common.types";
 

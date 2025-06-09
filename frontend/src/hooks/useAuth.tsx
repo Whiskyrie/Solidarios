@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usar o tipo correto para o dispatch
       await dispatch(logoutAction()).unwrap();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }, [dispatch]);
@@ -106,7 +106,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Usar o tipo correto para o dispatch
       return await dispatch(getProfileAction()).unwrap();
-    } catch (error) {
+    } catch {
       return null;
     }
   }, [dispatch]);
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usar o tipo correto para o dispatch
       await dispatch(refreshTokensAction(refreshToken)).unwrap();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }, [dispatch, refreshToken]);

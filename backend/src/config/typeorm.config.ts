@@ -52,6 +52,13 @@ export const AppDataSource = new DataSource({
   // Usar a variável de ambiente DB_SYNCHRONIZE em vez de baseado no ambiente
   synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging: process.env.DB_LOGGING === 'true',
-  migrationsRun: false, // Impede a execução automática de migrações
-  migrationsTableName: 'migrations',
+  migrationsRun: process.env.MIGRATIONS_RUN === 'true', // ✅ Ativar migrações
+  dropSchema: false,
+  cache: false,
 });
+export const initializeDataSource = async () => {
+  if (!AppDataSource.isInitialized) {
+    await AppDataSource.initialize();
+  }
+  return AppDataSource;
+};
