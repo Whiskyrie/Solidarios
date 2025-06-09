@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -123,13 +124,16 @@ export class ItemsService {
     donorId: string,
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
-    this.logger.debug(`Buscando itens do doador: ${donorId}`);
+    this.logger.debug(`Iniciando busca de itens para doador: ${donorId}`);
+    this.logger.debug(`Opções de paginação: ${JSON.stringify(pageOptionsDto)}`);
 
     try {
       // Verificar se o doador existe
+      this.logger.debug(`Verificando se doador ${donorId} existe...`);
       const donor = await this.usersService.findOne(donorId);
+
       if (!donor) {
-        this.logger.warn(`Doador não encontrado: ${donorId}`);
+        this.logger.warn(`Doador ${donorId} não encontrado`);
         throw new NotFoundException('Doador não encontrado');
       }
 
@@ -140,43 +144,53 @@ export class ItemsService {
         throw new BadRequestException('Usuário informado não é um doador');
       }
 
-      this.logger.debug(`Doador encontrado: ${donor.name} (${donor.email})`);
+      this.logger.debug(`Doador válido encontrado: ${donor.name}`);
 
+      // CORREÇÃO: Simplificar a query e tratar relações opcionais
       const queryBuilder = this.itemsRepository
         .createQueryBuilder('item')
-        .leftJoinAndSelect('item.category', 'category')
         .leftJoinAndSelect('item.donor', 'donor')
+        .leftJoinAndSelect('item.category', 'category') // Tornar opcional
         .where('item.donorId = :donorId', { donorId })
-        .orderBy('item.createdAt', pageOptionsDto.order)
+        .orderBy('item.receivedDate', pageOptionsDto.order) // Usar receivedDate em vez de createdAt
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
 
-      this.logger.debug(`Query SQL: ${queryBuilder.getQuery()}`);
-      this.logger.debug(`Parâmetros: ${JSON.stringify({ donorId })}`);
+      this.logger.debug(`SQL Query: ${queryBuilder.getQuery()}`);
 
       const itemCount = await queryBuilder.getCount();
       this.logger.debug(`Total de itens encontrados: ${itemCount}`);
 
       const items = await queryBuilder.getMany();
-      this.logger.debug(`Itens retornados: ${items.length}`);
+      this.logger.debug(`Itens carregados: ${items.length}`);
 
       const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
       const result = new PageDto(items, pageMetaDto);
 
-      this.logger.debug(
-        `Resultado final: ${JSON.stringify({
-          dataLength: result.data.length,
-          meta: result.meta,
-        })}`,
-      );
-
+      this.logger.debug(`Retornando resultado com ${items.length} itens`);
       return result;
     } catch (error) {
       this.logger.error(
-        `Erro ao buscar itens do doador ${donorId}: ${error.message}`,
+        `Erro detalhado ao buscar itens do doador ${donorId}:`,
         error.stack,
+        'ItemsService',
+        {
+          message: error.message,
+          pageOptions: pageOptionsDto,
+        },
       );
-      throw error;
+
+      // Re-throw conhecido errors, wrap unknown ones
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Erro interno ao buscar itens do doador',
+      );
     }
   }
 

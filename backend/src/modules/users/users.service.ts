@@ -16,7 +16,7 @@ import * as bcrypt from 'bcrypt';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
 import { UserStatsDto } from './dto/user-stats.dto';
-import { UserRole } from './entities/user-role.enum';
+import { UserRole } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {

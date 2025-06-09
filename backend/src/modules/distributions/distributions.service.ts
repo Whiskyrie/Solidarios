@@ -19,16 +19,23 @@ import { Item, ItemStatus } from '../items/entities/item.entity';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
+import { LogMethod } from '../../common/logging/logger.decorator';
+import { LoggingService } from '../../common/logging/logging.service';
 
 @Injectable()
 export class DistributionsService {
+  private readonly logger: LoggingService;
+
   constructor(
     @InjectRepository(Distribution)
     private distributionsRepository: Repository<Distribution>,
     private usersService: UsersService,
     private itemsService: ItemsService,
     private inventoryService: InventoryService,
-  ) {}
+    loggingService: LoggingService,
+  ) {
+    this.logger = loggingService.setContext('DistributionsService');
+  }
 
   async create(
     createDistributionDto: CreateDistributionDto,

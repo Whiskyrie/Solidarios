@@ -3,21 +3,21 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DistributionsService } from './distributions.service';
 import { DistributionsController } from './distributions.controller';
 import { Distribution } from './entities/distribution.entity';
-import { UsersModule } from '../users/users.module'; // Importa UsersModule
-import { ItemsModule } from '../items/items.module'; // Importa ItemsModule
-import { InventoryModule } from '../inventory/inventory.module'; // Importa InventoryModule
-import { LoggingModule } from '../../common/logging/logging.module'; // Importa LoggingModule
+import { UsersModule } from '../users/users.module';
+import { ItemsModule } from '../items/items.module';
+import { InventoryModule } from '../inventory/inventory.module';
+import { LoggingModule } from '../../common/logging/logging.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Distribution]), // Importa a entidade Distribution
-    UsersModule, // Importa UsersModule para usar UsersService
-    ItemsModule, // Importa ItemsModule para usar ItemsService
-    InventoryModule, // Importa InventoryModule para usar InventoryService
-    LoggingModule, // Importa LoggingModule
+    TypeOrmModule.forFeature([Distribution]),
+    UsersModule,
+    ItemsModule,
+    InventoryModule,
+    LoggingModule,
   ],
   controllers: [DistributionsController],
   providers: [DistributionsService],
-  exports: [DistributionsService], // Exporta DistributionsService para uso em outros módulos
+  exports: [DistributionsService],
 })
 export class DistributionsModule {}
