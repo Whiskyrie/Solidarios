@@ -519,7 +519,7 @@ const RegisterScreen: React.FC = () => {
                       />
                       <TextInput
                         style={styles.input}
-                        placeholder="Telefone (ex: 11 99999-9999)"
+                        placeholder="Telefone (ex: (11) 99999-9999)"
                         placeholderTextColor="#999"
                         keyboardType="phone-pad"
                         value={values.phone}
@@ -528,6 +528,7 @@ const RegisterScreen: React.FC = () => {
                           setFieldValue("phone", formattedPhone);
                         }}
                         onBlur={handleBlur("phone")}
+                        maxLength={15}
                       />
                     </View>
                     {touched.phone && errors.phone && (

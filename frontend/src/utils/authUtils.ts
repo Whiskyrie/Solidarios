@@ -62,28 +62,21 @@ export const hasValidToken = async (): Promise<boolean> => {
   return token !== null;
 };
 
-export const maskPhone = (value: string) => {
+export const maskPhone = (value: string): string => {
   // Remove todos os caracteres não-numéricos
   let cleaned = value.replace(/\D/g, "");
 
-  // Limita a 11 dígitos (DDD + 9 dígitos)
+  // Limita a 11 dígitos (DDD + 9 dígitos para celular)
   cleaned = cleaned.slice(0, 11);
 
-  // Aplica a máscara
-  let formatted = cleaned;
-
-  if (cleaned.length > 2) {
-    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+  // Aplica a máscara baseada no comprimento
+  if (cleaned.length <= 2) {
+    return cleaned;
+  } else if (cleaned.length <= 7) {
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+  } else {
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
   }
-
-  if (cleaned.length > 7) {
-    formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(
-      2,
-      7
-    )}-${cleaned.slice(7)}`;
-  }
-
-  return formatted;
 };
 
 export const maskCpf = (value: string) => {
