@@ -42,7 +42,7 @@ import {
 } from "../../navigation/types";
 import { Item } from "../../types/items.types";
 import { Distribution } from "../../types/distributions.types";
-import { User } from "../../types/users.types";
+import { UserRole } from "../../types/users.types";
 import { Inventory } from "../../types/inventory.types";
 import { StatData } from "../../components/cards/StatsCard";
 
@@ -125,10 +125,10 @@ const DashboardScreen: React.FC = () => {
           (item) => item.status === "disponivel"
         ).length;
         const beneficiaries = usersResponse.data.filter(
-          (user) => user.role === "beneficiario"
+          (user) => user.role === UserRole.BENEFICIARIO
         ).length;
         const donors = usersResponse.data.filter(
-          (user) => user.role === "doador"
+          (user) => user.role === UserRole.DOADOR
         ).length;
 
         setStats({

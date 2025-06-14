@@ -89,4 +89,143 @@ export interface UpdateItemDto {
 }
 
 // Tipo para itens paginados
+export interface DonorStatsDto {
+  donorId: string;
+  totalDonations: number;
+  availableItems: number;
+  distributedItems: number;
+  reservedItems: number;
+  peopleHelped: number;
+  impactScore: number;
+  donationsByCategory: Array<{
+    categoryName: string;
+    count: number;
+  }>;
+  donationsByType: Array<{
+    type: string;
+    count: number;
+  }>;
+  lastDonationDate?: Date;
+  averageDonationInterval?: number;
+  lastUpdated: Date;
+}
+
 export type ItemsPage = PageDto<Item>;
+
+export interface ItemHistory {
+  id: string;
+  itemId: string;
+  action: ItemAction;
+  description: string;
+  performedBy: string;
+  performedByName: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export enum ItemAction {
+  CREATED = "created",
+  UPDATED = "updated",
+  RESERVED = "reserved",
+  DISTRIBUTED = "distributed",
+  CANCELLED = "cancelled",
+  EXPIRED = "expired",
+}
+
+export interface ItemStats {
+  totalViews: number;
+  interestedUsers: number;
+  averageTimeToDistribute?: number;
+  completionRate: number;
+}
+
+export interface ItemFilters {
+  status?: ItemStatus | ItemStatus[];
+  categoryId?: string;
+  location?: {
+    city?: string;
+    state?: string;
+    radius?: number;
+    lat?: number;
+    lng?: number;
+  };
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+  sortBy?: ItemSortOptions;
+  searchQuery?: string;
+}
+
+export enum ItemSortOptions {
+  NEWEST = "newest",
+  OLDEST = "oldest",
+  NAME_ASC = "name_asc",
+  NAME_DESC = "name_desc",
+  STATUS = "status",
+  CATEGORY = "category",
+}
+
+export interface ItemRequest {
+  id: string;
+  itemId: string;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone?: string;
+  message?: string;
+  status: RequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export enum RequestStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  CANCELLED = "cancelled",
+}
+
+export interface CreateItemRequest {
+  description: string;
+  categoryId: string;
+  images?: string[];
+  location?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  availableUntil?: string;
+  notes?: string;
+}
+
+export interface UpdateItemRequest {
+  description?: string;
+  categoryId?: string;
+  images?: string[];
+  status?: ItemStatus;
+  availableUntil?: string;
+  notes?: string;
+}
+
+export interface ItemDistribution {
+  id: string;
+  itemId: string;
+  recipientId: string;
+  recipientName: string;
+  recipientEmail: string;
+  distributionDate: string;
+  deliveryMethod: DeliveryMethod;
+  notes?: string;
+  rating?: number;
+  feedback?: string;
+}
+
+export enum DeliveryMethod {
+  PICKUP = "pickup",
+  DELIVERY = "delivery",
+  MEETING_POINT = "meeting_point",
+}

@@ -1,387 +1,618 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+// EditProfileScreen.tsx
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
   TouchableOpacity,
-  Animated,
+  Alert,
+  StatusBar,
+  Platform,
+  KeyboardAvoidingView,
+  TextInput,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Formik } from "formik";
-import * as Yup from "yup";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { DoadorProfileStackParamList } from "../../navigation/types";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 // Componentes
 import {
   Typography,
-  TextField,
-  Button,
-  NotificationBanner,
+  Card,
   Avatar,
+  Loading,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
 // Hooks
 import { useAuth } from "../../hooks/useAuth";
-import { useUsers } from "../../hooks/useUsers";
 
-// Validação do formulário
-const UpdateProfileSchema = Yup.object().shape({
-  name: Yup.string()
-    .min(3, "Nome deve ter pelo menos 3 caracteres")
-    .required("Nome é obrigatório"),
-  email: Yup.string().email("Email inválido").required("Email é obrigatório"),
-  phone: Yup.string().nullable(),
-  address: Yup.string().nullable(),
-});
+// Tipos
+import {
+  UpdateUserRequest,
+  ProfileValidationErrors,
+} from "../../types/users.types";
 
 const EditProfileScreen: React.FC = () => {
-  const navigation = useNavigation();
-  const { user, getProfile } = useAuth();
-  const { updateUser, isLoading, error, clearError } = useUsers();
+  const navigation =
+    useNavigation<StackNavigationProp<DoadorProfileStackParamList>>();
+  const { user, updateProfile } = useAuth();
 
-  // Estado para notificação
-  const [notification, setNotification] = useState({
-    visible: false,
-    type: "success" as "success" | "error",
-    message: "",
-    description: "",
-  });
-
-  // Refs para animações
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const avatarScale = useRef(new Animated.Value(1)).current;
-
-  // Efeito de animação inicial
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 700,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 700,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, slideAnim]);
-
-  // Efeito para tratar erros da API - usando useCallback para evitar loops
-  const handleError = useCallback(() => {
-    if (error) {
-      setNotification({
-        visible: true,
-        type: "error",
-        message: "Erro ao atualizar perfil",
-        description: error || "Ocorreu um erro. Tente novamente.",
-      });
-    }
-  }, [error]);
-
-  useEffect(() => {
-    handleError();
-  }, [handleError]);
-
-  // Animar avatar ao pressionar
-  const handleAvatarPress = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(avatarScale, {
-        toValue: 1.05,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(avatarScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [avatarScale]);
-
-  // Atualizar perfil do usuário
-  const handleUpdateProfile = useCallback(
-    async (values: any) => {
-      if (!user) return;
-
-      try {
-        await updateUser(user.id, values);
-        await getProfile();
-
-        setNotification({
-          visible: true,
-          type: "success",
-          message: "Perfil atualizado com sucesso!",
-          description: "",
-        });
-
-        // Voltar após 1.5 segundos
-        setTimeout(() => {
-          navigation.goBack();
-        }, 1500);
-      } catch (err) {
-        // Erro será tratado pelo useEffect
-        console.error("Erro ao atualizar perfil:", err);
-      }
+  // Estados
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<UpdateUserRequest>({
+    name: user?.name || "",
+    phone: user?.phone || "",
+    address: {
+      street: user?.address?.street || "",
+      number: user?.address?.number || "",
+      complement: user?.address?.complement || "",
+      neighborhood: user?.address?.neighborhood || "",
+      city: user?.address?.city || "",
+      state: user?.address?.state || "",
+      zipCode: user?.address?.zipCode || "",
     },
-    [user, updateUser, getProfile, navigation]
-  );
+  });
+  const [errors, setErrors] = useState<ProfileValidationErrors>({});
+  const [hasChanges, setHasChanges] = useState(false);
 
-  // Fechar notificação
-  const handleCloseNotification = useCallback(() => {
-    if (notification.type === "error") {
-      clearError();
+  // Verificar se houve mudanças
+  useEffect(() => {
+    if (!user) return;
+
+    const hasNameChange = formData.name !== user.name;
+    const hasPhoneChange = formData.phone !== (user.phone || "");
+    const hasAddressChange =
+      formData.address?.street !== (user.address?.street || "") ||
+      formData.address?.number !== (user.address?.number || "") ||
+      formData.address?.complement !== (user.address?.complement || "") ||
+      formData.address?.neighborhood !== (user.address?.neighborhood || "") ||
+      formData.address?.city !== (user.address?.city || "") ||
+      formData.address?.state !== (user.address?.state || "") ||
+      formData.address?.zipCode !== (user.address?.zipCode || "");
+
+    setHasChanges(hasNameChange || hasPhoneChange || hasAddressChange);
+  }, [formData, user]);
+
+  // Validação do formulário
+  const validateForm = (): boolean => {
+    const newErrors: ProfileValidationErrors = {};
+
+    // Validar nome
+    if (!formData.name?.trim()) {
+      newErrors.name = "Nome é obrigatório";
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Nome deve ter pelo menos 2 caracteres";
     }
-    setNotification((prev) => ({ ...prev, visible: false }));
-  }, [notification.type, clearError]);
 
-  if (!user) return null;
+    // Validar telefone (opcional, mas se preenchido deve ser válido)
+    if (formData.phone && formData.phone.length > 0) {
+      const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+      if (!phoneRegex.test(formData.phone)) {
+        newErrors.phone = "Telefone deve estar no formato (11) 99999-9999";
+      }
+    }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
-    >
-      {/* Header com gradiente similar ao ProfileScreen */}
+    // Validar endereço (todos os campos são opcionais, mas se um for preenchido, alguns outros se tornam obrigatórios)
+    const addressFields = formData.address;
+    const hasAnyAddressField =
+      addressFields &&
+      Object.values(addressFields).some(
+        (value) => value && typeof value === "string" && value.trim().length > 0
+      );
+
+    if (hasAnyAddressField) {
+      if (!addressFields?.street?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          street: "Rua é obrigatória quando endereço é informado",
+        };
+      }
+      if (!addressFields?.number?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          number: "Número é obrigatório quando endereço é informado",
+        };
+      }
+      if (!addressFields?.neighborhood?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          neighborhood: "Bairro é obrigatório quando endereço é informado",
+        };
+      }
+      if (!addressFields?.city?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          city: "Cidade é obrigatória quando endereço é informado",
+        };
+      }
+      if (!addressFields?.state?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          state: "Estado é obrigatório quando endereço é informado",
+        };
+      }
+      if (!addressFields?.zipCode?.trim()) {
+        newErrors.address = {
+          ...newErrors.address,
+          zipCode: "CEP é obrigatório quando endereço é informado",
+        };
+      } else if (!/^\d{5}-?\d{3}$/.test(addressFields.zipCode)) {
+        newErrors.address = {
+          ...newErrors.address,
+          zipCode: "CEP deve estar no formato 12345-678",
+        };
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Atualizar campo do formulário
+  const updateField = (field: string, value: string) => {
+    if (field.startsWith("address.")) {
+      const addressField = field.replace("address.", "");
+      setFormData((prev) => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          [addressField]: value,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
+
+    // Limpar erro do campo
+    if (errors[field as keyof ProfileValidationErrors]) {
+      setErrors((prev) => ({
+        ...prev,
+        [field]: undefined,
+      }));
+    }
+  };
+
+  // Formatar telefone
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 11) {
+      if (numbers.length <= 2) {
+        return numbers;
+      } else if (numbers.length <= 6) {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      } else if (numbers.length <= 10) {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(
+          6
+        )}`;
+      } else {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(
+          7,
+          11
+        )}`;
+      }
+    }
+    return value;
+  };
+
+  // Salvar alterações
+  const handleSave = async () => {
+    if (!validateForm()) {
+      Alert.alert("Erro", "Por favor, corrija os campos destacados.");
+      return;
+    }
+
+    if (!hasChanges) {
+      Alert.alert("Aviso", "Nenhuma alteração foi feita.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await updateProfile(formData);
+      Alert.alert("Sucesso", "Perfil atualizado com sucesso!", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      console.error("Erro ao atualizar perfil:", error);
+      Alert.alert(
+        "Erro",
+        "Não foi possível atualizar o perfil. Tente novamente."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Confirmar cancelamento se houver mudanças
+  const handleBack = () => {
+    if (hasChanges) {
+      Alert.alert(
+        "Descartar alterações?",
+        "Você tem alterações não salvas. Deseja descartar?",
+        [
+          { text: "Continuar editando", style: "cancel" },
+          {
+            text: "Descartar",
+            style: "destructive",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // Header
+  const Header = () => (
+    <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
+      />
       <LinearGradient
         colors={["#173F5F", "#006E58"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="#173F5F"
-          translucent
-        />
-
-        {/* Botão de voltar */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-
-        {/* Título e avatar */}
         <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={theme.colors.neutral.white}
+            />
+          </TouchableOpacity>
+
           <Typography
-            variant="h2"
-            style={styles.headerTitle}
+            variant="h3"
             color={theme.colors.neutral.white}
+            style={styles.headerTitle}
           >
             Editar Perfil
           </Typography>
 
           <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={handleAvatarPress}
-            accessibilityLabel="Editar foto de perfil"
-            accessibilityRole="button"
+            style={[
+              styles.saveButton,
+              (!hasChanges || loading) && styles.saveButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!hasChanges || loading}
+            activeOpacity={0.7}
           >
-            <Animated.View
-              style={[
-                styles.avatarContainer,
-                { transform: [{ scale: avatarScale }] },
-              ]}
+            <Typography
+              variant="bodySecondary"
+              color={
+                hasChanges && !loading
+                  ? theme.colors.neutral.white
+                  : "rgba(255,255,255,0.5)"
+              }
+              style={styles.saveButtonText}
             >
-              <Avatar
-                name={user.name}
-                size="large"
-                style={styles.avatar}
-                source={user.avatarUrl ? { uri: user.avatarUrl } : undefined}
-              />
-              <View style={styles.editAvatarButton}>
-                <MaterialIcons name="camera-alt" size={16} color="#fff" />
-              </View>
-            </Animated.View>
+              Salvar
+            </Typography>
           </TouchableOpacity>
         </View>
       </LinearGradient>
+    </>
+  );
 
-      {/* Notificação */}
-      <NotificationBanner
-        visible={notification.visible}
-        type={notification.type}
-        message={notification.message}
-        description={notification.description}
-        onClose={handleCloseNotification}
-      />
+  if (!user) return null;
 
-      {/* Conteúdo principal */}
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+  return (
+    <View style={styles.container}>
+      <Header />
+
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
-          style={styles.scrollView}
+          style={styles.content}
           contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Card do formulário */}
-          <View style={styles.formCard}>
-            <Typography variant="h3" style={styles.formTitle}>
-              Atualize seus dados
+          {/* Avatar Section */}
+          <Card style={styles.avatarCard}>
+            <View style={styles.avatarSection}>
+              <Avatar name={formData.name} size="large" style={styles.avatar} />
+              <TouchableOpacity
+                style={styles.changePhotoButton}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name="camera-alt"
+                  size={16}
+                  color={theme.colors.primary.secondary}
+                />
+                <Typography
+                  variant="caption"
+                  color={theme.colors.primary.secondary}
+                >
+                  Alterar foto
+                </Typography>
+              </TouchableOpacity>
+            </View>
+          </Card>
+
+          {/* Dados Pessoais */}
+          <Card style={styles.formCard}>
+            <Typography variant="h4" style={styles.sectionTitle}>
+              Dados Pessoais
             </Typography>
 
-            <Formik
-              initialValues={{
-                name: user.name || "",
-                email: user.email || "",
-                phone: user.phone || "",
-                address: user.address || "",
-              }}
-              validationSchema={UpdateProfileSchema}
-              onSubmit={handleUpdateProfile}
-            >
-              {({
-                handleChange,
-                handleBlur,
-                handleSubmit,
-                values,
-                errors,
-                touched,
-              }) => (
-                <View style={styles.form}>
-                  {/* Campo Nome */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="person"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Nome completo *
-                    </Typography>
-                    <TextField
-                      value={values.name}
-                      onChangeText={handleChange("name")}
-                      onBlur={handleBlur("name")}
-                      error={touched.name ? (errors.name as string) : undefined}
-                      placeholder="Seu nome completo"
-                      inputContainerStyle={styles.inputContainer}
-                    />
-                  </View>
-
-                  {/* Campo Email */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="email"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Email *
-                    </Typography>
-                    <TextField
-                      value={values.email}
-                      onChangeText={handleChange("email")}
-                      onBlur={handleBlur("email")}
-                      error={
-                        touched.email ? (errors.email as string) : undefined
-                      }
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      placeholder="seu@email.com"
-                      inputContainerStyle={styles.inputContainer}
-                    />
-                  </View>
-
-                  {/* Campo Telefone */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="phone"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Telefone
-                    </Typography>
-                    <TextField
-                      value={values.phone}
-                      onChangeText={handleChange("phone")}
-                      onBlur={handleBlur("phone")}
-                      error={
-                        touched.phone ? (errors.phone as string) : undefined
-                      }
-                      keyboardType="phone-pad"
-                      placeholder="(00) 00000-0000"
-                      inputContainerStyle={styles.inputContainer}
-                    />
-                  </View>
-
-                  {/* Campo Endereço */}
-                  <View style={styles.fieldContainer}>
-                    <Typography
-                      variant="bodySecondary"
-                      style={styles.fieldLabel}
-                    >
-                      <MaterialIcons
-                        name="location-on"
-                        size={16}
-                        color={theme.colors.neutral.darkGray}
-                      />{" "}
-                      Endereço
-                    </Typography>
-                    <TextField
-                      value={values.address}
-                      onChangeText={handleChange("address")}
-                      onBlur={handleBlur("address")}
-                      error={
-                        touched.address ? (errors.address as string) : undefined
-                      }
-                      placeholder="Seu endereço completo"
-                      multiline
-                      numberOfLines={3}
-                      inputContainerStyle={styles.textAreaContainer}
-                    />
-                  </View>
-
-                  {/* Botões de ação */}
-                  <View style={styles.buttonsContainer}>
-                    <Button
-                      title="Cancelar"
-                      onPress={() => navigation.goBack()}
-                      variant="secondary"
-                      style={styles.buttonCancel}
-                    />
-                    <Button
-                      title="Salvar Alterações"
-                      onPress={() => handleSubmit()}
-                      loading={isLoading}
-                      style={styles.buttonSubmit}
-                    />
-                  </View>
-                </View>
+            <View style={styles.inputContainer}>
+              <Typography variant="bodySecondary" style={styles.inputLabel}>
+                Nome completo *
+              </Typography>
+              <TextInput
+                style={[styles.textInput, errors.name && styles.textInputError]}
+                value={formData.name}
+                onChangeText={(value) => updateField("name", value)}
+                placeholder="Digite seu nome completo"
+                placeholderTextColor={theme.colors.neutral.mediumGray}
+              />
+              {errors.name && (
+                <Typography
+                  variant="caption"
+                  color={theme.colors.status.error}
+                  style={styles.errorText}
+                >
+                  {errors.name}
+                </Typography>
               )}
-            </Formik>
-          </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Typography variant="bodySecondary" style={styles.inputLabel}>
+                E-mail
+              </Typography>
+              <TextInput
+                style={[styles.textInput, styles.disabledInput]}
+                value={user?.email || ""}
+                editable={false}
+                placeholder="E-mail não pode ser alterado"
+                placeholderTextColor={theme.colors.neutral.mediumGray}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Typography variant="bodySecondary" style={styles.inputLabel}>
+                Telefone
+              </Typography>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  errors.phone && styles.textInputError,
+                ]}
+                value={formData.phone}
+                onChangeText={(value) =>
+                  updateField("phone", formatPhone(value))
+                }
+                placeholder="(11) 99999-9999"
+                placeholderTextColor={theme.colors.neutral.mediumGray}
+                keyboardType="phone-pad"
+                maxLength={15}
+              />
+              {errors.phone && (
+                <Typography
+                  variant="caption"
+                  color={theme.colors.status.error}
+                  style={styles.errorText}
+                >
+                  {errors.phone}
+                </Typography>
+              )}
+            </View>
+          </Card>
+
+          {/* Endereço */}
+          <Card style={styles.formCard}>
+            <Typography variant="h4" style={styles.sectionTitle}>
+              Endereço
+            </Typography>
+
+            <View style={styles.addressRow}>
+              <View style={[styles.inputContainer, styles.zipCodeInput]}>
+                <Typography variant="bodySecondary" style={styles.inputLabel}>
+                  CEP
+                </Typography>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    errors.address?.zipCode && styles.textInputError,
+                  ]}
+                  value={formData.address?.zipCode}
+                  onChangeText={(value) =>
+                    updateField(
+                      "address.zipCode",
+                      value.replace(/\D/g, "").replace(/^(\d{5})(\d)/, "$1-$2")
+                    )
+                  }
+                  placeholder="12345-678"
+                  placeholderTextColor={theme.colors.neutral.mediumGray}
+                  keyboardType="numeric"
+                  maxLength={9}
+                />
+                {errors.address?.zipCode && (
+                  <Typography
+                    variant="caption"
+                    color={theme.colors.status.error}
+                    style={styles.errorText}
+                  >
+                    {errors.address.zipCode}
+                  </Typography>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Typography variant="bodySecondary" style={styles.inputLabel}>
+                Rua
+              </Typography>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  errors.address?.street && styles.textInputError,
+                ]}
+                value={formData.address?.street}
+                onChangeText={(value) => updateField("address.street", value)}
+                placeholder="Nome da rua"
+                placeholderTextColor={theme.colors.neutral.mediumGray}
+              />
+              {errors.address?.street && (
+                <Typography
+                  variant="caption"
+                  color={theme.colors.status.error}
+                  style={styles.errorText}
+                >
+                  {errors.address.street}
+                </Typography>
+              )}
+            </View>
+
+            <View style={styles.addressRow}>
+              <View style={[styles.inputContainer, styles.numberInput]}>
+                <Typography variant="bodySecondary" style={styles.inputLabel}>
+                  Número
+                </Typography>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    errors.address?.number && styles.textInputError,
+                  ]}
+                  value={formData.address?.number}
+                  onChangeText={(value) => updateField("address.number", value)}
+                  placeholder="123"
+                  placeholderTextColor={theme.colors.neutral.mediumGray}
+                />
+                {errors.address?.number && (
+                  <Typography
+                    variant="caption"
+                    color={theme.colors.status.error}
+                    style={styles.errorText}
+                  >
+                    {errors.address.number}
+                  </Typography>
+                )}
+              </View>
+              <View style={[styles.inputContainer, styles.complementInput]}>
+                <Typography variant="bodySecondary" style={styles.inputLabel}>
+                  Complemento
+                </Typography>
+                <TextInput
+                  style={styles.textInput}
+                  value={formData.address?.complement}
+                  onChangeText={(value) =>
+                    updateField("address.complement", value)
+                  }
+                  placeholder="Apto, bloco..."
+                  placeholderTextColor={theme.colors.neutral.mediumGray}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Typography variant="bodySecondary" style={styles.inputLabel}>
+                Bairro
+              </Typography>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  errors.address?.neighborhood && styles.textInputError,
+                ]}
+                value={formData.address?.neighborhood}
+                onChangeText={(value) =>
+                  updateField("address.neighborhood", value)
+                }
+                placeholder="Nome do bairro"
+                placeholderTextColor={theme.colors.neutral.mediumGray}
+              />
+              {errors.address?.neighborhood && (
+                <Typography
+                  variant="caption"
+                  color={theme.colors.status.error}
+                  style={styles.errorText}
+                >
+                  {errors.address.neighborhood}
+                </Typography>
+              )}
+            </View>
+
+            <View style={styles.addressRow}>
+              <View style={[styles.inputContainer, styles.cityInput]}>
+                <Typography variant="bodySecondary" style={styles.inputLabel}>
+                  Cidade
+                </Typography>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    errors.address?.city && styles.textInputError,
+                  ]}
+                  value={formData.address?.city}
+                  onChangeText={(value) => updateField("address.city", value)}
+                  placeholder="Cidade"
+                  placeholderTextColor={theme.colors.neutral.mediumGray}
+                />
+                {errors.address?.city && (
+                  <Typography
+                    variant="caption"
+                    color={theme.colors.status.error}
+                    style={styles.errorText}
+                  >
+                    {errors.address.city}
+                  </Typography>
+                )}
+              </View>
+              <View style={[styles.inputContainer, styles.stateInput]}>
+                <Typography variant="bodySecondary" style={styles.inputLabel}>
+                  Estado
+                </Typography>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    errors.address?.state && styles.textInputError,
+                  ]}
+                  value={formData.address?.state}
+                  onChangeText={(value) =>
+                    updateField("address.state", value.toUpperCase())
+                  }
+                  placeholder="UF"
+                  placeholderTextColor={theme.colors.neutral.mediumGray}
+                  maxLength={2}
+                  autoCapitalize="characters"
+                />
+                {errors.address?.state && (
+                  <Typography
+                    variant="caption"
+                    color={theme.colors.status.error}
+                    style={styles.errorText}
+                  >
+                    {errors.address.state}
+                  </Typography>
+                )}
+              </View>
+            </View>
+          </Card>
         </ScrollView>
-      </Animated.View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+
+      <Loading visible={loading} message="Salvando alterações..." />
+    </View>
   );
 };
 
@@ -393,124 +624,122 @@ const styles = StyleSheet.create({
   headerGradient: {
     paddingTop:
       Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
-    paddingBottom: 40,
+    paddingBottom: 16,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
-    ...theme.shadows.strong,
-  },
-  backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 55 : 35 + (StatusBar.currentHeight ?? 0),
-    left: theme.spacing.m,
-    zIndex: 1,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
+    ...theme.shadows.medium,
   },
   headerContent: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: theme.spacing.m,
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.m,
+  },
+  backButton: {
+    padding: theme.spacing.xs,
   },
   headerTitle: {
-    fontWeight: "bold",
-    fontSize: 24,
-    marginBottom: theme.spacing.m,
+    flex: 1,
+    textAlign: "center",
+    fontWeight: "600",
+    marginHorizontal: theme.spacing.s,
   },
-  avatarContainer: {
-    position: "relative",
-    marginBottom: -30,
-    borderRadius: 50,
-    padding: 3,
-    backgroundColor: theme.colors.neutral.white,
-    ...theme.shadows.strong,
+  saveButton: {
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  saveButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
-  editAvatarButton: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    backgroundColor: theme.colors.primary.secondary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    ...theme.shadows.medium,
+  saveButtonText: {
+    fontWeight: "600",
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    marginTop: 30,
-  },
-  scrollView: {
-    flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
-  },
-  formCard: {
-    backgroundColor: theme.colors.neutral.white,
-    borderRadius: theme.borderRadius.medium,
     padding: theme.spacing.m,
-    ...theme.shadows.medium,
+    paddingBottom: theme.spacing.xl,
   },
-  formTitle: {
-    textAlign: "center",
-    color: theme.colors.primary.main,
-    marginBottom: theme.spacing.l,
-  },
-  form: {
-    width: "100%",
-  },
-  fieldContainer: {
+  avatarCard: {
     marginBottom: theme.spacing.m,
-  },
-  fieldLabel: {
-    marginBottom: theme.spacing.xs,
-    fontWeight: "500",
-    flexDirection: "row",
     alignItems: "center",
   },
-  inputContainer: {
-    backgroundColor: theme.colors.neutral.lightGray,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral.mediumGray,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
+  avatarSection: {
+    alignItems: "center",
   },
-  textAreaContainer: {
-    backgroundColor: theme.colors.neutral.lightGray,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral.mediumGray,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    minHeight: 80,
+  avatar: {
+    marginBottom: theme.spacing.s,
   },
-  buttonsContainer: {
+  changePhotoButton: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: theme.spacing.l,
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 16,
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+  },
+  formCard: {
+    marginBottom: theme.spacing.m,
+  },
+  sectionTitle: {
+    marginBottom: theme.spacing.m,
+    fontWeight: "600",
+    color: theme.colors.neutral.darkGray,
+  },
+  inputContainer: {
+    marginBottom: theme.spacing.m,
+  },
+  inputLabel: {
+    marginBottom: theme.spacing.xs,
+    fontWeight: "500",
+    color: theme.colors.neutral.darkGray,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.mediumGray,
+    borderRadius: 8,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.s,
+    fontSize: 16,
+    color: theme.colors.neutral.black,
+    backgroundColor: theme.colors.neutral.white,
+  },
+  textInputError: {
+    borderColor: theme.colors.status.error,
+  },
+  disabledInput: {
+    backgroundColor: theme.colors.neutral.lightGray,
+    opacity: 0.6,
+    color: theme.colors.neutral.darkGray,
+  },
+  errorText: {
+    marginTop: theme.spacing.xs,
+  },
+  addressRow: {
+    flexDirection: "row",
     gap: theme.spacing.s,
   },
-  buttonCancel: {
+  zipCodeInput: {
     flex: 1,
-    paddingVertical: theme.spacing.s,
-    borderRadius: 12,
   },
-  buttonSubmit: {
+  numberInput: {
     flex: 1,
-    backgroundColor: theme.colors.primary.secondary,
-    paddingVertical: theme.spacing.s,
-    borderRadius: 12,
+  },
+  complementInput: {
+    flex: 2,
+  },
+  cityInput: {
+    flex: 2,
+  },
+  stateInput: {
+    flex: 1,
   },
 });
 
