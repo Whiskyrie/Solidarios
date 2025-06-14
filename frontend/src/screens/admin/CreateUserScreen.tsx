@@ -77,7 +77,7 @@ const CreateUserScreen: React.FC = () => {
           navigation.goBack();
         }, 1500);
       }
-    } catch (err) {
+    } catch {
       setNotification({
         visible: true,
         type: "error",

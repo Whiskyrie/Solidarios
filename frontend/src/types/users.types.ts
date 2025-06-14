@@ -11,35 +11,117 @@ export enum UserRole {
 }
 
 export interface User {
-  phone: string;
-  address: string;
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  phone?: string;
+  address?: UserAddress;
+  profileImage?: string;
+  userType: UserType;
+  role: UserRole; // Adicionar propriedade role para consistência
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface UserAddress {
+  id?: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export enum UserType {
+  DOADOR = "doador",
+  RECEPTOR = "receptor",
+  ADMIN = "admin",
+}
+
+export interface UserProfile extends User {
+  donationStats?: DonorStats;
+  receivedDonationsStats?: ReceiverStats;
+}
+
+export interface DonorStats {
+  totalDonations: number;
+  distributedItems: number;
+  activeItems: number;
+  peopleHelped: number;
+  impactScore: number;
+  averageRating?: number;
+  completionRate: number;
+}
+
+export interface ReceiverStats {
+  totalReceived: number;
+  completedRequests: number;
+  averageRating?: number;
+}
+
 export interface CreateUserDto {
   name: string;
   email: string;
+  phone?: string;
+  address?: string;
   password: string;
-  role?: UserRole;
-  isActive?: boolean;
+  role: UserRole;
 }
 
 export interface UpdateUserDto {
   name?: string;
   email?: string;
+  phone?: string;
+  address?: string;
   password?: string;
   role?: UserRole;
   isActive?: boolean;
 }
 
-// Tipo para a resposta paginada
-export interface PageMetaDto {
+export interface UpdateUserRequest {
+  name?: string;
+  phone?: string;
+  address?: Partial<UserAddress>;
+  profileImage?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface UserPreferences {
+  notifications: {
+    email: boolean;
+    push: boolean;
+    newItems: boolean;
+    statusUpdates: boolean;
+    messages: boolean;
+  };
+  privacy: {
+    showProfile: boolean;
+    showStats: boolean;
+    showLocation: boolean;
+  };
+}
+
+// Tipo para estatísticas do usuário
+export interface UserStats {
+  userId: string;
+  totalDonations: number;
+  peopleHelped: number;
+  impactScore: number;
+  lastUpdated: Date;
+}
+
+// Paginação
+export interface PageMeta {
   page: number;
   take: number;
   itemCount: number;
@@ -50,17 +132,23 @@ export interface PageMetaDto {
 
 export interface PageDto<T> {
   data: T[];
-  meta: PageMetaDto;
+  meta: PageMeta;
 }
 
 // Tipo para usuários paginados
 export type UsersPage = PageDto<User>;
 
-// Tipo para estatísticas do usuário
-export interface UserStats {
-  userId: string;
-  totalDonations: number;
-  peopleHelped: number;
-  impactScore: number;
-  lastUpdated: string;
+// Erros de validação do perfil
+export interface ProfileValidationErrors {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: {
+    street?: string;
+    number?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  };
 }

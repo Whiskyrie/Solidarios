@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Item } from './entities/item.entity';
+import { Item, ItemStatus } from './entities/item.entity';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { UsersService } from '../users/users.service';
@@ -16,12 +16,15 @@ import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
+import { DonorStatsDto } from './dto/donor-stats.dto';
 
 @Injectable()
 export class ItemsService {
   constructor(
     @InjectRepository(Item)
     private itemsRepository: Repository<Item>,
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
     private usersService: UsersService,
     private readonly logger: LoggingService,
   ) {
@@ -257,6 +260,148 @@ export class ItemsService {
     } catch (error) {
       this.logger.error(
         `Erro ao remover item ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+  @LogMethod()
+  async getDonorStats(
+    donorId: string,
+    currentUser: User,
+  ): Promise<DonorStatsDto> {
+    this.logger.log(`Calculando estatísticas para o doador: ${donorId}`);
+
+    try {
+      // Verificar permissões
+      if (
+        currentUser.role !== UserRole.ADMIN &&
+        currentUser.role !== UserRole.FUNCIONARIO &&
+        currentUser.id !== donorId
+      ) {
+        this.logger.warn(
+          `Usuário ${currentUser.id} tentou acessar estatísticas do doador ${donorId} sem permissão`,
+        );
+        throw new ForbiddenException(
+          'Você não tem permissão para acessar estas estatísticas.',
+        );
+      }
+
+      // Verificar se o doador existe
+      const donor = await this.usersRepository.findOne({
+        where: { id: donorId, role: UserRole.DOADOR },
+      });
+
+      if (!donor) {
+        throw new NotFoundException(`Doador com ID ${donorId} não encontrado.`);
+      }
+
+      // Buscar todos os itens do doador com relacionamentos CORRETOS
+      const items = await this.itemsRepository.find({
+        where: { donorId },
+        relations: ['category', 'distributions', 'distributions.beneficiary'],
+      });
+
+      // Calcular estatísticas básicas
+      const totalDonations = items.length;
+      const availableItems = items.filter(
+        (item) => item.status === ItemStatus.DISPONIVEL,
+      ).length;
+      const distributedItems = items.filter(
+        (item) => item.status === ItemStatus.DISTRIBUIDO,
+      ).length;
+      const reservedItems = items.filter(
+        (item) => item.status === ItemStatus.RESERVADO,
+      ).length;
+
+      // Calcular pessoas ajudadas (baseado em beneficiários únicos)
+      const uniqueBeneficiaries = new Set<string>();
+      items.forEach((item) => {
+        if (item.distributions && Array.isArray(item.distributions)) {
+          item.distributions.forEach((dist) => {
+            if (dist.beneficiaryId) {
+              uniqueBeneficiaries.add(dist.beneficiaryId);
+            }
+          });
+        }
+      });
+      const peopleHelped = uniqueBeneficiaries.size;
+
+      // Calcular score de impacto
+      const impactScore =
+        distributedItems * 3 + reservedItems * 1 + peopleHelped * 2;
+
+      // Doações por categoria
+      const categoryMap = new Map<string, number>();
+      items.forEach((item) => {
+        const categoryName = item.category?.name || 'Sem categoria';
+        categoryMap.set(categoryName, (categoryMap.get(categoryName) || 0) + 1);
+      });
+      const donationsByCategory = Array.from(categoryMap.entries()).map(
+        ([categoryName, count]) => ({
+          categoryName,
+          count,
+        }),
+      );
+
+      // Doações por tipo
+      const typeMap = new Map<string, number>();
+      items.forEach((item) => {
+        typeMap.set(item.type, (typeMap.get(item.type) || 0) + 1);
+      });
+      const donationsByType = Array.from(typeMap.entries()).map(
+        ([type, count]) => ({
+          type,
+          count,
+        }),
+      );
+
+      // Calcular data da última doação e intervalo médio
+      const sortedItems = items.sort(
+        (a, b) =>
+          new Date(b.receivedDate).getTime() -
+          new Date(a.receivedDate).getTime(),
+      );
+      const lastDonationDate =
+        sortedItems.length > 0 ? sortedItems[0].receivedDate : undefined;
+
+      let averageDonationInterval: number | undefined;
+      if (items.length > 1) {
+        const intervals: number[] = [];
+        for (let i = 1; i < sortedItems.length; i++) {
+          const diff =
+            new Date(sortedItems[i - 1].receivedDate).getTime() -
+            new Date(sortedItems[i].receivedDate).getTime();
+          intervals.push(diff / (1000 * 60 * 60 * 24)); // converter para dias
+        }
+        averageDonationInterval =
+          intervals.reduce((sum, interval) => sum + interval, 0) /
+          intervals.length;
+      }
+
+      const stats: DonorStatsDto = {
+        donorId,
+        totalDonations,
+        availableItems,
+        distributedItems,
+        reservedItems,
+        peopleHelped,
+        impactScore,
+        donationsByCategory,
+        donationsByType,
+        lastDonationDate,
+        averageDonationInterval,
+        lastUpdated: new Date(),
+      };
+
+      this.logger.log(
+        `Estatísticas calculadas para doador ${donorId}: ${totalDonations} doações, ${peopleHelped} pessoas ajudadas, impacto ${impactScore}`,
+      );
+
+      return stats;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao calcular estatísticas do doador ${donorId}: ${error.message}`,
         error.stack,
       );
       throw error;

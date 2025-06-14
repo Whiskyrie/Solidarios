@@ -10,6 +10,7 @@ import {
   LoginResponse,
   TokensResponse,
 } from "../../types/auth.types";
+import { UpdateUserRequest } from "../../types/users.types";
 import AuthService from "../../api/auth";
 
 // Estado inicial
@@ -164,6 +165,29 @@ export const getProfile = createAsyncThunk(
   }
 );
 
+export const updateProfile = createAsyncThunk(
+  "auth/updateProfile",
+  async (
+    { userId, data }: { userId: string; data: UpdateUserRequest },
+    { rejectWithValue }
+  ) => {
+    try {
+      console.log("[authSlice] Atualizando perfil do usuário:", userId);
+      const response = await AuthService.updateProfile(userId, data);
+      console.log("[authSlice] Perfil atualizado com sucesso");
+      return response;
+    } catch (error: any) {
+      console.error(
+        "[authSlice] Erro ao atualizar perfil:",
+        error.response?.data || error.message || error
+      );
+      return rejectWithValue(
+        error.response?.data?.message || "Erro ao atualizar perfil"
+      );
+    }
+  }
+);
+
 export const restoreAuthState = createAsyncThunk(
   "auth/restoreAuthState",
   async (_, { dispatch }) => {
@@ -180,7 +204,7 @@ export const restoreAuthState = createAsyncThunk(
           refreshToken,
           isAuthenticated: true,
         };
-      } catch (error) {
+      } catch {
         // Se falhar ao obter perfil, tentar refresh token
         try {
           await dispatch(refreshTokens(refreshToken)).unwrap();
@@ -194,7 +218,7 @@ export const restoreAuthState = createAsyncThunk(
             refreshToken: newRefreshToken,
             isAuthenticated: true,
           };
-        } catch (refreshError) {
+        } catch {
           // Se falhar o refresh, limpar tudo
           await AsyncStorage.removeItem("@auth_token");
           await AsyncStorage.removeItem("@refresh_token");
@@ -311,11 +335,11 @@ const authSlice = createSlice({
       .addCase(logout.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(logout.fulfilled, (state) => {
+      .addCase(logout.fulfilled, () => {
         // Reset para o estado inicial
         return initialState;
       })
-      .addCase(logout.rejected, (state) => {
+      .addCase(logout.rejected, () => {
         // Mesmo em caso de erro, resetar o estado
         return initialState;
       });
@@ -335,7 +359,7 @@ const authSlice = createSlice({
           state.error = null;
         }
       )
-      .addCase(refreshTokens.rejected, (state) => {
+      .addCase(refreshTokens.rejected, () => {
         // Falha no refresh leva a logout
         return initialState;
       });
@@ -352,6 +376,21 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(getProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = formatErrorMessage(action.payload);
+      });
+
+    // Update profile
+    builder
+      .addCase(updateProfile.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+        state.error = null;
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.error = formatErrorMessage(action.payload);
       });

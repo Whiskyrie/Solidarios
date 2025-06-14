@@ -31,6 +31,7 @@ import {
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { Item } from './entities/item.entity';
+import { DonorStatsDto } from './dto/donor-stats.dto';
 
 @ApiTags('items')
 @Controller('items')
@@ -126,5 +127,26 @@ export class ItemsController {
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO) // Apenas Admin e Funcionário podem remover
   remove(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
     return this.itemsService.remove(id, req.user);
+  }
+
+  @Get('donor/:donorId/stats')
+  @ApiOperation({
+    summary: 'Obter estatísticas detalhadas de um doador',
+    description:
+      'Retorna estatísticas de impacto e performance das doações de um doador específico',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estatísticas do doador retornadas com sucesso.',
+    type: DonorStatsDto,
+  })
+  @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
+  @ApiResponse({ status: 403, description: 'Acesso negado.' })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  async getDonorStats(
+    @Param('donorId', ParseUUIDPipe) donorId: string,
+    @Request() req,
+  ): Promise<DonorStatsDto> {
+    return this.itemsService.getDonorStats(donorId, req.user);
   }
 }
