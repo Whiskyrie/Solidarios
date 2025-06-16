@@ -65,6 +65,8 @@ const ItemsService = {
     await api.delete(`/items/${id}`);
   },
 
+
+
   /**
    * Obter itens por doador
    * @param donorId ID do doador
@@ -114,8 +116,12 @@ const ItemsService = {
     status: string,
     pageOptions?: PageOptionsDto
   ): Promise<ItemsPage> => {
-    const response = await api.get<ItemsPage>(`/items/status/${status}`, {
-      params: pageOptions,
+     const response = await api.get<ItemsPage>(`/items`, {
+      params: {
+        page: pageOptions?.page || 1,
+        take: pageOptions?.take || 20,
+        status: status, // Passar status como query parameter
+      },
     });
     return response.data;
   },
@@ -147,6 +153,20 @@ const ItemsService = {
     });
     return response.data;
   },
+
+  /**
+   * Solicitar um item (para beneficiários)
+   * @param itemId ID do item a ser solicitado
+   * @param beneficiaryId ID do beneficiário que está solicitando
+   * @returns Dados da solicitação criada
+   */
+  requestItem: async (itemId: string, beneficiaryId: string): Promise<any> => {
+    const response = await api.post(`/items/${itemId}/request`, {
+      beneficiaryId: beneficiaryId,
+    });
+    return response.data;
+  },
+
 };
 
 export default ItemsService;
