@@ -23,7 +23,7 @@ export const ImpactStatsSection: React.FC<ImpactStatsSectionProps> = React.memo(
       {
         icon: "favorite",
         iconColor: "#FFFFFF",
-        gradientColors: ["#FF6B6B", "#FF8E8E"],
+        gradientColors: ["#FF6B6B", "#FD7F7F", "#FD9898", "#EE9F9F"],
         value: stats.totalDonations || 0,
         label: "Doações",
         subtitle: "realizadas",

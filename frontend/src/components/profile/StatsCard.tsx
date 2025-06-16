@@ -1,7 +1,8 @@
 import React from "react";
-import { View, StyleSheet, Animated } from "react-native";
+import { View, StyleSheet, Animated, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Typography } from "../barrelComponents";
 import theme from "../../theme/index";
 
@@ -11,9 +12,10 @@ export interface StatCardProps {
   gradientColors: [string, string, ...string[]];
   value: number;
   label: string;
-  subtitle?: string; // Adicionado subtitle como opcional
+  subtitle?: string;
   fadeAnim?: Animated.Value;
   slideAnim?: Animated.Value;
+  onPress?: () => void;
 }
 
 export const StatCard: React.FC<StatCardProps> = React.memo(
@@ -26,10 +28,52 @@ export const StatCard: React.FC<StatCardProps> = React.memo(
     subtitle,
     fadeAnim,
     slideAnim,
+    onPress,
   }) => {
-    // Debug removido para evitar logs excessivos
+    const handlePress = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onPress?.();
+    };
 
-    // Renderizar com ou sem animação
+    const CardContent = () => (
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statGradient}
+      >
+        <View style={styles.statIconContainer}>
+          <MaterialIcons name={icon} size={28} color={iconColor} />
+        </View>
+
+        <View style={styles.statContent}>
+          <Typography
+            variant="h2"
+            color={theme.colors.neutral.white}
+            style={styles.statValue}
+          >
+            {value}
+          </Typography>
+          <Typography
+            variant="bodySecondary"
+            color="rgba(255,255,255,0.9)"
+            style={styles.statLabel}
+          >
+            {label}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="rgba(255,255,255,0.7)"
+            style={styles.statSubtitle}
+          >
+            {subtitle
+              ? subtitle.charAt(0).toUpperCase() + subtitle.slice(1)
+              : ""}
+          </Typography>
+        </View>
+      </LinearGradient>
+    );
+
     if (fadeAnim && slideAnim) {
       return (
         <Animated.View
@@ -41,80 +85,34 @@ export const StatCard: React.FC<StatCardProps> = React.memo(
             },
           ]}
         >
-          <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statGradient}
-          >
-            <View style={styles.statIconContainer}>
-              <MaterialIcons name={icon} size={28} color={iconColor} />
-            </View>
-
-            <View style={styles.statContent}>
-              <Typography
-                variant="h2"
-                color={theme.colors.neutral.white}
-                style={styles.statValue}
-              >
-                {value}
-              </Typography>
-              <Typography
-                variant="bodySecondary"
-                color="rgba(255,255,255,0.9)"
-                style={styles.statLabel}
-              >
-                {label}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="rgba(255,255,255,0.7)"
-                style={styles.statSubtitle}
-              >
-                {subtitle}
-              </Typography>
-            </View>
-          </LinearGradient>
+          {onPress ? (
+            <TouchableOpacity
+              onPress={handlePress}
+              activeOpacity={0.8}
+              style={styles.touchable}
+            >
+              <CardContent />
+            </TouchableOpacity>
+          ) : (
+            <CardContent />
+          )}
         </Animated.View>
       );
     }
 
     return (
       <View style={styles.statCard}>
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.statGradient}
-        >
-          <View style={styles.statIconContainer}>
-            <MaterialIcons name={icon} size={28} color={iconColor} />
-          </View>
-
-          <View style={styles.statContent}>
-            <Typography
-              variant="h2"
-              color={theme.colors.neutral.white}
-              style={styles.statValue}
-            >
-              {value}
-            </Typography>
-            <Typography
-              variant="bodySecondary"
-              color="rgba(255,255,255,0.9)"
-              style={styles.statLabel}
-            >
-              {label}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="rgba(255,255,255,0.7)"
-              style={styles.statSubtitle}
-            >
-              {subtitle}
-            </Typography>
-          </View>
-        </LinearGradient>
+        {onPress ? (
+          <TouchableOpacity
+            onPress={handlePress}
+            activeOpacity={0.8}
+            style={styles.touchable}
+          >
+            <CardContent />
+          </TouchableOpacity>
+        ) : (
+          <CardContent />
+        )}
       </View>
     );
   }
@@ -131,6 +129,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 135,
     backgroundColor: "#FFFFFF",
+  },
+  touchable: {
+    borderRadius: 16,
   },
   statGradient: {
     padding: theme.spacing.m,
