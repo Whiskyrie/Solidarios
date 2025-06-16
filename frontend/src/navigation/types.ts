@@ -126,6 +126,9 @@ export type DoadorProfileStackParamList = {
   EditProfile: undefined;
   DonationHistory: undefined;
   Impact: undefined;
+  UnderConstruction: {
+    featureName: string;
+  };
 };
 
 // Tipos para BeneficiarioNavigator - Tabs

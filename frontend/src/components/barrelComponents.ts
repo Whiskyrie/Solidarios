@@ -11,3 +11,5 @@ export * from "./forms/barrelForms";
 
 // Componentes de feedback
 export * from "./feedback/barrelFeedback";
+
+export * from "./profile/barrelProfile";
