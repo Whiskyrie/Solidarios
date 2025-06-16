@@ -16,31 +16,35 @@ interface ImpactStatsSectionProps {
 
 export const ImpactStatsSection: React.FC<ImpactStatsSectionProps> = React.memo(
   ({ stats, fadeAnim, slideAnim }) => {
+    // Debug apenas uma vez
+    console.log("ImpactStatsSection - stats:", stats);
+
     const statsData: StatCardProps[] = [
       {
         icon: "favorite",
         iconColor: "#FFFFFF",
         gradientColors: ["#FF6B6B", "#FF8E8E"],
-        value: stats.totalDonations || 0, // Garantir valor padrão
+        value: stats.totalDonations || 0,
         label: "Doações",
+        subtitle: "realizadas",
       },
       {
         icon: "inventory",
         iconColor: "#FFFFFF",
         gradientColors: ["#4ECDC4", "#44B3A8"],
-        value: stats.distributedItems || 0, // Garantir valor padrão
+        value: stats.distributedItems || 0,
         label: "Itens",
+        subtitle: "distribuídos",
       },
       {
         icon: "groups",
         iconColor: "#FFFFFF",
         gradientColors: ["#45B7D1", "#4A90E2"],
-        value: stats.peopleHelped || 0, // Garantir valor padrão
+        value: stats.peopleHelped || 0,
         label: "Pessoas",
+        subtitle: "ajudadas",
       },
     ];
-
-    console.log("ImpactStatsSection - statsData:", statsData);
 
     return (
       <View style={styles.impactSection}>
@@ -52,14 +56,14 @@ export const ImpactStatsSection: React.FC<ImpactStatsSectionProps> = React.memo(
         </Typography>
 
         <View style={styles.statsGrid}>
-          {statsData.map((stat, index) => {
-            console.log(`Rendering StatCard ${index}:`, stat);
-            return (
-              <View key={index} style={styles.statCardWrapper}>
-                <StatCard {...stat} fadeAnim={fadeAnim} slideAnim={slideAnim} />
-              </View>
-            );
-          })}
+          {statsData.map((stat, index) => (
+            <View
+              key={`stat-${index}-${stat.label}`}
+              style={styles.statCardWrapper}
+            >
+              <StatCard {...stat} fadeAnim={fadeAnim} slideAnim={slideAnim} />
+            </View>
+          ))}
         </View>
       </View>
     );

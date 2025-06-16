@@ -6,8 +6,10 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
+  ManyToOne,
 } from 'typeorm';
 import { Item } from '../../items/entities/item.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('inventory')
 export class Inventory {
@@ -20,6 +22,14 @@ export class Inventory {
 
   @Column()
   itemId: string;
+
+  // ADIÇÃO: Relacionamento direto com doador
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'donorId' })
+  donor?: User;
+
+  @Column({ nullable: true })
+  donorId?: string;
 
   @Column({ default: 1 })
   quantity: number;

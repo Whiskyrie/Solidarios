@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Animated } from "react-native";
 import { useAuth } from "./useAuth";
+import api from "../api/api";
 import { ANIMATION_DURATIONS } from "../components/constants/profileConstants";
 
 interface ProfileStats {
@@ -24,29 +25,32 @@ export const useProfileData = () => {
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   const loadProfileData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      console.log("loadProfileData - Iniciando carregamento...");
+      console.log("useProfileData - Carregando dados para user:", user.id);
 
-      // TODO: Substituir por chamada real da API
-      // const response = await profileService.getProfileStats(user?.id);
+      // Usar o endpoint de stats do usuário
+      const response = await api.get(`/users/${user.id}/stats`);
+      console.log("useProfileData - Resposta da API:", response.data);
 
-      // Por enquanto, simular carregamento
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // IMPORTANTE: Usar dados reais da API aqui
-      const realStats: ProfileStats = {
-        totalDonations: 0, // Dados reais da API
-        distributedItems: 0, // Dados reais da API
-        peopleHelped: 0, // Dados reais da API
+      const apiData = response.data;
+      const mappedStats: ProfileStats = {
+        totalDonations: apiData.totalDonations || 0,
+        distributedItems: apiData.distributedItems || 0,
+        peopleHelped: apiData.peopleHelped || 0,
       };
 
-      console.log("loadProfileData - Dados carregados:", realStats);
-      setStats(realStats);
+      console.log("useProfileData - Stats mapeados:", mappedStats);
+      setStats(mappedStats);
 
-      // Iniciar animações apenas uma vez
+      // Iniciar animações
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -60,22 +64,25 @@ export const useProfileData = () => {
         }),
       ]).start();
     } catch (err) {
-      console.error("Erro ao carregar dados do perfil:", err);
+      console.error("useProfileData - Erro:", err);
       setError("Não foi possível carregar os dados do perfil");
+
+      // Manter valores zerados em caso de erro
+      setStats({
+        totalDonations: 0,
+        distributedItems: 0,
+        peopleHelped: 0,
+      });
     } finally {
       setLoading(false);
     }
-  }, [fadeAnim, slideAnim]); // Dependências fixas
+  }, [user?.id, fadeAnim, slideAnim]);
 
   useEffect(() => {
-    if (user?.id) {
-      console.log("useProfileData - Carregando dados para user:", user.id);
-      loadProfileData();
-    }
-  }, [user?.id, loadProfileData]); // Apenas user.id como dependência
+    loadProfileData();
+  }, [loadProfileData]);
 
   const retry = useCallback(() => {
-    // Reset animations
     fadeAnim.setValue(0);
     slideAnim.setValue(50);
     loadProfileData();

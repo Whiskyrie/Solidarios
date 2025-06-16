@@ -1,12 +1,12 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsPositive,
-  IsString,
   IsUUID,
+  IsOptional,
+  IsString,
+  IsNumber,
+  Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateInventoryDto {
   @ApiProperty({
@@ -18,29 +18,37 @@ export class CreateInventoryDto {
   itemId: string;
 
   @ApiPropertyOptional({
-    example: 1,
+    example: 'uuid-do-doador',
+    description: 'ID do doador do item',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'ID do doador inválido' })
+  donorId?: string;
+
+  @ApiPropertyOptional({
+    example: 10,
     description: 'Quantidade do item no estoque',
     default: 1,
   })
   @IsOptional()
-  @IsNumber({}, { message: 'A quantidade deve ser um número' })
-  @IsPositive({ message: 'A quantidade deve ser um número positivo' })
+  @IsNumber({}, { message: 'Quantidade deve ser um número' })
+  @Min(1, { message: 'Quantidade deve ser maior que zero' })
   quantity?: number;
 
   @ApiPropertyOptional({
-    example: 'Prateleira A3',
+    example: 'Estoque Principal - Setor A',
     description: 'Localização do item no estoque',
   })
   @IsOptional()
-  @IsString({ message: 'A localização deve ser uma string' })
+  @IsString({ message: 'Localização deve ser um texto' })
   location?: string;
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Nível mínimo para alerta de estoque baixo',
+    description: 'Nível de alerta para estoque baixo',
   })
   @IsOptional()
-  @IsNumber({}, { message: 'O nível de alerta deve ser um número' })
-  @IsPositive({ message: 'O nível de alerta deve ser um número positivo' })
+  @IsNumber({}, { message: 'Nível de alerta deve ser um número' })
+  @Min(0, { message: 'Nível de alerta deve ser maior ou igual a zero' })
   alertLevel?: number;
 }
