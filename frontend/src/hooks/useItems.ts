@@ -64,6 +64,49 @@ export const useItems = () => {
     }
   }, []);
 
+  // NOVA FUNÇÃO: Buscar apenas itens disponíveis (para beneficiários)
+  const fetchAvailableItems = useCallback(async (pageOptions?: PageOptionsDto) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log("[useItems] Buscando itens disponíveis com opções:", pageOptions);
+      
+      // Usar getByStatus com status "disponivel"
+      const response = await ItemsService.getByStatus("disponivel", pageOptions);
+      
+      console.log("[useItems] Resposta da API:", response);
+
+      // Se for a primeira página, substituir os itens
+      if (pageOptions?.page === 1 || !pageOptions?.page) {
+        setItems(response.data || []);
+      } else {
+        // Concatenar com itens existentes para paginação
+        setItems((prevItems) => [
+          ...(Array.isArray(prevItems) ? prevItems : []),
+          ...(response.data || [])
+        ]);
+      }
+
+      // Atualizar paginação
+      setPagination({
+        page: response.meta?.page || 1,
+        totalPages: response.meta?.pageCount || 1,
+        totalItems: response.meta?.itemCount || 0,
+      });
+
+      return response;
+    } catch (err: any) {
+      console.error("[useItems] Erro ao buscar itens disponíveis:", err);
+      const errorMessage =
+        err.response?.data?.message || err.message || "Erro ao buscar itens disponíveis";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Função para obter um item por ID
   const fetchItemById = useCallback(async (id: string) => {
     setIsLoading(true);
@@ -135,6 +178,27 @@ export const useItems = () => {
     } catch (err: any) {
       setError(err.message || "Erro ao remover item");
       return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+   // Função para solicitar um item (baseada no padrão do createItem)
+  const requestItem = useCallback(async (itemId: string, beneficiaryId: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Usar o mesmo padrão do createItem, mas para request
+      const data = await ItemsService.requestItem(itemId, beneficiaryId);
+      
+      // Remover o item da lista local (não está mais disponível)
+      setItems((prevItems) => prevItems.filter(item => item.id !== itemId));
+      
+      return data;
+    } catch (err: any) {
+      setError(err.message || "Erro ao solicitar item");
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -300,6 +364,7 @@ export const useItems = () => {
 
     // Ações
     fetchItems,
+    fetchAvailableItems, // NOVA FUNÇÃO ADICIONADA
     fetchItemById,
     createItem,
     updateItem,
@@ -307,6 +372,7 @@ export const useItems = () => {
     fetchItemsByDonor,
     fetchItemsByCategory,
     fetchItemsByStatus,
+    requestItem,
     uploadPhotos,
     removePhoto,
     clearError,
