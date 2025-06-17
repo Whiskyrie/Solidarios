@@ -71,6 +71,25 @@ export class ItemsController {
     return this.itemsService.findAllPaginated(pageOptionsDto);
   }
 
+   @Get('available/all') // ROTA NOVA -> GET /items/available/all
+  @ApiOperation({ summary: 'Listar todos os itens disponíveis para beneficiários (com paginação)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de itens disponíveis retornada com sucesso.',
+    type: PageDto,
+  })
+  @ApiQuery({
+    type: PageOptionsDto,
+    required: false,
+    description: 'Opções de paginação',
+  })
+  // PERMISSÃO CORRIGIDA: Agora Beneficiários (e outros) podem acessar esta rota
+  @Roles(UserRole.BENEFICIARIO, UserRole.ADMIN, UserRole.FUNCIONARIO) 
+  findAvailable(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<Item>> {
+    // Chama um novo método no serviço que você criará no próximo passo
+    return this.itemsService.findAvailablePaginated(pageOptionsDto);
+  }
+
   @Get('donor/:donorId')
   @ApiOperation({ summary: 'Buscar itens por doador' })
   @ApiResponse({
