@@ -1,136 +1,110 @@
-import React, { useRef } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Animated,
-  TouchableOpacityProps 
-} from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import Typography from '../common/Typography';
-import theme from '../../theme';
+import React from "react";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { Typography } from "../barrelComponents";
+import theme from "../../theme/index";
 
-interface MenuItemProps extends TouchableOpacityProps {
-  label: string;
-  icon: string;
-  badge?: number | string;
-  rightIcon?: string;
+export interface MenuItemProps {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  showBadge?: boolean;
+  badgeColor?: string;
 }
 
-/**
- * Componente de item de menu com animação
- */
-const MenuItem = React.memo(({
-  label,
+export const MenuItem: React.FC<MenuItemProps> = ({
   icon,
-  badge,
-  rightIcon = "chevron-right",
-  ...rest
-}: MenuItemProps) => {
-  // Animação para feedback visual
-  const bgColorAnim = useRef(new Animated.Value(0)).current;
-
-  // Handlers para animação
-  const handlePressIn = () => {
-    Animated.timing(bgColorAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.timing(bgColorAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  // Interpolação de cor para o background
-  const backgroundColor = bgColorAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [theme.colors.neutral.white, `${theme.colors.primary.secondary}10`]
-  });
-
-  return (
-    <TouchableOpacity
-      {...rest}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-    >
-      <Animated.View style={[styles.container, { backgroundColor }]}>
-        {/* Ícone esquerdo */}
-        <View style={styles.iconContainer}>
-          <MaterialIcons 
-            name={icon} 
-            size={24} 
-            color={theme.colors.primary.secondary} 
-          />
-        </View>
-        
-        {/* Conteúdo central */}
-        <View style={styles.content}>
-          <Typography variant="body" style={styles.label}>
-            {label}
-          </Typography>
-          
-          {badge !== undefined && (
-            <View style={styles.badge}>
-              <Typography 
-                variant="caption" 
-                color={theme.colors.neutral.white}
-              >
-                {badge}
-              </Typography>
-            </View>
-          )}
-        </View>
-        
-        {/* Ícone direito */}
-        <MaterialIcons 
-          name={rightIcon} 
-          size={24} 
-          color={theme.colors.neutral.darkGray} 
+  title,
+  subtitle,
+  onPress,
+  showBadge = false,
+  badgeColor = theme.colors.status.success,
+}) => (
+  <TouchableOpacity
+    style={styles.menuItem}
+    onPress={onPress}
+    activeOpacity={0.7}
+    accessibilityRole="button"
+    accessibilityLabel={title}
+    accessibilityHint={subtitle}
+  >
+    <View style={styles.menuItemLeft}>
+      <View style={[styles.menuIconContainer, { borderColor: badgeColor }]}>
+        <MaterialIcons
+          name={icon}
+          size={24}
+          color={theme.colors.primary.secondary}
         />
-      </Animated.View>
-    </TouchableOpacity>
-  );
-});
+        {showBadge && (
+          <View style={[styles.badge, { backgroundColor: badgeColor }]} />
+        )}
+      </View>
+      <View style={styles.menuTextContainer}>
+        <Typography variant="body" style={styles.menuTitle}>
+          {title}
+        </Typography>
+        <Typography
+          variant="small"
+          color={theme.colors.neutral.darkGray}
+          style={styles.menuSubtitle}
+        >
+          {subtitle}
+        </Typography>
+      </View>
+    </View>
+    <MaterialIcons
+      name="chevron-right"
+      size={24}
+      color={theme.colors.neutral.darkGray}
+    />
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.s,
-    paddingHorizontal: theme.spacing.m,
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: theme.spacing.m,
+    paddingHorizontal: theme.spacing.s,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.small,
-    backgroundColor: `${theme.colors.primary.secondary}10`,
-    marginRight: theme.spacing.s,
-  },
-  content: {
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
-  label: {
-    flex: 1,
+  menuIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: theme.spacing.m,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    position: "relative",
   },
   badge: {
-    backgroundColor: theme.colors.primary.secondary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginRight: theme.spacing.s,
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.neutral.white,
+  },
+  menuTextContainer: {
+    flex: 1,
+  },
+  menuTitle: {
+    fontWeight: "600",
+    marginBottom: 2,
+    color: theme.colors.neutral.black,
+  },
+  menuSubtitle: {
+    lineHeight: 16,
   },
 });
-
-export default MenuItem;
