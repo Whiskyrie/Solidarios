@@ -35,21 +35,12 @@ import { Category } from './entities/category.entity';
 
 @ApiTags('categories')
 @Controller('categories')
-<<<<<<< HEAD
-=======
-@UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
-// NÃO adicionar @UseInterceptors aqui pois já está global
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-<<<<<<< HEAD
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-=======
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
   @ApiOperation({ summary: 'Criar uma nova categoria' })
   @ApiResponse({ status: 201, description: 'Categoria criada com sucesso.' })
   @ApiResponse({ status: 400, description: 'Dados inválidos.' })
@@ -88,11 +79,8 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-<<<<<<< HEAD
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-=======
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
   @ApiOperation({ summary: 'Atualizar uma categoria pelo ID' })
   @ApiResponse({
     status: 200,
@@ -113,11 +101,8 @@ export class CategoriesController {
   }
 
   @Delete(':id')
-<<<<<<< HEAD
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-=======
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
   @ApiOperation({ summary: 'Remover uma categoria pelo ID' })
   @ApiResponse({ status: 204, description: 'Categoria removida com sucesso.' })
   @ApiResponse({ status: 404, description: 'Categoria não encontrada.' })
