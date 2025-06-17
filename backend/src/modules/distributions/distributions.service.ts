@@ -4,10 +4,6 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
-<<<<<<< HEAD
-=======
-  BadRequestException,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -22,19 +18,9 @@ import { Item, ItemStatus } from '../items/entities/item.entity';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
-<<<<<<< HEAD
 
 @Injectable()
 export class DistributionsService {
-=======
-import { LogMethod } from '../../common/logging/logger.decorator';
-import { Logger } from '@nestjs/common';
-
-@Injectable()
-export class DistributionsService {
-  private readonly logger = new Logger(DistributionsService.name);
-
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
   constructor(
     @InjectRepository(Distribution)
     private distributionsRepository: Repository<Distribution>,
@@ -161,7 +147,6 @@ export class DistributionsService {
     return distribution;
   }
 
-<<<<<<< HEAD
   // Modificado para suportar paginação
   async findByBeneficiary(
     beneficiaryId: string,
@@ -188,53 +173,6 @@ export class DistributionsService {
 
     const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
     return new PageDto(distributions, pageMetaDto);
-=======
-  @LogMethod()
-  async findByBeneficiary(
-    beneficiaryId: string,
-    pageOptionsDto: PageOptionsDto,
-  ): Promise<PageDto<Distribution>> {
-    this.logger.debug(
-      `Buscando distribuições do beneficiário: ${beneficiaryId}`,
-    );
-
-    try {
-      // Verificar se o beneficiário existe
-      const beneficiary = await this.usersService.findOne(beneficiaryId);
-      if (!beneficiary) {
-        throw new NotFoundException('Beneficiário não encontrado');
-      }
-
-      if (beneficiary.role !== UserRole.BENEFICIARIO) {
-        throw new BadRequestException(
-          'Usuário informado não é um beneficiário',
-        );
-      }
-
-      const queryBuilder = this.distributionsRepository
-        .createQueryBuilder('distribution')
-        .leftJoinAndSelect('distribution.beneficiary', 'beneficiary')
-        .leftJoinAndSelect('distribution.employee', 'employee')
-        .leftJoinAndSelect('distribution.items', 'items')
-        .leftJoinAndSelect('items.category', 'category')
-        .where('distribution.beneficiaryId = :beneficiaryId', { beneficiaryId })
-        .orderBy('distribution.date', pageOptionsDto.order)
-        .skip(pageOptionsDto.skip)
-        .take(pageOptionsDto.take);
-
-      const itemCount = await queryBuilder.getCount();
-      const distributions = await queryBuilder.getMany();
-
-      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-      return new PageDto(distributions, pageMetaDto);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar distribuições do beneficiário: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
   }
 
   async update(
