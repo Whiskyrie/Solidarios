@@ -13,10 +13,7 @@ import {
   UseGuards,
   Request,
   Query,
-<<<<<<< HEAD
-=======
   ForbiddenException,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -31,22 +28,16 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-<<<<<<< HEAD
-=======
   ApiParam,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { Item } from './entities/item.entity';
+import { DonorStatsDto } from './dto/donor-stats.dto';
 
 @ApiTags('items')
 @Controller('items')
-<<<<<<< HEAD
 @UseGuards(JwtAuthGuard, RolesGuard) // Proteger todas as rotas e verificar roles
-=======
-@UseGuards(JwtAuthGuard, RolesGuard)
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 @ApiBearerAuth() // Indica que precisa de token JWT para todos os endpoints
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
@@ -81,24 +72,6 @@ export class ItemsController {
   }
 
   @Get('donor/:donorId')
-<<<<<<< HEAD
-  @ApiOperation({ summary: 'Listar itens por doador com paginação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista paginada de itens do doador retornada com sucesso.',
-    type: PageDto,
-  })
-  @ApiQuery({
-    type: PageOptionsDto,
-    required: false,
-    description: 'Opções de paginação',
-  })
-  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
-  getByDonor(
-    @Param('donorId', ParseUUIDPipe) donorId: string,
-    @Query() pageOptionsDto: PageOptionsDto,
-  ): Promise<PageDto<Item>> {
-=======
   @ApiOperation({ summary: 'Buscar itens por doador' })
   @ApiResponse({
     status: 200,
@@ -135,7 +108,6 @@ export class ItemsController {
       throw new ForbiddenException('Você só pode acessar seus próprios itens');
     }
 
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
     return this.itemsService.findByDonorPaginated(donorId, pageOptionsDto);
   }
 
@@ -177,5 +149,26 @@ export class ItemsController {
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO) // Apenas Admin e Funcionário podem remover
   remove(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
     return this.itemsService.remove(id, req.user);
+  }
+
+  @Get('donor/:donorId/stats')
+  @ApiOperation({
+    summary: 'Obter estatísticas detalhadas de um doador',
+    description:
+      'Retorna estatísticas de impacto e performance das doações de um doador específico',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estatísticas do doador retornadas com sucesso.',
+    type: DonorStatsDto,
+  })
+  @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
+  @ApiResponse({ status: 403, description: 'Acesso negado.' })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  async getDonorStats(
+    @Param('donorId', ParseUUIDPipe) donorId: string,
+    @Request() req,
+  ): Promise<DonorStatsDto> {
+    return this.itemsService.getDonorStats(donorId, req.user);
   }
 }
