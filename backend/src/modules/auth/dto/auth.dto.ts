@@ -5,10 +5,7 @@ import {
   MinLength,
   IsOptional,
   IsEnum,
-<<<<<<< HEAD
-=======
   Matches,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../users/entities/user.entity';
@@ -61,8 +58,6 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole, { message: 'Papel inválido' })
   role?: UserRole;
-<<<<<<< HEAD
-=======
 
   @ApiProperty({
     example: '(11) 99999-9999',
@@ -86,5 +81,4 @@ export class RegisterDto {
   @IsString({ message: 'O endereço deve ser uma string' })
   @MinLength(5, { message: 'O endereço deve ter pelo menos 5 caracteres' })
   address?: string;
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 }
