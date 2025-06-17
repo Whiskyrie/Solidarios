@@ -12,13 +12,8 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Request,
-<<<<<<< HEAD
   ForbiddenException,
   Query,
-=======
-  Query,
-  ForbiddenException,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { DistributionsService } from './distributions.service';
 import { CreateDistributionDto } from './dto/create-distribution.dto';
@@ -33,10 +28,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-<<<<<<< HEAD
-=======
-  ApiParam,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
@@ -94,7 +85,6 @@ export class DistributionsController {
   }
 
   @Get('beneficiary/:beneficiaryId')
-<<<<<<< HEAD
   @ApiOperation({
     summary: 'Buscar distribuições por beneficiário (com paginação)',
   })
@@ -125,50 +115,6 @@ export class DistributionsController {
         'Você não tem permissão para ver distribuições de outros beneficiários.',
       );
     }
-=======
-  @ApiOperation({ summary: 'Buscar distribuições por beneficiário' })
-  @ApiResponse({
-    status: 200,
-    description: 'Distribuições do beneficiário encontradas com sucesso.',
-    type: PageDto<Distribution>,
-  })
-  @ApiResponse({ status: 404, description: 'Beneficiário não encontrado.' })
-  @ApiResponse({ status: 403, description: 'Acesso negado.' })
-  @ApiParam({
-    name: 'beneficiaryId',
-    description: 'ID do beneficiário',
-    type: 'string',
-    format: 'uuid',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Número da página (padrão: 1)',
-    type: 'number',
-  })
-  @ApiQuery({
-    name: 'take',
-    required: false,
-    description: 'Quantidade de distribuições por página (padrão: 10)',
-    type: 'number',
-  })
-  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.BENEFICIARIO)
-  async findByBeneficiary(
-    @Param('beneficiaryId', ParseUUIDPipe) beneficiaryId: string,
-    @Query() pageOptionsDto: PageOptionsDto,
-    @Request() req,
-  ): Promise<PageDto<Distribution>> {
-    // Verificar se é o próprio beneficiário ou admin/funcionário
-    if (
-      req.user.role === UserRole.BENEFICIARIO &&
-      req.user.id !== beneficiaryId
-    ) {
-      throw new ForbiddenException(
-        'Você só pode acessar suas próprias distribuições',
-      );
-    }
-
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
     return this.distributionsService.findByBeneficiary(
       beneficiaryId,
       pageOptionsDto,
