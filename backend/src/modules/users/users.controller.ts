@@ -10,15 +10,10 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
-<<<<<<< HEAD
-  Query,
-  UseGuards,
-=======
   UseGuards,
   Request,
   Query,
   BadRequestException,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -33,27 +28,18 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-<<<<<<< HEAD
-=======
   ApiParam,
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { User } from './entities/user.entity';
-<<<<<<< HEAD
-=======
 import { UserStatsDto } from './dto/user-stats.dto';
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 
 @ApiTags('users')
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
-<<<<<<< HEAD
-=======
 // NÃO adicionar @UseInterceptors aqui pois já está global
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -117,8 +103,6 @@ export class UsersController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }
-<<<<<<< HEAD
-=======
 
   @Get(':id/stats')
   @ApiOperation({
@@ -244,5 +228,4 @@ export class UsersController {
   ): Promise<PageDto<User>> {
     return this.usersService.findByRole(UserRole.BENEFICIARIO, pageOptionsDto);
   }
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 }
