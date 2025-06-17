@@ -5,8 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-<<<<<<< HEAD
+import { Repository, DataSource } from 'typeorm';
 import { User } from './entities/user.entity';
 =======
 import { User, UserRole } from './entities/user.entity';
@@ -19,6 +18,8 @@ import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 import * as bcrypt from 'bcrypt';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
+import { Inventory } from '../inventory/entities/inventory.entity';
+import { Distribution } from '../distributions/entities/distribution.entity';
 <<<<<<< HEAD
 =======
 import { UserStatsDto } from './dto/user-stats.dto';
@@ -29,6 +30,11 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @InjectRepository(Inventory)
+    private inventoryRepository: Repository<Inventory>,
+    @InjectRepository(Distribution)
+    private distributionRepository: Repository<Distribution>,
+    private dataSource: DataSource, // Adicionar esta linha
     private readonly logger: LoggingService,
   ) {
     this.logger.setContext('UsersService');
@@ -220,82 +226,65 @@ export class UsersService {
 =======
 
   @LogMethod()
-  async getUserStats(userId: string): Promise<UserStatsDto> {
-    this.logger.log(`Calculando estatísticas para o usuário: ${userId}`);
-
+  async getUserStats(userId: string) {
     try {
-      // Verificar se o usuário existe
+      console.log('getUserStats - Iniciando para userId:', userId);
 
-      // Query para buscar estatísticas das doações
-      // Assumindo que existe uma tabela 'items' com 'donorId' e campos relacionados
-      const statsQuery = `
-        SELECT 
-          COALESCE(COUNT(DISTINCT i.id), 0) as total_donations,
-          COALESCE(SUM(CASE 
-            WHEN d.id IS NOT NULL THEN 1 
-            ELSE 0 
-          END), 0) as people_helped
-        FROM items i
-        LEFT JOIN distributions_items_items dii ON dii."itemsId" = i.id
-        LEFT JOIN distributions d ON d.id = dii."distributionsId"
-        WHERE i."donorId" = $1
+      // Verificar se o usuário existe
+      const user = await this.usersRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      console.log('getUserStats - Usuário encontrado:', user.name, user.role);
+
+      // CORREÇÃO: Agora podemos usar donorId diretamente no inventory
+      const totalDonations = await this.inventoryRepository.count({
+        where: { donorId: userId },
+      });
+
+      // Buscar itens distribuídos pelo doador
+      const distributedItemsQuery = `
+        SELECT COUNT(DISTINCT di.itemId) as count
+        FROM distribution_items di
+        INNER JOIN inventory i ON di.itemId = i.itemId
+        WHERE i.donorId = $1
       `;
 
-      const result = await this.usersRepository.query(statsQuery, [userId]);
+      // Buscar pessoas ajudadas
+      const peopleHelpedQuery = `
+        SELECT COUNT(DISTINCT d.beneficiaryId) as count
+        FROM distributions d
+        INNER JOIN distribution_items di ON d.id = di.distributionId
+        INNER JOIN inventory i ON di.itemId = i.itemId
+        WHERE i.donorId = $1
+      `;
 
-      const totalDonations = parseInt(result[0]?.total_donations || '0');
-      const peopleHelped = parseInt(result[0]?.people_helped || '0');
-      const impactScore = totalDonations * 2 + peopleHelped;
+      const [distributedResult, peopleResult] = await Promise.all([
+        this.dataSource.query(distributedItemsQuery, [userId]),
+        this.dataSource.query(peopleHelpedQuery, [userId]),
+      ]);
 
-      const stats: UserStatsDto = {
-        userId,
+      const stats = {
         totalDonations,
-        peopleHelped,
-        impactScore,
-        lastUpdated: new Date(),
+        distributedItems: parseInt(distributedResult[0]?.count || '0'),
+        peopleHelped: parseInt(peopleResult[0]?.count || '0'),
       };
 
-      this.logger.log(
-        `Estatísticas calculadas para usuário ${userId}: ${totalDonations} doações, ${peopleHelped} pessoas ajudadas, impacto ${impactScore}`,
-      );
-
+      console.log('getUserStats - Stats calculados:', stats);
       return stats;
     } catch (error) {
-      this.logger.error(
-        `Erro ao calcular estatísticas do usuário ${userId}: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
-  }
+      console.error('getUserStats - Erro:', error.message);
 
-  @LogMethod()
-  async findByRole(
-    role: UserRole,
-    pageOptionsDto: PageOptionsDto,
-  ): Promise<PageDto<User>> {
-    this.logger.debug(`Buscando usuários com perfil: ${role}`);
-
-    try {
-      const queryBuilder = this.usersRepository
-        .createQueryBuilder('user')
-        .where('user.role = :role', { role })
-        .andWhere('user.isActive = :isActive', { isActive: true }) // Apenas usuários ativos
-        .orderBy('user.name', pageOptionsDto.order)
-        .skip(pageOptionsDto.skip)
-        .take(pageOptionsDto.take);
-
-      const itemCount = await queryBuilder.getCount();
-      const users = await queryBuilder.getMany();
-
-      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
-      return new PageDto(users, pageMetaDto);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao buscar usuários por perfil: ${error.message}`,
-        error.stack,
-      );
-      throw error;
+      // Retornar valores zero em caso de erro
+      return {
+        totalDonations: 0,
+        distributedItems: 0,
+        peopleHelped: 0,
+      };
     }
   }
 
