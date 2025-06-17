@@ -36,10 +36,6 @@ import { Inventory } from './entities/inventory.entity';
 @Controller('inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
-<<<<<<< HEAD
-=======
-// NÃO adicionar @UseInterceptors aqui pois já está global
->>>>>>> fb378d50a7704e5cbb0e34b8885e244919630848
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
