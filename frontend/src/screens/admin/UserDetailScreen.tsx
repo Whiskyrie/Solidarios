@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -23,7 +23,6 @@ import {
   Loading,
   ErrorState,
   Card,
-  Divider,
   Badge,
   Avatar,
   NotificationBanner,
@@ -49,9 +48,8 @@ const UserDetailScreen: React.FC = () => {
   const route = useRoute<UserDetailScreenRouteProp>();
   const { id } = route.params;
   useAuth();
-  const { user, fetchUserById, removeUser, isLoading, error, clearError } =
-    useUsers();
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const { user, fetchUserById, isLoading, error, clearError } = useUsers();
+  const [, setShowDeleteConfirmation] = useState(false);
   const [notification, setNotification] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -75,41 +73,8 @@ const UserDetailScreen: React.FC = () => {
   );
 
   // Função para deletar usuário
-  const handleDeleteUser = async () => {
-    try {
-      await removeUser(id);
-      setNotification({
-        visible: true,
-        type: "success",
-        message: "Usuário excluído com sucesso!",
-      });
-      setTimeout(() => {
-        navigation.goBack();
-      }, 1500);
-    } catch (err) {
-      setNotification({
-        visible: true,
-        type: "error",
-        message: "Erro ao excluir usuário.",
-      });
-    }
-  };
 
   // Confirmar exclusão
-  const confirmDelete = () => {
-    Alert.alert(
-      "Excluir Usuário",
-      "Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.",
-      [
-        {
-          text: "Cancelar",
-          onPress: () => setShowDeleteConfirmation(false),
-          style: "cancel",
-        },
-        { text: "Excluir", onPress: handleDeleteUser, style: "destructive" },
-      ]
-    );
-  };
 
   // Função para editar usuário
   const handleEditUser = () => {
@@ -248,7 +213,7 @@ const UserDetailScreen: React.FC = () => {
               >
                 Endereço:
               </Typography>
-              <Typography variant="body">{user.address}</Typography>
+              <Typography variant="body">{user.address.street}</Typography>
             </View>
           )}
 
