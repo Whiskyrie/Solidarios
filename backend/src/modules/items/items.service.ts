@@ -85,6 +85,44 @@ export class ItemsService {
     return this.itemsRepository.find({ relations: ['donor'] });
   }
 
+@LogMethod()
+  async findAvailablePaginated(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Item>> {
+    this.logger.debug(
+      `Buscando itens DISPONÍVEIS paginados - página ${pageOptionsDto.page}`,
+    );
+
+    try {
+      const queryBuilder = this.itemsRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.donor', 'donor')
+        .leftJoinAndSelect('item.category', 'category')
+        // FILTRO DE SEGURANÇA: Garante que apenas itens disponíveis sejam retornados
+        .where('item.status = :status', { status: 'disponivel' }) 
+        .orderBy('item.receivedDate', pageOptionsDto.order)
+        .skip(pageOptionsDto.skip)
+        .take(pageOptionsDto.take);
+
+      const itemCount = await queryBuilder.getCount();
+      const items = await queryBuilder.getMany();
+
+      const pageMetaDto = new PageMetaDto({ pageOptionsDto, itemCount });
+
+      this.logger.debug(
+        `Retornando ${items.length} itens disponíveis (total: ${itemCount})`,
+      );
+      return new PageDto(items, pageMetaDto);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar itens disponíveis paginados: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+
   // Novo método com paginação
   @LogMethod()
   async findAllPaginated(
