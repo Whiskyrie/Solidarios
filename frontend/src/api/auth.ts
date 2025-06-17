@@ -9,7 +9,7 @@ import {
   TokensResponse,
   RefreshTokenDto,
 } from "../types/auth.types";
-import { User } from "../types/users.types";
+import { User, UpdateUserRequest } from "../types/users.types";
 
 // Namespace para agrupar as funções do serviço
 const AuthService = {
@@ -43,12 +43,17 @@ const AuthService = {
       console.log("[AuthService] Login bem-sucedido");
       return authData;
     } catch (error: any) {
-      // Código de tratamento de erro existente
       console.error(
         "[AuthService] Erro na requisição de login:",
         error.response?.status
       );
-      // Resto do código...
+      console.error("[AuthService] Detalhes do erro:", error.message);
+      if (error.response) {
+        console.error(
+          "[AuthService] Resposta do servidor:",
+          error.response.data
+        );
+      }
       throw error;
     }
   },
@@ -69,8 +74,7 @@ const AuthService = {
         success: true,
       });
 
-      // Extrair os dados da estrutura correta - a resposta real tem a estrutura:
-      // { data: { accessToken, refreshToken, user }, message, statusCode, timestamp }
+      // Extrair os dados da estrutura correta
       let authData;
 
       if (response.data.data && response.data.data.accessToken) {
@@ -99,7 +103,6 @@ const AuthService = {
 
       return authData;
     } catch (error: any) {
-      // Código de tratamento de erro existente
       console.error(
         "[AuthService] Erro na requisição de registro:",
         error.response?.status
@@ -181,12 +184,67 @@ const AuthService = {
   },
 
   /**
+   * Atualizar perfil do usuário
+   * @param userId ID do usuário a ser atualizado
+   * @param data Dados para atualização
+   * @returns Dados do usuário atualizado
+   */
+  updateProfile: async (
+    userId: string,
+    data: UpdateUserRequest
+  ): Promise<User> => {
+    console.log("[AuthService] Atualizando perfil do usuário:", userId);
+    try {
+      const response = await api.put<User>(`/users/${userId}`, data);
+
+      // Verificar se a resposta está aninhada
+      let userData;
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "data" in response.data
+      ) {
+        // Formato aninhado
+        userData = (response.data as any).data;
+      } else {
+        // Formato direto
+        userData = response.data;
+      }
+
+      console.log("[AuthService] Perfil atualizado com sucesso");
+      return userData;
+    } catch (error: any) {
+      console.error(
+        "[AuthService] Erro ao atualizar perfil:",
+        error.response?.data || error.message
+      );
+      if (error.response) {
+        console.error("[AuthService] Status do erro:", error.response.status);
+        console.error("[AuthService] Dados do erro:", error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  /**
    * Solicitar redefinição de senha
    * @param email Email do usuário que esqueceu a senha
    * @returns Void - Resposta é vazia com status 204
    */
   forgotPassword: async (email: string): Promise<void> => {
-    await api.post("/auth/forgot-password", { email });
+    console.log("[AuthService] Solicitando redefinição de senha para:", email);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      console.log(
+        "[AuthService] Solicitação de redefinição enviada com sucesso"
+      );
+    } catch (error: any) {
+      console.error(
+        "[AuthService] Erro ao solicitar redefinição:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   },
 
   /**
@@ -196,10 +254,20 @@ const AuthService = {
    * @returns Void - Resposta é vazia com status 204
    */
   resetPassword: async (token: string, newPassword: string): Promise<void> => {
-    await api.post("/auth/reset-password", {
-      token,
-      password: newPassword,
-    });
+    console.log("[AuthService] Redefinindo senha com token");
+    try {
+      await api.post("/auth/reset-password", {
+        token,
+        password: newPassword,
+      });
+      console.log("[AuthService] Senha redefinida com sucesso");
+    } catch (error: any) {
+      console.error(
+        "[AuthService] Erro ao redefinir senha:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   },
 };
 
