@@ -119,6 +119,7 @@ getDonorStats: async (donorId: string): Promise<DonorStatsDto> => {
     return response.data;
   },
 
+ 
   /**
    * Obter itens por status
    * @param status Status dos itens (disponível, reservado, distribuído)
@@ -129,11 +130,16 @@ getDonorStats: async (donorId: string): Promise<DonorStatsDto> => {
     status: string,
     pageOptions?: PageOptionsDto
   ): Promise<ItemsPage> => {
-     const response = await api.get<ItemsPage>(`/items`, {
+     // LÓGICA DE DIRECIONAMENTO: Se o status for 'disponivel', usa a nova rota segura.
+     const url = status === 'disponivel' ? '/items/available/all' : '/items';
+
+     const response = await api.get<ItemsPage>(url, {
       params: {
         page: pageOptions?.page || 1,
         take: pageOptions?.take || 20,
-        status: status, // Passar status como query parameter
+        // O parâmetro 'status' não é mais necessário para a nova rota,
+        // mas não há problema em enviá-lo. O backend irá ignorá-lo e aplicar o filtro correto.
+        status: status, 
       },
     });
     return response.data;
