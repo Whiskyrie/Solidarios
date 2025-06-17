@@ -11,7 +11,6 @@ import { Inventory } from './entities/inventory.entity';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { ItemsService } from '../items/items.service';
-import { ItemStatus } from '../items/entities/item.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
@@ -33,59 +32,41 @@ export class InventoryService {
   @LogMethod()
   async create(
     createInventoryDto: CreateInventoryDto,
-    currentUser: User,
+    _currentUser: User,
   ): Promise<Inventory> {
     this.logger.log(
       `Adicionando item ${createInventoryDto.itemId} ao inventário`,
     );
 
     try {
-      // Apenas Admin ou Funcionário podem adicionar itens ao inventário
-      if (
-        currentUser.role !== UserRole.ADMIN &&
-        currentUser.role !== UserRole.FUNCIONARIO
-      ) {
-        this.logger.warn(
-          `Usuário ${currentUser.id} (${currentUser.role}) sem permissão para adicionar ao inventário`,
-        );
-        throw new ForbiddenException(
-          'Você não tem permissão para adicionar itens ao inventário.',
-        );
-      }
-
-      // Verifica se o item existe e está disponível
+      // Verificar se o item existe
       const item = await this.itemsService.findOne(createInventoryDto.itemId);
-      if (item.status !== ItemStatus.DISPONIVEL) {
-        this.logger.warn(
-          `Item ${createInventoryDto.itemId} não está disponível (status: ${item.status})`,
-        );
-        throw new ConflictException(
-          `Item com ID ${createInventoryDto.itemId} não está disponível para adicionar ao estoque.`,
-        );
+      if (!item) {
+        throw new NotFoundException('Item não encontrado');
       }
 
-      // Verifica se já existe um registro de inventário para este item
+      // Verificar se já existe no inventário
       const existingInventory = await this.inventoryRepository.findOne({
         where: { itemId: createInventoryDto.itemId },
       });
+
       if (existingInventory) {
-        this.logger.warn(
-          `Item ${createInventoryDto.itemId} já existe no inventário`,
-        );
-        throw new ConflictException(
-          `Já existe um registro de inventário para o item com ID ${createInventoryDto.itemId}. Use a rota de atualização.`,
-        );
+        throw new ConflictException('Item já existe no inventário');
       }
 
+      // CORREÇÃO: Usar donorId do item se não fornecido
       const inventoryEntry = this.inventoryRepository.create({
         ...createInventoryDto,
-        item: item,
+        donorId: createInventoryDto.donorId || item.donorId, // Usar donorId do item
+        quantity: createInventoryDto.quantity || 1,
       });
 
       const savedEntry = await this.inventoryRepository.save(inventoryEntry);
+
       this.logger.log(
         `Item adicionado ao inventário com sucesso: ${savedEntry.id}`,
       );
+
       return savedEntry;
     } catch (error) {
       this.logger.error(
