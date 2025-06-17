@@ -5,9 +5,11 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  ManyToMany,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Category } from 'src/modules/categories/entities/category.entity';
+import { Distribution } from '../../distributions/entities/distribution.entity';
 // import { Category } from './category.entity'; // Será criada depois
 
 export enum ItemType {
@@ -69,4 +71,7 @@ export class Item {
 
   @Column({ nullable: true })
   categoryId: string;
+
+  @ManyToMany(() => Distribution, (distribution) => distribution.items)
+  distributions: Distribution[];
 }
