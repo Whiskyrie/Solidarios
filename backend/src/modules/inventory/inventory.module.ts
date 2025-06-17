@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryService } from './inventory.service';
 import { InventoryController } from './inventory.controller';
@@ -7,7 +7,11 @@ import { ItemsModule } from '../items/items.module';
 import { LoggingModule } from '../../common/logging/logging.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Inventory]), ItemsModule, LoggingModule],
+  imports: [
+    TypeOrmModule.forFeature([Inventory]),
+    forwardRef(() => ItemsModule), // Usar forwardRef se houver dependência circular
+    LoggingModule,
+  ],
   controllers: [InventoryController],
   providers: [InventoryService],
   exports: [InventoryService],
