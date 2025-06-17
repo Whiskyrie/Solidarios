@@ -8,6 +8,7 @@ import {
   UpdateItemDto,
   ItemsPage,
   ItemsApiResponse,
+  DonorStatsDto, // <-- Add this line
 } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
 
@@ -89,6 +90,18 @@ const ItemsService = {
       throw error;
     }
   },
+
+  /**
+ * Obter estatísticas de um doador
+ * @param donorId ID do doador
+ * @returns Dados estatísticos do doador
+ */
+getDonorStats: async (donorId: string): Promise<DonorStatsDto> => {
+  const response = await api.get<DonorStatsDto>(`/items/donor/${donorId}/stats`);
+  return response.data;
+},
+
+
 
   /**
    * Obter itens por categoria
