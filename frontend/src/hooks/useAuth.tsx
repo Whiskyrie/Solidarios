@@ -15,9 +15,10 @@ import {
   getProfile as getProfileAction,
   refreshTokens as refreshTokensAction,
   clearErrors as clearErrorsAction,
+  updateProfile as updateProfileAction,
 } from "../store/slices/authSlice";
 import { useAppDispatch, useAppSelector } from "../store";
-import { UserRole } from "../types/users.types";
+import { UserRole, UpdateUserRequest } from "../types/users.types";
 
 // Definição do tipo para o contexto de autenticação
 type AuthContextType = {
@@ -38,6 +39,7 @@ type AuthContextType = {
   isFuncionario: () => boolean;
   isDoador: () => boolean;
   isBeneficiario: () => boolean;
+  updateProfile: (data: UpdateUserRequest) => Promise<boolean>;
 };
 
 // Criar o contexto
@@ -58,10 +60,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Função para login
   const login = useCallback(
-    async (credentials: LoginDto) => {
+    async (credentials: LoginDto): Promise<boolean> => {
       try {
         console.log("[useAuth] Disparando ação de login");
-        // Usar o tipo correto para o dispatch (AppDispatch já está tipado para suportar thunks)
         await dispatch(loginAction(credentials)).unwrap();
         console.log("[useAuth] Login realizado com sucesso");
         return true;
@@ -75,10 +76,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Função para registrar novo usuário
   const register = useCallback(
-    async (userData: RegisterDto) => {
+    async (userData: RegisterDto): Promise<boolean> => {
       try {
         console.log("[useAuth] Disparando ação de registro");
-        // Usar o tipo correto para o dispatch
         await dispatch(registerAction(userData)).unwrap();
         console.log("[useAuth] Registro realizado com sucesso");
         return true;
@@ -91,35 +91,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   // Função para fazer logout
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (): Promise<boolean> => {
     try {
-      // Usar o tipo correto para o dispatch
+      console.log("[useAuth] Fazendo logout");
       await dispatch(logoutAction()).unwrap();
       return true;
     } catch (error) {
+      console.error("[useAuth] Erro no logout:", error);
       return false;
     }
   }, [dispatch]);
 
   // Função para obter perfil do usuário
-  const getProfile = useCallback(async () => {
+  const getProfile = useCallback(async (): Promise<any | null> => {
     try {
-      // Usar o tipo correto para o dispatch
-      return await dispatch(getProfileAction()).unwrap();
+      console.log("[useAuth] Obtendo perfil do usuário");
+      const profile = await dispatch(getProfileAction()).unwrap();
+      return profile;
     } catch (error) {
+      console.error("[useAuth] Erro ao obter perfil:", error);
       return null;
     }
   }, [dispatch]);
 
   // Função para renovar tokens
-  const refreshTokens = useCallback(async () => {
-    if (!refreshToken) return false;
+  const refreshTokens = useCallback(async (): Promise<boolean> => {
+    if (!refreshToken) {
+      console.warn("[useAuth] Refresh token não disponível");
+      return false;
+    }
 
     try {
-      // Usar o tipo correto para o dispatch
+      console.log("[useAuth] Renovando tokens");
       await dispatch(refreshTokensAction(refreshToken)).unwrap();
       return true;
     } catch (error) {
+      console.error("[useAuth] Erro ao renovar tokens:", error);
       return false;
     }
   }, [dispatch, refreshToken]);
@@ -131,7 +138,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Verificar se o usuário tem uma determinada role
   const hasRole = useCallback(
-    (role: UserRole | UserRole[]) => {
+    (role: UserRole | UserRole[]): boolean => {
       if (!user) return false;
 
       if (Array.isArray(role)) {
@@ -144,24 +151,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   // Verificar se o usuário é admin
-  const isAdmin = useCallback(() => {
+  const isAdmin = useCallback((): boolean => {
     return hasRole(UserRole.ADMIN);
   }, [hasRole]);
 
   // Verificar se o usuário é funcionário
-  const isFuncionario = useCallback(() => {
+  const isFuncionario = useCallback((): boolean => {
     return hasRole(UserRole.FUNCIONARIO);
   }, [hasRole]);
 
   // Verificar se o usuário é doador
-  const isDoador = useCallback(() => {
+  const isDoador = useCallback((): boolean => {
     return hasRole(UserRole.DOADOR);
   }, [hasRole]);
 
   // Verificar se o usuário é beneficiário
-  const isBeneficiario = useCallback(() => {
+  const isBeneficiario = useCallback((): boolean => {
     return hasRole(UserRole.BENEFICIARIO);
   }, [hasRole]);
+
+  // Função para atualizar perfil do usuário
+  const updateProfile = useCallback(
+    async (data: UpdateUserRequest): Promise<boolean> => {
+      if (!user) {
+        console.error("[useAuth] Usuário não autenticado");
+        return false;
+      }
+
+      try {
+        console.log("[useAuth] Atualizando perfil do usuário");
+
+        // Preparar dados para atualização
+        const updateData = {
+          userId: user.id,
+          data: data,
+        };
+
+        // Disparar ação de atualização
+        await dispatch(updateProfileAction(updateData)).unwrap();
+
+        console.log("[useAuth] Perfil atualizado com sucesso");
+        return true;
+      } catch (error) {
+        console.error("[useAuth] Erro ao atualizar perfil:", error);
+        return false;
+      }
+    },
+    [user, dispatch]
+  );
 
   // Criar o objeto de valor do contexto
   const authContextValue: AuthContextType = {
@@ -180,6 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getProfile,
     refreshTokens,
     clearErrors,
+    updateProfile,
 
     // Helpers
     hasRole,
@@ -205,5 +243,8 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// Exportar o tipo do contexto para uso em outros arquivos
+export type { AuthContextType };
 
 export default AuthProvider;
