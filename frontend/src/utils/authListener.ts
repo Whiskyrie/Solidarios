@@ -1,12 +1,14 @@
 /**
  * Listener para eventos de autenticação
  * Gerencia redirecionamentos automáticos quando a sessão expira
+ * CORRIGIDO: Verificações de segurança para NavigationContainer
  */
 import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigation } from "@react-navigation/native";
 import { forceLogout } from "../store/slices/authSlice";
 import api from "../api/api";
+import { View } from "react-native";
 
 // Tipo para o estado do Redux (ajuste conforme sua estrutura)
 interface RootState {
@@ -20,7 +22,7 @@ interface RootState {
 
 /**
  * Hook para escutar eventos de autenticação e reagir adequadamente
- * Deve ser usado no componente raiz do app ou no navigator principal
+ * Deve ser usado DENTRO do NavigationContainer
  */
 export const useAuthListener = () => {
   const dispatch = useDispatch();
@@ -29,12 +31,16 @@ export const useAuthListener = () => {
   const hasSetupInterceptor = useRef(false);
 
   useEffect(() => {
+    // Verificar se o navigation está disponível
+    if (!navigation) {
+      console.warn("[AuthListener] Navigation não está disponível ainda");
+      return;
+    }
+
     // Configurar interceptador uma única vez
     if (!hasSetupInterceptor.current) {
       const cleanup = setupAuthErrorInterceptor();
       hasSetupInterceptor.current = true;
-
-      // Retornar função de limpeza
       return cleanup;
     }
   }, [dispatch, navigation, isAuthenticated]);
@@ -61,19 +67,25 @@ export const useAuthListener = () => {
           // Dispatch do logout forçado
           dispatch(forceLogout());
 
-          // Redirecionar para tela de login
+          // Redirecionar para tela de login com verificação de segurança
           try {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Login" }],
-            });
+            if (navigation && navigation.reset) {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              });
+            } else if (navigation && navigation.navigate) {
+              navigation.navigate("Login");
+            } else {
+              console.warn(
+                "[AuthListener] Navigation não disponível para redirecionamento"
+              );
+            }
           } catch (navError) {
             console.error(
               "[AuthListener] Erro ao navegar para login:",
               navError
             );
-            // Fallback: tentar navigate normal
-            navigation.navigate("Login");
           }
         }
 
@@ -91,12 +103,13 @@ export const useAuthListener = () => {
 /**
  * Componente para ser usado no app principal
  * Automaticamente configura os listeners de autenticação
+ * DEVE ser usado DENTRO do NavigationContainer
  */
 export const AuthListener: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   useAuthListener();
-  return React.createElement(React.Fragment, null, children);
+  return React.createElement(View, { style: { flex: 1 } }, children);
 };
 
 /**
@@ -129,5 +142,50 @@ export const useAuthActions = () => {
     clearError: () => dispatch({ type: "auth/clearError" }),
     setLoading: (loading: boolean) =>
       dispatch({ type: "auth/setLoading", payload: loading }),
+  };
+};
+
+/**
+ * Hook de segurança para verificar se o navigation está disponível
+ * Útil para componentes que precisam navegar condicionalmente
+ */
+export const useNavigationSafe = () => {
+  const navigation = useNavigation<any>();
+
+  const navigateSafe = (routeName: string, params?: any) => {
+    try {
+      if (navigation && navigation.navigate) {
+        navigation.navigate(routeName, params);
+      } else {
+        console.warn(
+          `[useNavigationSafe] Não foi possível navegar para ${routeName}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `[useNavigationSafe] Erro ao navegar para ${routeName}:`,
+        error
+      );
+    }
+  };
+
+  const resetSafe = (routes: any[]) => {
+    try {
+      if (navigation && navigation.reset) {
+        navigation.reset({ index: 0, routes });
+      } else {
+        console.warn(
+          "[useNavigationSafe] Não foi possível fazer reset da navegação"
+        );
+      }
+    } catch (error) {
+      console.error("[useNavigationSafe] Erro ao fazer reset:", error);
+    }
+  };
+
+  return {
+    navigateSafe,
+    resetSafe,
+    isNavigationAvailable: !!(navigation && navigation.navigate),
   };
 };

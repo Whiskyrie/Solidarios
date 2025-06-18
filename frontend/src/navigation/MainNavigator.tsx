@@ -1,7 +1,7 @@
 /**
  * MainNavigator - Navegador principal com gerenciamento inteligente de estado
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
 import { useAppDispatch, useAppSelector } from "../store";
@@ -25,49 +25,42 @@ const MainNavigator: React.FC = () => {
   const { isAuthenticated, isLoading, tokenStatus } = useAuth();
   const authState = useAppSelector((state) => state.auth);
 
-  // Estado local para controlar se já tentou restaurar
-  const [hasTriedRestore, setHasTriedRestore] = useState(false);
+  // Estados locais para controlar o fluxo
   const [isInitializing, setIsInitializing] = useState(true);
+  const hasInitialized = useRef(false);
 
-  // Efeito para restaurar estado de autenticação
+  // Efeito ÚNICO para restaurar estado de autenticação
   useEffect(() => {
     const initializeAuthState = async () => {
-      // Se já tentou restaurar ou está carregando, não fazer nada
-      if (hasTriedRestore || isLoading) {
+      // Se já inicializou, não fazer nada
+      if (hasInitialized.current) {
         return;
       }
 
-      // Se não há tokens no estado Redux, tentar restaurar
-      if (!authState.accessToken && !authState.refreshToken) {
-        console.log(
-          "[MainNavigator] Tentando restaurar estado de autenticação..."
-        );
+      console.log("[MainNavigator] Inicializando estado de autenticação...");
 
-        try {
+      try {
+        // Se não há tokens no estado Redux, tentar restaurar
+        if (!authState.accessToken && !authState.refreshToken) {
+          console.log("[MainNavigator] Restaurando estado de autenticação...");
           await dispatch(restoreAuthState()).unwrap();
-          console.log("[MainNavigator] Estado restaurado com sucesso");
-        } catch (error) {
-          console.log(
-            "[MainNavigator] Nenhum estado anterior encontrado:",
-            error
-          );
         }
+      } catch (error) {
+        console.log(
+          "[MainNavigator] Nenhum estado anterior encontrado:",
+          error
+        );
+      } finally {
+        hasInitialized.current = true;
+        setIsInitializing(false);
+        console.log("[MainNavigator] Inicialização completa");
       }
-
-      setHasTriedRestore(true);
-      setIsInitializing(false);
     };
 
     initializeAuthState();
-  }, [
-    dispatch,
-    authState.accessToken,
-    authState.refreshToken,
-    hasTriedRestore,
-    isLoading,
-  ]);
+  }, []); // Dependências vazias - executar apenas uma vez
 
-  // Efeito para monitorar status do token
+  // Efeito separado para monitorar status do token (sem causar loop)
   useEffect(() => {
     if (isAuthenticated && !tokenStatus.hasValidTokens) {
       console.log(
@@ -76,18 +69,20 @@ const MainNavigator: React.FC = () => {
     }
   }, [isAuthenticated, tokenStatus.hasValidTokens]);
 
-  // Mostrar splash durante inicialização ou carregamento
-  if (isInitializing || isLoading || !hasTriedRestore) {
+  // Mostrar splash durante inicialização
+  if (isInitializing || (!hasInitialized.current && isLoading)) {
     return <SplashScreen />;
   }
 
-  // Log para debug
-  console.log("[MainNavigator] Estado atual:", {
-    isAuthenticated,
-    hasValidTokens: tokenStatus.hasValidTokens,
-    isTokenExpired: tokenStatus.isExpired,
-    timeUntilExpiry: tokenStatus.timeUntilExpiry,
-  });
+  // Log para debug (apenas quando necessário)
+  if (__DEV__ && hasInitialized.current) {
+    console.log("[MainNavigator] Estado atual:", {
+      isAuthenticated,
+      hasValidTokens: tokenStatus.hasValidTokens,
+      isTokenExpired: tokenStatus.isExpired,
+      timeUntilExpiry: tokenStatus.timeUntilExpiry,
+    });
+  }
 
   return (
     <Stack.Navigator

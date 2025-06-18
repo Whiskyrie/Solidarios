@@ -1,5 +1,6 @@
 /**
  * App.tsx - Aplicação principal com sistema de autenticação integrado
+ * CORRIGIDO: AuthListener agora está dentro do NavigationContainer
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
@@ -36,6 +37,20 @@ export const NotificationContext = React.createContext({
   }) => {},
   hideNotification: () => {},
 });
+
+/**
+ * Componente interno que contém a navegação e o AuthListener
+ * Necessário para garantir que o AuthListener tenha acesso ao NavigationContainer
+ */
+const AppContent: React.FC = () => {
+  return (
+    <NavigationContainer>
+      <AuthListener>
+        <MainNavigator />
+      </AuthListener>
+    </NavigationContainer>
+  );
+};
 
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -90,9 +105,6 @@ export default function App() {
         console.log("[App] Inicialização completa com sucesso");
       } catch (error) {
         console.error("[App] Erro durante inicialização:", error);
-
-        // Em caso de erro, ainda permitir que o app inicie
-        // O usuário precisará fazer login manualmente
         console.log("[App] Continuando inicialização apesar do erro");
       } finally {
         setAppIsReady(true);
@@ -140,25 +152,21 @@ export default function App() {
       <SafeAreaProvider onLayout={onLayoutRootView}>
         <StatusBar style="auto" />
         <AuthProvider>
-          <AuthListener>
-            <NotificationContext.Provider
-              value={{ showNotification, hideNotification }}
-            >
-              <NavigationContainer>
-                <MainNavigator />
-                <NotificationBanner
-                  visible={notification.visible}
-                  type={notification.type}
-                  message={notification.message}
-                  description={notification.description}
-                  onClose={hideNotification}
-                  position="top"
-                  autoClose
-                  duration={3000}
-                />
-              </NavigationContainer>
-            </NotificationContext.Provider>
-          </AuthListener>
+          <NotificationContext.Provider
+            value={{ showNotification, hideNotification }}
+          >
+            <AppContent />
+            <NotificationBanner
+              visible={notification.visible}
+              type={notification.type}
+              message={notification.message}
+              description={notification.description}
+              onClose={hideNotification}
+              position="top"
+              autoClose
+              duration={3000}
+            />
+          </NotificationContext.Provider>
         </AuthProvider>
       </SafeAreaProvider>
     </Provider>
