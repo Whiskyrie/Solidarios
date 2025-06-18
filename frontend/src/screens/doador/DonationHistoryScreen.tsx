@@ -1,15 +1,26 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  RefreshControl,
+  TouchableOpacity,
+  StatusBar,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+} from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { LinearGradient } from "expo-linear-gradient";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { DoadorDonationsStackParamList } from "../../navigation/types";
 
 // Componentes
 import {
-  Header,
-  EmptyState,
+  Typography,
+  Card,
+  Button,
   ItemCard,
-  Loading,
   ErrorState,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
@@ -66,68 +77,244 @@ const DonationHistoryScreen: React.FC = () => {
 
   // Função para navegar para a tela de nova doação
   const navigateToNewDonation = () => {
-    // Navegando para a tab NewDonation em vez da tela diretamente
     const rootNavigation = navigation.getParent();
     if (rootNavigation) {
       rootNavigation.navigate("NewDonation");
     }
   };
 
+  // Header melhorado seguindo padrão EditProfileScreen
+  const Header = () => (
+    <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
+      />
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={theme.colors.neutral.white}
+            />
+          </TouchableOpacity>
+
+          <Typography
+            variant="h3"
+            color={theme.colors.neutral.white}
+            style={styles.headerTitle}
+          >
+            Histórico de Doações
+          </Typography>
+
+          <View style={styles.headerRight} />
+        </View>
+      </LinearGradient>
+    </>
+  );
+
+  // Loading Skeleton melhorado
+  const HistorySkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <Card key={item} style={styles.skeletonCard}>
+          <View style={styles.skeletonRow}>
+            <View style={styles.skeletonImage} />
+            <View style={styles.skeletonContent}>
+              <View style={styles.skeletonLine} />
+              <View style={styles.skeletonLineSmall} />
+              <View style={styles.skeletonLineTiny} />
+            </View>
+          </View>
+        </Card>
+      ))}
+    </View>
+  );
+
+  // Empty State melhorado
+  const EmptyHistoryState = () => (
+    <Card style={styles.emptyStateCard}>
+      <View style={styles.emptyStateContent}>
+        <MaterialIcons
+          name="history"
+          size={64}
+          color={theme.colors.neutral.mediumGray}
+        />
+        <Typography variant="h4" center style={styles.emptyTitle}>
+          Nenhuma doação encontrada
+        </Typography>
+        <Typography
+          variant="bodySecondary"
+          center
+          style={styles.emptyDescription}
+        >
+          Quando você fizer doações, elas aparecerão aqui para acompanhar seu
+          impacto social
+        </Typography>
+        <Button
+          title="Fazer primeira doação"
+          onPress={navigateToNewDonation}
+          style={styles.emptyActionButton}
+        />
+      </View>
+    </Card>
+  );
+
+  // Componente de estatísticas rápidas
+  const QuickStats = () => {
+    const totalDonations = items?.length || 0;
+    const distributedItems =
+      items?.filter((item) => item.status === "distribuido").length || 0;
+
+    return (
+      <Card style={styles.statsCard}>
+        <View style={styles.statsContent}>
+          <View style={styles.statItem}>
+            <Typography
+              variant="h3"
+              color={theme.colors.primary.secondary}
+              center
+            >
+              {totalDonations}
+            </Typography>
+            <Typography
+              variant="caption"
+              center
+              color={theme.colors.neutral.darkGray}
+            >
+              Total de doações
+            </Typography>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Typography variant="h3" color={theme.colors.status.success} center>
+              {distributedItems}
+            </Typography>
+            <Typography
+              variant="caption"
+              center
+              color={theme.colors.neutral.darkGray}
+            >
+              Itens distribuídos
+            </Typography>
+          </View>
+        </View>
+      </Card>
+    );
+  };
+
   // Se estiver carregando inicialmente, mostrar loading
   if (isLoading && !refreshing && !items?.length) {
-    return <Loading visible={true} message="Carregando histórico..." overlay />;
+    return (
+      <View style={styles.container}>
+        <Header />
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <HistorySkeleton />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    );
   }
 
   // Se houver erro, mostrar tela de erro
   if (error) {
     return (
-      <ErrorState
-        title="Erro ao carregar histórico"
-        description={error}
-        actionLabel="Tentar novamente"
-        onAction={() => {
-          clearError();
-          loadDonationHistory();
-        }}
-      />
+      <View style={styles.container}>
+        <Header />
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ErrorState
+            title="Erro ao carregar histórico"
+            description={error}
+            actionLabel="Tentar novamente"
+            onAction={() => {
+              clearError();
+              loadDonationHistory();
+            }}
+          />
+        </KeyboardAvoidingView>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
-      <Header
-        title="Histórico de Doações"
-        onBackPress={() => navigation.goBack()}
-        backgroundColor={theme.colors.primary.secondary}
-      />
+      <Header />
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ItemCard
-            item={item}
-            onPress={() =>
-              navigation.navigate("DonationDetail", { id: item.id })
-            }
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListEmptyComponent={
-          <EmptyState
-            title="Sem histórico de doações"
-            description="Você ainda não realizou doações"
-            actionLabel="Fazer uma doação"
-            onAction={navigateToNewDonation}
-          />
-        }
-      />
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {/* Estatísticas rápidas */}
+          {items && items.length > 0 && <QuickStats />}
+
+          {/* Lista de doações ou estado vazio */}
+          {items && items.length > 0 ? (
+            <View style={styles.listContainer}>
+              <Typography variant="h4" style={styles.listTitle}>
+                Suas Doações
+              </Typography>
+
+              {items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onPress={() =>
+                    navigation.navigate("DonationDetail", { id: item.id })
+                  }
+                  style={styles.itemCard}
+                  showDonor={false}
+                  showCategory={true}
+                />
+              ))}
+
+              {/* Botão de carregar mais */}
+              {pagination && pagination.page < pagination.totalPages && (
+                <Button
+                  title="Carregar mais doações"
+                  variant="secondary"
+                  onPress={handleLoadMore}
+                  style={styles.loadMoreButton}
+                  loading={isLoading}
+                />
+              )}
+            </View>
+          ) : (
+            <EmptyHistoryState />
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -135,12 +322,146 @@ const DonationHistoryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 0,
-    backgroundColor: theme.colors.neutral.white,
+    backgroundColor: theme.colors.neutral.lightGray,
   },
-  listContent: {
+  headerGradient: {
+    paddingTop:
+      Platform.OS === "ios" ? 50 : (StatusBar.currentHeight || 0) + 20,
+    paddingBottom: theme.spacing.m,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.m,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    marginHorizontal: theme.spacing.m,
+  },
+  headerRight: {
+    width: 40, // Para manter simetria
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
     padding: theme.spacing.m,
-    paddingBottom: theme.spacing.xl,
+  },
+
+  // Estatísticas rápidas
+  statsCard: {
+    marginBottom: theme.spacing.m,
+    padding: theme.spacing.m,
+  },
+  statsContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    marginHorizontal: theme.spacing.m,
+  },
+
+  // Lista de doações
+  listContainer: {
+    flex: 1,
+  },
+  listTitle: {
+    marginBottom: theme.spacing.m,
+    color: theme.colors.primary.main,
+  },
+  itemCard: {
+    marginBottom: theme.spacing.s,
+  },
+  loadMoreButton: {
+    marginTop: theme.spacing.m,
+    marginHorizontal: theme.spacing.s,
+  },
+
+  // Skeleton loading
+  skeletonContainer: {
+    flex: 1,
+  },
+  skeletonCard: {
+    marginBottom: theme.spacing.s,
+    opacity: 0.7,
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.s,
+  },
+  skeletonImage: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.borderRadius.small,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    marginRight: theme.spacing.s,
+  },
+  skeletonContent: {
+    flex: 1,
+  },
+  skeletonLine: {
+    height: 16,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 4,
+    marginBottom: theme.spacing.xs,
+    width: "80%",
+  },
+  skeletonLineSmall: {
+    height: 12,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 4,
+    marginBottom: theme.spacing.xs,
+    width: "60%",
+  },
+  skeletonLineTiny: {
+    height: 10,
+    backgroundColor: theme.colors.neutral.mediumGray,
+    borderRadius: 4,
+    width: "40%",
+  },
+
+  // Empty state
+  emptyStateCard: {
+    marginTop: theme.spacing.xl,
+    padding: theme.spacing.xl,
+  },
+  emptyStateContent: {
+    alignItems: "center",
+  },
+  emptyTitle: {
+    marginTop: theme.spacing.m,
+    marginBottom: theme.spacing.s,
+  },
+  emptyDescription: {
+    marginBottom: theme.spacing.l,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  emptyActionButton: {
+    paddingHorizontal: theme.spacing.l,
   },
 });
 
