@@ -1,15 +1,17 @@
-// src/navigation/MainNavigator.tsx
-import React, { useEffect } from "react";
+/**
+ * MainNavigator - Navegador principal com gerenciamento inteligente de estado
+ */
+import React, { useEffect, useState } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
-import { ActivityIndicator, View } from "react-native";
+import { useAppDispatch, useAppSelector } from "../store";
+import { restoreAuthState } from "../store/slices/authSlice";
 
 // Navegadores
 import AuthNavigator from "./AuthNavigator";
 import RoleNavigator from "./RoleNavigator";
 import SplashScreen from "../screens/auth/SplashScreen";
 
-// Definição de rotas
 export type MainStackParamList = {
   Auth: undefined;
   Role: undefined;
@@ -19,33 +21,98 @@ export type MainStackParamList = {
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const MainNavigator: React.FC = () => {
-  const { isAuthenticated, isLoading, getProfile } = useAuth();
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, isLoading, tokenStatus } = useAuth();
+  const authState = useAppSelector((state) => state.auth);
 
-  // Carregar perfil do usuário ao iniciar, mas somente uma vez
+  // Estado local para controlar se já tentou restaurar
+  const [hasTriedRestore, setHasTriedRestore] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Efeito para restaurar estado de autenticação
   useEffect(() => {
-    if (!isLoading) {
-      // Evita chamadas repetidas para getProfile
-      // O hook useAuth já deve tentar obter o perfil na inicialização
-    }
-  }, []);
+    const initializeAuthState = async () => {
+      // Se já tentou restaurar ou está carregando, não fazer nada
+      if (hasTriedRestore || isLoading) {
+        return;
+      }
 
-  // Se ainda estiver carregando, mostre a tela de splash
-  if (isLoading) {
+      // Se não há tokens no estado Redux, tentar restaurar
+      if (!authState.accessToken && !authState.refreshToken) {
+        console.log(
+          "[MainNavigator] Tentando restaurar estado de autenticação..."
+        );
+
+        try {
+          await dispatch(restoreAuthState()).unwrap();
+          console.log("[MainNavigator] Estado restaurado com sucesso");
+        } catch (error) {
+          console.log(
+            "[MainNavigator] Nenhum estado anterior encontrado:",
+            error
+          );
+        }
+      }
+
+      setHasTriedRestore(true);
+      setIsInitializing(false);
+    };
+
+    initializeAuthState();
+  }, [
+    dispatch,
+    authState.accessToken,
+    authState.refreshToken,
+    hasTriedRestore,
+    isLoading,
+  ]);
+
+  // Efeito para monitorar status do token
+  useEffect(() => {
+    if (isAuthenticated && !tokenStatus.hasValidTokens) {
+      console.log(
+        "[MainNavigator] Token inválido detectado, pode ser necessário reautenticar"
+      );
+    }
+  }, [isAuthenticated, tokenStatus.hasValidTokens]);
+
+  // Mostrar splash durante inicialização ou carregamento
+  if (isInitializing || isLoading || !hasTriedRestore) {
     return <SplashScreen />;
   }
 
-  // Depois que o carregamento terminar, use o navegador adequado
+  // Log para debug
+  console.log("[MainNavigator] Estado atual:", {
+    isAuthenticated,
+    hasValidTokens: tokenStatus.hasValidTokens,
+    isTokenExpired: tokenStatus.isExpired,
+    timeUntilExpiry: tokenStatus.timeUntilExpiry,
+  });
+
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
         animation: "fade",
+        animationDuration: 300,
       }}
     >
-      {isAuthenticated ? (
-        <Stack.Screen name="Role" component={RoleNavigator} />
+      {isAuthenticated && tokenStatus.hasValidTokens ? (
+        <Stack.Screen
+          name="Role"
+          component={RoleNavigator}
+          options={{
+            gestureEnabled: false, // Evitar voltar para auth por gesture
+          }}
+        />
       ) : (
-        <Stack.Screen name="Auth" component={AuthNavigator} />
+        <Stack.Screen
+          name="Auth"
+          component={AuthNavigator}
+          options={{
+            gestureEnabled: false,
+          }}
+        />
       )}
     </Stack.Navigator>
   );

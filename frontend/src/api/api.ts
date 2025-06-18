@@ -1,185 +1,174 @@
 /**
- * Configuração da API com interceptadores para autenticação automática
- * Inclui renovação automática de tokens em caso de erro 401
+ * Configuração da API com interceptors inteligentes
+ * Integrado com o sistema de renovação automática de tokens
  */
-import axios from "axios";
+import axios, { AxiosError, AxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { store } from "../store";
+import { forceLogout, refreshTokens } from "../store/slices/authSlice";
 
-// Configuração de URLs para diferentes ambientes
-const API_URLS = {
-  LOCAL: "http://localhost:3000",
-  CLOUD: "https://api-solidarios.onrender.com",
-} as const;
+const BASE_URL = "https://walrus-app-tyhbw.ondigitalocean.app/api";
 
-type ApiEnvironment = keyof typeof API_URLS;
-
-// Função para obter o ambiente padrão do .env
-const getDefaultEnvironment = (): ApiEnvironment => {
-  const envValue = process.env.EXPO_PUBLIC_API_ENVIRONMENT?.toUpperCase();
-  return envValue && envValue in API_URLS
-    ? (envValue as ApiEnvironment)
-    : "CLOUD";
-};
-
-// Variável para controlar qual ambiente usar
-let currentEnvironment: ApiEnvironment = getDefaultEnvironment();
-
-// Função para obter a URL base atual
-export const getApiBaseUrl = () => API_URLS[currentEnvironment];
-
-// Função para alternar entre ambientes
-export const toggleApiEnvironment = async () => {
-  currentEnvironment = currentEnvironment === "CLOUD" ? "LOCAL" : "CLOUD";
-  await AsyncStorage.setItem("@api_environment", currentEnvironment);
-  api.defaults.baseURL = getApiBaseUrl();
-  console.log(
-    `[API Config] Ambiente alterado para: ${currentEnvironment} (${getApiBaseUrl()})`
-  );
-  return currentEnvironment;
-};
-
-// Função para inicializar ambiente da API
-export const initApiEnvironment = async () => {
-  try {
-    // Primeiro tenta do AsyncStorage (para sobrescrever a configuração quando alterada pelo usuário)
-    const savedEnvironment = await AsyncStorage.getItem("@api_environment");
-    if (savedEnvironment && savedEnvironment in API_URLS) {
-      currentEnvironment = savedEnvironment as ApiEnvironment;
-    } else {
-      // Se não houver configuração no AsyncStorage, usa o valor do .env
-      currentEnvironment = getDefaultEnvironment();
-    }
-
-    api.defaults.baseURL = getApiBaseUrl();
-    console.log(
-      `[API Config] URL base configurada: ${currentEnvironment} (${getApiBaseUrl()})`
-    );
-  } catch (error) {
-    console.error("[API Config] Erro ao inicializar ambiente:", error);
-  }
-};
-
+// Criar instância do axios
 const api = axios.create({
-  baseURL: API_URLS[currentEnvironment],
-  timeout: 15000,
+  baseURL: BASE_URL,
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Inicializa o ambiente (chamado na inicialização do app)
-initApiEnvironment();
+// Flag para evitar múltiplas tentativas de refresh simultâneas
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: string) => void;
+  reject: (error: any) => void;
+}> = [];
 
-// Log de requisições
+/**
+ * Processa a fila de requisições pendentes após renovação de token
+ */
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token!);
+    }
+  });
+
+  failedQueue = [];
+};
+
+/**
+ * Interceptor de requisição - adiciona token de autorização
+ */
 api.interceptors.request.use(
-  (config) => {
-    console.log("[API] Requisição:", {
-      method: config.method?.toUpperCase(),
-      url: `${config.url}`,
-      params: config.params,
-    });
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem("@auth_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error("[API] Erro ao obter token para requisição:", error);
+    }
+
     return config;
   },
   (error) => {
-    console.error("[API] Erro na requisição:", error);
+    console.error("[API] Erro no interceptor de requisição:", error);
     return Promise.reject(error);
   }
 );
 
-// Interceptador de resposta com renovação automática de token
+/**
+ * Interceptor de resposta - trata erros de autenticação e renovação automática
+ */
 api.interceptors.response.use(
-  (response) => {
-    console.log("[API] Resposta:", {
-      status: response.status,
-      url: response.config.url,
-    });
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
-    // Se o erro for 401 (não autorizado) e não for uma rota de auth, tentar renovar token
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      !originalRequest.url?.includes("/auth/login") &&
-      !originalRequest.url?.includes("/auth/register") &&
-      !originalRequest.url?.includes("/auth/refresh")
-    ) {
+    // Verificar se é erro 401 e se não é uma tentativa de retry
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log("[API] Erro 401 detectado, iniciando processo de renovação");
+
+      // Se já está renovando, adicionar à fila de espera
+      if (isRefreshing) {
+        console.log("[API] Renovação em andamento, adicionando à fila");
+
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers!.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      // Marcar como tentativa de retry
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        console.log(
-          "[API] Detectado erro 401, tentando renovar token automaticamente"
-        );
-        const refreshToken = await AsyncStorage.getItem("@refresh_token");
+        console.log("[API] Iniciando renovação de tokens...");
 
-        if (refreshToken) {
-          // Importação dinâmica para evitar dependência circular
-          const { handleRefreshTokens } = await import("../utils/authUtils");
-          const newTokens = await handleRefreshTokens(refreshToken);
+        // Tentar renovar tokens usando Redux
+        await store.dispatch(refreshTokens()).unwrap();
 
-          // Atualizar o header da requisição original com o novo token
-          originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
+        // Obter novo token
+        const newToken = await AsyncStorage.getItem("@auth_token");
 
-          console.log(
-            "[API] Token renovado com sucesso, repetindo requisição original"
-          );
-          // Repetir a requisição original com o novo token
+        if (newToken) {
+          console.log("[API] Token renovado com sucesso");
+
+          // Processar fila de requisições pendentes
+          processQueue(null, newToken);
+
+          // Refazer requisição original com novo token
+          originalRequest.headers!.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } else {
-          console.log(
-            "[API] Refresh token não encontrado, redirecionamento necessário"
-          );
+          throw new Error("Novo token não disponível após renovação");
         }
       } catch (refreshError) {
-        console.error(
-          "[API] Falha ao renovar token automaticamente:",
-          refreshError
-        );
+        console.error("[API] Falha na renovação de tokens:", refreshError);
 
-        // Se falhar ao renovar, limpar tokens e sinalizar necessidade de login
-        await AsyncStorage.removeItem("@auth_token");
-        await AsyncStorage.removeItem("@refresh_token");
+        // Processar fila com erro
+        processQueue(refreshError, null);
 
-        // Aqui você pode disparar uma ação do Redux ou evento para redirecionar ao login
-        // Por exemplo: store.dispatch(logout()) ou navigation.navigate('Login')
-        // Como não temos acesso direto aqui, vamos adicionar uma propriedade ao erro
-        const authError = new Error("Sessão expirada. Faça login novamente.");
-        (authError as any).isAuthError = true;
-        (authError as any).shouldRedirectToLogin = true;
-        throw authError;
+        // Fazer logout forçado
+        store.dispatch(forceLogout());
+
+        // Criar erro personalizado para redirecionamento
+        const authError = new Error("Sessão expirada") as any;
+        authError.isAuthError = true;
+        authError.shouldRedirectToLogin = true;
+
+        return Promise.reject(authError);
+      } finally {
+        isRefreshing = false;
       }
     }
 
-    console.error("[API] Erro na resposta:", {
-      status: error.response?.status,
-      url: error.config?.url,
-      message: error.response?.data?.message || error.message,
-    });
+    // Para outros tipos de erro, rejeitar normalmente
     return Promise.reject(error);
   }
 );
 
-// Adicionar token de autenticação em cada requisição
-api.interceptors.request.use(
-  async (config) => {
-    // Não adicionar token para rotas de autenticação
-    if (
-      config.url?.includes("/auth/login") ||
-      config.url?.includes("/auth/register") ||
-      config.url?.includes("/auth/refresh")
-    ) {
-      return config;
-    }
+/**
+ * Função utilitária para fazer requisições com retry automático
+ */
+export const makeAuthenticatedRequest = async (
+  requestConfig: AxiosRequestConfig
+) => {
+  return await api(requestConfig);
+};
 
-    const token = await AsyncStorage.getItem("@auth_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+/**
+ * Limpa a fila de requisições pendentes (útil para logout)
+ */
+export const clearRequestQueue = () => {
+  failedQueue.forEach(({ reject }) => {
+    reject(new Error("Request cancelled due to logout"));
+  });
+  failedQueue = [];
+  isRefreshing = false;
+};
+
+/**
+ * Obtém status atual do sistema de requisições
+ */
+export const getApiStatus = () => {
+  return {
+    isRefreshing,
+    queueLength: failedQueue.length,
+    baseURL: BASE_URL,
+  };
+};
 
 export default api;

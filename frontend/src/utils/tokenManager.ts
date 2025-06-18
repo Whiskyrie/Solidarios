@@ -1,152 +1,277 @@
 /**
- * Gerenciador de tokens para renovação automática
- * Controla a expiração e renovação preventiva dos tokens JWT
+ * Gerenciador de tokens com renovação automática e verificação de expiração
+ * Atualizado para integrar com Redux e sistema de autenticação
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { handleRefreshTokens } from "./authUtils";
+import {
+  handleRefreshTokens,
+  isAuthSystemReady,
+} from "../store/slices/authHelpers";
 
+// Configuração do gerenciador de tokens
+interface TokenManagerConfig {
+  renewalTimeBeforeExpiry: number; // em minutos
+  enableDebugLogs: boolean;
+  maxRetryAttempts: number;
+  retryDelay: number; // em ms
+}
+
+// Configuração padrão
+const DEFAULT_CONFIG: TokenManagerConfig = {
+  renewalTimeBeforeExpiry: 5,
+  enableDebugLogs: __DEV__,
+  maxRetryAttempts: 3,
+  retryDelay: 1000,
+};
+
+let currentConfig = DEFAULT_CONFIG;
 let refreshTimer: NodeJS.Timeout | null = null;
+let isRefreshing = false;
 
 /**
- * Decodifica um JWT para extrair informações sem validação
- * @param token Token JWT a ser decodificado
- * @returns Payload decodificado ou null se inválido
+ * Configura o gerenciador de tokens
  */
-const decodeJWT = (token: string) => {
+export const configureTokenManager = (config: Partial<TokenManagerConfig>) => {
+  currentConfig = { ...DEFAULT_CONFIG, ...config };
+
+  if (currentConfig.enableDebugLogs) {
+    console.log("[tokenManager] Configuração atualizada:", currentConfig);
+  }
+};
+
+/**
+ * Decodifica JWT sem verificar assinatura (apenas para leitura de dados)
+ */
+export const decodeJWT = (token: string) => {
   try {
-    const payload = token.split(".")[1];
-    const decoded = JSON.parse(atob(payload));
-    return decoded;
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      throw new Error("Token JWT inválido");
+    }
+
+    const payload = JSON.parse(atob(parts[1]));
+    return payload;
   } catch (error) {
-    console.error("[TokenManager] Erro ao decodificar token:", error);
+    if (currentConfig.enableDebugLogs) {
+      console.error("[tokenManager] Erro ao decodificar JWT:", error);
+    }
     return null;
   }
 };
 
 /**
- * Programa renovação automática do token antes da expiração
- * Verifica a expiração do access token atual e agenda a renovação
- * para 5 minutos antes do vencimento
+ * Verifica se um token JWT está expirado
+ */
+export const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded = decodeJWT(token);
+    if (!decoded || !decoded.exp) {
+      return true;
+    }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const isExpired = decoded.exp <= currentTime;
+
+    if (currentConfig.enableDebugLogs && isExpired) {
+      console.log("[tokenManager] Token expirado detectado");
+    }
+
+    return isExpired;
+  } catch (error) {
+    if (currentConfig.enableDebugLogs) {
+      console.error("[tokenManager] Erro ao verificar expiração:", error);
+    }
+    return true;
+  }
+};
+
+/**
+ * Calcula quantos minutos restam até a expiração do token
+ */
+export const getTokenTimeRemaining = (token: string): number => {
+  try {
+    const decoded = decodeJWT(token);
+    if (!decoded || !decoded.exp) {
+      return 0;
+    }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeRemaining = Math.max(0, decoded.exp - currentTime);
+
+    return Math.floor(timeRemaining / 60); // Converter para minutos
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * Programa a renovação automática do token
  */
 export const scheduleTokenRefresh = async () => {
   try {
-    const accessToken = await AsyncStorage.getItem("@auth_token");
-    const refreshToken = await AsyncStorage.getItem("@refresh_token");
-
-    if (!accessToken || !refreshToken) {
-      console.log(
-        "[TokenManager] Tokens não encontrados, cancelando agendamento"
-      );
+    // Verificar se o sistema está pronto
+    if (!isAuthSystemReady()) {
+      if (currentConfig.enableDebugLogs) {
+        console.log("[tokenManager] Sistema não pronto, adiando programação");
+      }
       return;
     }
 
-    const decoded = decodeJWT(accessToken);
-    if (!decoded?.exp) {
-      console.log("[TokenManager] Token sem data de expiração válida");
-      return;
-    }
-
-    const expirationTime = decoded.exp * 1000; // Convert to milliseconds
-    const currentTime = Date.now();
-    const timeUntilExpiry = expirationTime - currentTime;
-
-    // Renovar 5 minutos antes da expiração (ou imediatamente se já expirou)
-    const renewalTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000);
-
-    // Limpar timer anterior se existir
+    // Cancelar timer anterior se existir
     if (refreshTimer) {
       clearTimeout(refreshTimer);
+      refreshTimer = null;
     }
 
-    // Se o token já expirou ou expira muito em breve, renovar imediatamente
-    if (renewalTime <= 0) {
-      console.log(
-        "[TokenManager] Token expirado ou prestes a expirar, renovando imediatamente"
-      );
-      try {
-        await handleRefreshTokens(refreshToken);
-        scheduleTokenRefresh(); // Reprogramar após renovação
-      } catch (error) {
-        console.error("[TokenManager] Falha na renovação imediata:", error);
+    // Obter token atual
+    const accessToken = await AsyncStorage.getItem("@auth_token");
+
+    if (!accessToken || isTokenExpired(accessToken)) {
+      if (currentConfig.enableDebugLogs) {
+        console.log("[tokenManager] Token não disponível ou expirado");
       }
       return;
     }
 
-    refreshTimer = setTimeout(async () => {
-      try {
-        console.log(
-          "[TokenManager] Executando renovação automática programada"
-        );
-        const currentRefreshToken = await AsyncStorage.getItem(
-          "@refresh_token"
-        );
-
-        if (currentRefreshToken) {
-          await handleRefreshTokens(currentRefreshToken);
-          // Reprogramar próxima renovação após sucesso
-          scheduleTokenRefresh();
-        }
-      } catch (error) {
-        console.error("[TokenManager] Falha na renovação automática:", error);
-        // Em caso de erro, tentar novamente em 1 minuto
-        setTimeout(() => scheduleTokenRefresh(), 60000);
-      }
-    }, renewalTime);
-
-    console.log(
-      `[TokenManager] Renovação programada para ${Math.round(
-        renewalTime / 1000
-      )}s (${new Date(Date.now() + renewalTime).toLocaleTimeString()})`
+    const timeRemaining = getTokenTimeRemaining(accessToken);
+    const scheduleTime = Math.max(
+      1,
+      timeRemaining - currentConfig.renewalTimeBeforeExpiry
     );
+
+    if (scheduleTime <= 0) {
+      // Token expira muito em breve, renovar imediatamente
+      if (currentConfig.enableDebugLogs) {
+        console.log(
+          "[tokenManager] Token expira em breve, renovando imediatamente"
+        );
+      }
+      await performTokenRefresh();
+      return;
+    }
+
+    // Programar renovação
+    const delayMs = scheduleTime * 60 * 1000;
+    refreshTimer = setTimeout(async () => {
+      await performTokenRefresh();
+    }, delayMs);
+
+    if (currentConfig.enableDebugLogs) {
+      console.log(
+        `[tokenManager] Renovação programada para ${scheduleTime} minutos`
+      );
+    }
   } catch (error) {
-    console.error("[TokenManager] Erro ao programar renovação:", error);
+    console.error("[tokenManager] Erro ao programar renovação:", error);
+  }
+};
+
+/**
+ * Executa a renovação do token com retry automático
+ */
+const performTokenRefresh = async (attempt = 1): Promise<void> => {
+  if (isRefreshing) {
+    if (currentConfig.enableDebugLogs) {
+      console.log("[tokenManager] Renovação já em andamento, ignorando");
+    }
+    return;
+  }
+
+  isRefreshing = true;
+
+  try {
+    if (currentConfig.enableDebugLogs) {
+      console.log(
+        `[tokenManager] Tentativa ${attempt} de renovação automática`
+      );
+    }
+
+    // Usar o helper integrado que gerencia Redux
+    await handleRefreshTokens();
+
+    if (currentConfig.enableDebugLogs) {
+      console.log("[tokenManager] Renovação automática bem-sucedida");
+    }
+
+    // Programar próxima renovação
+    await scheduleTokenRefresh();
+  } catch (error) {
+    console.error(`[tokenManager] Erro na tentativa ${attempt}:`, error);
+
+    // Tentar novamente se não excedeu o limite
+    if (attempt < currentConfig.maxRetryAttempts) {
+      setTimeout(async () => {
+        await performTokenRefresh(attempt + 1);
+      }, currentConfig.retryDelay * attempt);
+    } else {
+      console.error("[tokenManager] Máximo de tentativas excedido");
+    }
+  } finally {
+    isRefreshing = false;
   }
 };
 
 /**
  * Cancela a renovação automática programada
- * Deve ser chamado ao fazer logout ou quando não há mais necessidade
  */
 export const cancelTokenRefresh = () => {
   if (refreshTimer) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
-    console.log("[TokenManager] Renovação automática cancelada");
+
+    if (currentConfig.enableDebugLogs) {
+      console.log("[tokenManager] Renovação automática cancelada");
+    }
+  }
+
+  isRefreshing = false;
+};
+
+/**
+ * Força uma renovação imediata do token
+ */
+export const forceTokenRefresh = async (): Promise<boolean> => {
+  try {
+    if (isRefreshing) {
+      if (currentConfig.enableDebugLogs) {
+        console.log("[tokenManager] Renovação já em andamento");
+      }
+      return false;
+    }
+
+    await performTokenRefresh();
+    return true;
+  } catch (error) {
+    console.error("[tokenManager] Erro na renovação forçada:", error);
+    return false;
   }
 };
 
 /**
- * Verifica se o token atual está próximo do vencimento
- * @param token Token JWT a ser verificado
- * @param minutesBeforeExpiry Minutos antes do vencimento para considerar "próximo"
- * @returns true se está próximo do vencimento ou já expirou
+ * Obtém status atual do gerenciador de tokens
  */
-export const isTokenNearExpiry = (
-  token: string,
-  minutesBeforeExpiry: number = 5
-): boolean => {
-  const decoded = decodeJWT(token);
-  if (!decoded?.exp) return true;
+export const getTokenManagerStatus = async () => {
+  const accessToken = await AsyncStorage.getItem("@auth_token");
 
-  const expirationTime = decoded.exp * 1000;
-  const currentTime = Date.now();
-  const timeUntilExpiry = expirationTime - currentTime;
-  const thresholdTime = minutesBeforeExpiry * 60 * 1000;
-
-  return timeUntilExpiry <= thresholdTime;
+  return {
+    hasActiveTimer: refreshTimer !== null,
+    isCurrentlyRefreshing: isRefreshing,
+    hasToken: !!accessToken,
+    tokenExpired: accessToken ? isTokenExpired(accessToken) : true,
+    timeRemaining: accessToken ? getTokenTimeRemaining(accessToken) : 0,
+    config: currentConfig,
+    systemReady: isAuthSystemReady(),
+  };
 };
 
 /**
- * Verifica se o token está expirado
- * @param token Token JWT a ser verificado
- * @returns true se o token está expirado
+ * Para completamente o gerenciador de tokens
  */
-export const isTokenExpired = (token: string): boolean => {
-  const decoded = decodeJWT(token);
-  if (!decoded?.exp) return true;
+export const stopTokenManager = () => {
+  cancelTokenRefresh();
+  isRefreshing = false;
 
-  const expirationTime = decoded.exp * 1000;
-  const currentTime = Date.now();
-
-  return currentTime >= expirationTime;
+  if (currentConfig.enableDebugLogs) {
+    console.log("[tokenManager] Gerenciador de tokens parado");
+  }
 };

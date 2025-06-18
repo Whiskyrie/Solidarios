@@ -12,6 +12,7 @@ import {
   cancelTokenRefresh,
   isTokenExpired,
 } from "../../utils/tokenManager";
+import { refreshTokens as refreshTokensUtil } from "../../utils/tokenUtils";
 
 // Estado inicial
 const initialState: AuthState = {
@@ -130,22 +131,31 @@ export const logout = createAsyncThunk(
 
 export const refreshTokens = createAsyncThunk(
   "auth/refreshTokens",
-  async (refreshToken: string, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     try {
-      const response = await AuthService.refreshTokens(refreshToken);
+      const state = getState() as { auth: AuthState };
+      const currentRefreshToken = state.auth.refreshToken;
 
-      // Atualizar tokens no armazenamento
-      await AsyncStorage.setItem("@auth_token", response.accessToken);
-      await AsyncStorage.setItem("@refresh_token", response.refreshToken);
+      if (!currentRefreshToken) {
+        throw new Error("Refresh token não disponível");
+      }
 
-      return response;
+      console.log("[authSlice] Renovando tokens automaticamente...");
+      const tokens = await refreshTokensUtil(currentRefreshToken);
+
+      // Salvar tokens no armazenamento
+      await AsyncStorage.setItem("@auth_token", tokens.accessToken);
+      await AsyncStorage.setItem("@refresh_token", tokens.refreshToken);
+
+      console.log("[authSlice] Tokens renovados com sucesso");
+      return tokens;
     } catch (error: any) {
-      // Em caso de erro ao atualizar token, fazer logout
+      console.error("[authSlice] Erro ao renovar tokens:", error);
+      // Em caso de erro, limpar tokens
       await AsyncStorage.removeItem("@auth_token");
       await AsyncStorage.removeItem("@refresh_token");
-
       return rejectWithValue(
-        error.response?.data?.message || "Erro ao atualizar tokens"
+        error.response?.data?.message || "Erro ao renovar tokens"
       );
     }
   }
@@ -205,7 +215,7 @@ export const restoreAuthState = createAsyncThunk(
           );
           // Token expirado, tentar renovar imediatamente
           try {
-            await dispatch(refreshTokens(refreshToken)).unwrap();
+            await dispatch(refreshTokens()).unwrap();
           } catch (refreshError) {
             console.error(
               "[authSlice] Falha ao renovar token na inicialização:",
@@ -282,7 +292,29 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.isLoading = false;
       state.error = "Sessão expirada. Faça login novamente.";
+
+      // Cancelar renovação automática no logout forçado
       cancelTokenRefresh();
+      console.log(
+        "[authSlice] Logout forçado e renovação automática cancelada"
+      );
+    },
+    // Nova ação para atualizar tokens diretamente
+    updateTokens: (
+      state,
+      action: PayloadAction<{
+        accessToken: string;
+        refreshToken: string;
+      }>
+    ) => {
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+
+      // Programar próxima renovação automaticamente
+      scheduleTokenRefresh();
+      console.log(
+        "[authSlice] Tokens atualizados e próxima renovação programada"
+      );
     },
   },
   extraReducers: (builder) => {
@@ -379,9 +411,10 @@ const authSlice = createSlice({
         );
       })
 
-      // Refresh Tokens
+      // Refresh Tokens - casos atualizados
       .addCase(refreshTokens.pending, (state) => {
-        state.isLoading = true;
+        // Não mostrar loading para renovação automática de tokens
+        state.error = null;
       })
       .addCase(refreshTokens.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;
@@ -389,10 +422,10 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = null;
 
-        // Reprogramar renovação automática após refresh bem-sucedido
+        // Programar próxima renovação
         scheduleTokenRefresh();
         console.log(
-          "[authSlice] Tokens renovados e renovação automática reprogramada"
+          "[authSlice] Tokens renovados e próxima renovação programada"
         );
       })
       .addCase(refreshTokens.rejected, (state, action) => {
@@ -479,5 +512,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setLoading, forceLogout } = authSlice.actions;
+export const { clearError, setLoading, forceLogout, updateTokens } =
+  authSlice.actions;
 export default authSlice.reducer;

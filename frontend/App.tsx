@@ -1,3 +1,6 @@
+/**
+ * App.tsx - Aplicação principal com sistema de autenticação integrado
+ */
 import React, { useState, useEffect, useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,8 +11,14 @@ import * as SplashScreen from "expo-splash-screen";
 
 // Provedores de contexto
 import { AuthProvider } from "./src/hooks/useAuth";
+import { AuthListener } from "./src/utils/authListener";
 
-// Navegadores - Importando o MainNavigator
+// Sistema de autenticação
+import { initializeAuth } from "./src/utils/authInit";
+import { restoreAuthState } from "./src/store/slices/authSlice";
+import { configureTokenManager } from "./src/utils/tokenManager";
+
+// Navegadores
 import MainNavigator from "./src/navigation/MainNavigator";
 
 // Componentes globais
@@ -29,10 +38,7 @@ export const NotificationContext = React.createContext({
 });
 
 export default function App() {
-  // Estado para controlar se o app está pronto
   const [appIsReady, setAppIsReady] = useState(false);
-
-  // Estado para notificações globais
   const [notification, setNotification] = useState({
     visible: false,
     type: "success" as "success" | "error" | "warning" | "info",
@@ -40,22 +46,54 @@ export default function App() {
     description: "",
   });
 
-  // Carregar recursos necessários
+  // Carregar recursos e inicializar sistema de autenticação
   useEffect(() => {
     async function prepare() {
       try {
-        // Carregue fontes personalizadas se necessário
-        // await Font.loadAsync({
-        //   'custom-font': require('./assets/fonts/CustomFont.ttf'),
-        // });
+        console.log("[App] Iniciando preparação da aplicação...");
 
-        // Simula um tempo de carregamento mínimo para uma transição suave
+        // 1. Configurar token manager
+        console.log("[App] Configurando token manager...");
+        configureTokenManager({
+          renewalTimeBeforeExpiry: 5, // 5 minutos antes da expiração
+          enableDebugLogs: __DEV__,
+          maxRetryAttempts: 3,
+          retryDelay: 1000,
+        });
+
+        // 2. Inicializar sistema de autenticação
+        console.log("[App] Inicializando sistema de autenticação...");
+        const authInitialized = await initializeAuth({
+          renewalTimeBeforeExpiry: 5,
+          enableDebugLogs: __DEV__,
+          loginRouteName: "Login",
+          tokenCheckInterval: 30, // Verificar tokens a cada 30 minutos
+        });
+
+        if (authInitialized) {
+          console.log(
+            "[App] Sistema de autenticação inicializado - usuário possivelmente autenticado"
+          );
+        } else {
+          console.log(
+            "[App] Sistema de autenticação inicializado - usuário não autenticado"
+          );
+        }
+
+        // 3. Restaurar estado de autenticação no Redux
+        console.log("[App] Restaurando estado de autenticação no Redux...");
+        store.dispatch(restoreAuthState());
+
+        // 4. Aguardar um pouco para transição suave
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Você pode adicionar outras operações de inicialização aqui
-        // como verificar autenticação, carregar configurações, etc.
-      } catch (e) {
-        console.warn("Erro ao carregar recursos:", e);
+        console.log("[App] Inicialização completa com sucesso");
+      } catch (error) {
+        console.error("[App] Erro durante inicialização:", error);
+
+        // Em caso de erro, ainda permitir que o app inicie
+        // O usuário precisará fazer login manualmente
+        console.log("[App] Continuando inicialização apesar do erro");
       } finally {
         setAppIsReady(true);
       }
@@ -64,15 +102,13 @@ export default function App() {
     prepare();
   }, []);
 
-  // Callback para quando o layout raiz estiver pronto
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      // Isso diz ao splash screen para se esconder imediatamente
+      console.log("[App] Layout pronto, escondendo splash screen");
       await SplashScreen.hideAsync();
     }
   }, [appIsReady]);
 
-  // Funções para gerenciar notificações
   const showNotification = ({
     type,
     message,
@@ -94,7 +130,7 @@ export default function App() {
     setNotification((prev) => ({ ...prev, visible: false }));
   };
 
-  // Não renderiza nada até o app estar pronto
+  // Não renderizar nada até o app estar pronto
   if (!appIsReady) {
     return null;
   }
@@ -104,23 +140,25 @@ export default function App() {
       <SafeAreaProvider onLayout={onLayoutRootView}>
         <StatusBar style="auto" />
         <AuthProvider>
-          <NotificationContext.Provider
-            value={{ showNotification, hideNotification }}
-          >
-            <NavigationContainer>
-              <MainNavigator />
-              <NotificationBanner
-                visible={notification.visible}
-                type={notification.type}
-                message={notification.message}
-                description={notification.description}
-                onClose={hideNotification}
-                position="top"
-                autoClose
-                duration={3000}
-              />
-            </NavigationContainer>
-          </NotificationContext.Provider>
+          <AuthListener>
+            <NotificationContext.Provider
+              value={{ showNotification, hideNotification }}
+            >
+              <NavigationContainer>
+                <MainNavigator />
+                <NotificationBanner
+                  visible={notification.visible}
+                  type={notification.type}
+                  message={notification.message}
+                  description={notification.description}
+                  onClose={hideNotification}
+                  position="top"
+                  autoClose
+                  duration={3000}
+                />
+              </NavigationContainer>
+            </NotificationContext.Provider>
+          </AuthListener>
         </AuthProvider>
       </SafeAreaProvider>
     </Provider>
