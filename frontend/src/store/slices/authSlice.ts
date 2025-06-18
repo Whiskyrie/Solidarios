@@ -1,17 +1,17 @@
 /**
  * Redux slice para gerenciamento do estado de autenticação
+ * Integrado com o sistema de renovação automática de tokens
  */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  LoginDto,
-  RegisterDto,
-  AuthState,
-  LoginResponse,
-  TokensResponse,
-} from "../../types/auth.types";
+import { LoginDto, RegisterDto, AuthState } from "../../types/auth.types";
 import { UpdateUserRequest } from "../../types/users.types";
 import AuthService from "../../api/auth";
+import {
+  scheduleTokenRefresh,
+  cancelTokenRefresh,
+  isTokenExpired,
+} from "../../utils/tokenManager";
 
 // Estado inicial
 const initialState: AuthState = {
@@ -191,224 +191,293 @@ export const updateProfile = createAsyncThunk(
 export const restoreAuthState = createAsyncThunk(
   "auth/restoreAuthState",
   async (_, { dispatch }) => {
-    const accessToken = await AsyncStorage.getItem("@auth_token");
-    const refreshToken = await AsyncStorage.getItem("@refresh_token");
+    try {
+      const accessToken = await AsyncStorage.getItem("@auth_token");
+      const refreshToken = await AsyncStorage.getItem("@refresh_token");
 
-    if (accessToken && refreshToken) {
-      try {
-        // Tentar obter o perfil para validar o token
-        await dispatch(getProfile()).unwrap();
+      if (accessToken && refreshToken) {
+        // Verificar se token ainda é válido
+        const isExpired = isTokenExpired(accessToken);
 
-        return {
-          accessToken,
-          refreshToken,
-          isAuthenticated: true,
-        };
-      } catch {
-        // Se falhar ao obter perfil, tentar refresh token
+        if (isExpired) {
+          console.log(
+            "[authSlice] Token expirado na inicialização, tentando renovar"
+          );
+          // Token expirado, tentar renovar imediatamente
+          try {
+            await dispatch(refreshTokens(refreshToken)).unwrap();
+          } catch (refreshError) {
+            console.error(
+              "[authSlice] Falha ao renovar token na inicialização:",
+              refreshError
+            );
+            // Se falhar o refresh, limpar tudo
+            await AsyncStorage.removeItem("@auth_token");
+            await AsyncStorage.removeItem("@refresh_token");
+            throw new Error("Sessão expirada");
+          }
+        }
+
+        // Tentar obter perfil para validar autenticação
         try {
-          await dispatch(refreshTokens(refreshToken)).unwrap();
           await dispatch(getProfile()).unwrap();
 
-          const newAccessToken = await AsyncStorage.getItem("@auth_token");
-          const newRefreshToken = await AsyncStorage.getItem("@refresh_token");
+          // Se chegou até aqui, a autenticação é válida
+          const currentAccessToken = await AsyncStorage.getItem("@auth_token");
+          const currentRefreshToken = await AsyncStorage.getItem(
+            "@refresh_token"
+          );
 
           return {
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken,
+            accessToken: currentAccessToken,
+            refreshToken: currentRefreshToken,
             isAuthenticated: true,
           };
-        } catch {
-          // Se falhar o refresh, limpar tudo
+        } catch (profileError) {
+          console.error(
+            "[authSlice] Falha ao obter perfil na inicialização:",
+            profileError
+          );
+          // Se falhar ao obter perfil, limpar tokens
           await AsyncStorage.removeItem("@auth_token");
           await AsyncStorage.removeItem("@refresh_token");
-
-          return {
-            accessToken: null,
-            refreshToken: null,
-            isAuthenticated: false,
-          };
+          throw new Error("Falha na validação da sessão");
         }
       }
-    }
 
-    return {
-      accessToken: null,
-      refreshToken: null,
-      isAuthenticated: false,
-    };
+      return {
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+      };
+    } catch (error) {
+      console.error(
+        "[authSlice] Erro ao restaurar estado de autenticação:",
+        error
+      );
+      return {
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+      };
+    }
   }
 );
 
-// Função auxiliar para formatação de erros
-const formatErrorMessage = (error: any): string => {
-  if (!error) return "Ocorreu um erro desconhecido";
-
-  if (typeof error === "string") return error;
-
-  // Tratamento de estruturas aninhadas de erro
-  if (error.message) {
-    if (typeof error.message === "object" && error.message.message) {
-      return error.message.message;
-    }
-    return error.message;
-  }
-
-  return "Falha na comunicação com o servidor";
-};
-
-// Slice
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    clearErrors: (state) => {
+    clearError: (state) => {
       state.error = null;
     },
-    updateTokens: (state, action: PayloadAction<TokensResponse>) => {
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    // Ação para forçar logout em caso de erro de autenticação
+    forceLogout: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.isAuthenticated = false;
       state.isLoading = false;
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
-      state.isAuthenticated = true;
-      state.error = null;
+      state.error = "Sessão expirada. Faça login novamente.";
+      cancelTokenRefresh();
     },
   },
   extraReducers: (builder) => {
-    // Login
     builder
+      // Login
       .addCase(login.pending, (state) => {
-        console.log("[authSlice] Login pendente");
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(
-        login.fulfilled,
-        (state, action: PayloadAction<LoginResponse>) => {
-          console.log(
-            "[authSlice] Login concluído com sucesso, atualizando estado"
-          );
-          state.isLoading = false;
-          state.isAuthenticated = true;
-          state.user = action.payload.user;
-          state.accessToken = action.payload.accessToken;
-          state.refreshToken = action.payload.refreshToken;
-          state.error = null;
-        }
-      )
+      .addCase(login.fulfilled, (state, action) => {
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+        state.isLoading = false;
+        state.error = null;
+
+        // Programar renovação automática após login bem-sucedido
+        scheduleTokenRefresh();
+        console.log(
+          "[authSlice] Login realizado e renovação automática programada"
+        );
+      })
       .addCase(login.rejected, (state, action) => {
-        console.log("[authSlice] Login rejeitado, erro:", action.payload);
-        state.isLoading = false;
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
         state.isAuthenticated = false;
-        state.error = formatErrorMessage(action.payload);
-      });
+        state.isLoading = false;
+        state.error = action.payload as string;
+        cancelTokenRefresh();
+      })
 
-    // Register
-    builder
+      // Register
       .addCase(register.pending, (state) => {
-        console.log("[authSlice] Registro pendente");
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(
-        register.fulfilled,
-        (state, action: PayloadAction<LoginResponse>) => {
-          console.log(
-            "[authSlice] Registro concluído com sucesso, atualizando estado"
-          );
-          state.isLoading = false;
-          state.isAuthenticated = true;
-          state.user = action.payload.user;
-          state.accessToken = action.payload.accessToken;
-          state.refreshToken = action.payload.refreshToken;
-          state.error = null;
-        }
-      )
-      .addCase(register.rejected, (state, action) => {
-        console.log("[authSlice] Registro rejeitado, erro:", action.payload);
+      .addCase(register.fulfilled, (state, action) => {
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
         state.isLoading = false;
-        state.isAuthenticated = false;
-        state.error = formatErrorMessage(action.payload);
-      });
+        state.error = null;
 
-    // Logout
-    builder
+        // Programar renovação automática após registro bem-sucedido
+        scheduleTokenRefresh();
+        console.log(
+          "[authSlice] Registro realizado e renovação automática programada"
+        );
+      })
+      .addCase(register.rejected, (state, action) => {
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = action.payload as string;
+        cancelTokenRefresh();
+      })
+
+      // Logout
       .addCase(logout.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(logout.fulfilled, () => {
-        // Reset para o estado inicial
-        return initialState;
-      })
-      .addCase(logout.rejected, () => {
-        // Mesmo em caso de erro, resetar o estado
-        return initialState;
-      });
+      .addCase(logout.fulfilled, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = null;
 
-    // Refresh tokens
-    builder
+        // Cancelar renovação automática após logout
+        cancelTokenRefresh();
+        console.log(
+          "[authSlice] Logout realizado e renovação automática cancelada"
+        );
+      })
+      .addCase(logout.rejected, (state, action) => {
+        // Mesmo em caso de erro no logout, limpar estado local
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = action.payload as string;
+
+        // Cancelar renovação automática mesmo em caso de erro
+        cancelTokenRefresh();
+        console.log(
+          "[authSlice] Logout forçado e renovação automática cancelada"
+        );
+      })
+
+      // Refresh Tokens
       .addCase(refreshTokens.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(
-        refreshTokens.fulfilled,
-        (state, action: PayloadAction<TokensResponse>) => {
-          state.isLoading = false;
-          state.accessToken = action.payload.accessToken;
-          state.refreshToken = action.payload.refreshToken;
-          state.isAuthenticated = true;
-          state.error = null;
-        }
-      )
-      .addCase(refreshTokens.rejected, () => {
-        // Falha no refresh leva a logout
-        return initialState;
-      });
+      .addCase(refreshTokens.fulfilled, (state, action) => {
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isLoading = false;
+        state.error = null;
 
-    // Get profile
-    builder
+        // Reprogramar renovação automática após refresh bem-sucedido
+        scheduleTokenRefresh();
+        console.log(
+          "[authSlice] Tokens renovados e renovação automática reprogramada"
+        );
+      })
+      .addCase(refreshTokens.rejected, (state, action) => {
+        // Se falhar ao renovar tokens, fazer logout
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = action.payload as string;
+
+        // Cancelar renovação automática
+        cancelTokenRefresh();
+        console.log(
+          "[authSlice] Falha na renovação de tokens, logout automático"
+        );
+      })
+
+      // Get Profile
       .addCase(getProfile.pending, (state) => {
         state.isLoading = true;
       })
       .addCase(getProfile.fulfilled, (state, action) => {
-        state.isLoading = false;
         state.user = action.payload;
-        state.isAuthenticated = true;
+        state.isLoading = false;
         state.error = null;
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = formatErrorMessage(action.payload);
-      });
+        state.error = action.payload as string;
+      })
 
-    // Update profile
-    builder
+      // Update Profile
       .addCase(updateProfile.pending, (state) => {
         state.isLoading = true;
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
+        state.user = { ...state.user, ...action.payload };
         state.isLoading = false;
-        state.user = action.payload;
         state.error = null;
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = formatErrorMessage(action.payload);
-      });
+        state.error = action.payload as string;
+      })
 
-    // Restore auth state
-    builder
+      // Restore Auth State
       .addCase(restoreAuthState.pending, (state) => {
         state.isLoading = true;
       })
       .addCase(restoreAuthState.fulfilled, (state, action) => {
+        if (action.payload.isAuthenticated) {
+          state.accessToken = action.payload.accessToken;
+          state.refreshToken = action.payload.refreshToken;
+          state.isAuthenticated = true;
+
+          // Programar renovação automática após restaurar estado
+          scheduleTokenRefresh();
+          console.log(
+            "[authSlice] Estado de autenticação restaurado e renovação automática programada"
+          );
+        } else {
+          state.user = null;
+          state.accessToken = null;
+          state.refreshToken = null;
+          state.isAuthenticated = false;
+          cancelTokenRefresh();
+        }
         state.isLoading = false;
-        state.accessToken = action.payload.accessToken;
-        state.refreshToken = action.payload.refreshToken;
-        state.isAuthenticated = action.payload.isAuthenticated;
+        state.error = null;
+      })
+      .addCase(restoreAuthState.rejected, (state, _action) => {
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = null; // Não mostrar erro na restauração
+        cancelTokenRefresh();
+        console.log(
+          "[authSlice] Falha ao restaurar estado, usuário não autenticado"
+        );
       });
   },
 });
 
-export const { clearErrors, updateTokens } = authSlice.actions;
-
+export const { clearError, setLoading, forceLogout } = authSlice.actions;
 export default authSlice.reducer;
