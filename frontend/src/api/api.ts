@@ -1,20 +1,21 @@
+/**
+ * Configuração da API com interceptadores para autenticação automática
+ * Inclui renovação automática de tokens em caso de erro 401
+ */
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_ENVIRONMENT } from "@env";
 
-// URLs disponíveis
+// Configuração de URLs para diferentes ambientes
 const API_URLS = {
-  CLOUD: "https://walrus-app-tyhbw.ondigitalocean.app/api",
-  LOCAL: "http://10.0.2.2:3000", // Para emuladores Android
-  // LOCAL: "http://localhost:3000", // Para web ou iOS
-};
+  LOCAL: "http://localhost:3000",
+  CLOUD: "https://api-solidarios.onrender.com",
+} as const;
 
-// Define o tipo para o ambiente
 type ApiEnvironment = keyof typeof API_URLS;
 
-//  Obter o ambiente padrão do arquivo .env ou usar CLOUD como fallback
+// Função para obter o ambiente padrão do .env
 const getDefaultEnvironment = (): ApiEnvironment => {
-  const envValue = API_ENVIRONMENT?.toUpperCase();
+  const envValue = process.env.EXPO_PUBLIC_API_ENVIRONMENT?.toUpperCase();
   return envValue && envValue in API_URLS
     ? (envValue as ApiEnvironment)
     : "CLOUD";
@@ -85,7 +86,7 @@ api.interceptors.request.use(
   }
 );
 
-// Log de respostas e handling de refresh token
+// Interceptador de resposta com renovação automática de token
 api.interceptors.response.use(
   (response) => {
     console.log("[API] Resposta:", {
@@ -94,7 +95,63 @@ api.interceptors.response.use(
     });
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Se o erro for 401 (não autorizado) e não for uma rota de auth, tentar renovar token
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/auth/login") &&
+      !originalRequest.url?.includes("/auth/register") &&
+      !originalRequest.url?.includes("/auth/refresh")
+    ) {
+      originalRequest._retry = true;
+
+      try {
+        console.log(
+          "[API] Detectado erro 401, tentando renovar token automaticamente"
+        );
+        const refreshToken = await AsyncStorage.getItem("@refresh_token");
+
+        if (refreshToken) {
+          // Importação dinâmica para evitar dependência circular
+          const { handleRefreshTokens } = await import("../utils/authUtils");
+          const newTokens = await handleRefreshTokens(refreshToken);
+
+          // Atualizar o header da requisição original com o novo token
+          originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
+
+          console.log(
+            "[API] Token renovado com sucesso, repetindo requisição original"
+          );
+          // Repetir a requisição original com o novo token
+          return api(originalRequest);
+        } else {
+          console.log(
+            "[API] Refresh token não encontrado, redirecionamento necessário"
+          );
+        }
+      } catch (refreshError) {
+        console.error(
+          "[API] Falha ao renovar token automaticamente:",
+          refreshError
+        );
+
+        // Se falhar ao renovar, limpar tokens e sinalizar necessidade de login
+        await AsyncStorage.removeItem("@auth_token");
+        await AsyncStorage.removeItem("@refresh_token");
+
+        // Aqui você pode disparar uma ação do Redux ou evento para redirecionar ao login
+        // Por exemplo: store.dispatch(logout()) ou navigation.navigate('Login')
+        // Como não temos acesso direto aqui, vamos adicionar uma propriedade ao erro
+        const authError = new Error("Sessão expirada. Faça login novamente.");
+        (authError as any).isAuthError = true;
+        (authError as any).shouldRedirectToLogin = true;
+        throw authError;
+      }
+    }
+
     console.error("[API] Erro na resposta:", {
       status: error.response?.status,
       url: error.config?.url,
@@ -110,6 +167,7 @@ api.interceptors.request.use(
     // Não adicionar token para rotas de autenticação
     if (
       config.url?.includes("/auth/login") ||
+      config.url?.includes("/auth/register") ||
       config.url?.includes("/auth/refresh")
     ) {
       return config;
