@@ -79,6 +79,20 @@ export class InventoryController {
     return this.inventoryService.findAllPaginated(pageOptionsDto);
   }
 
+  @Get('low-stock')
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO)
+  @ApiOperation({ summary: 'Listar itens com estoque baixo' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de itens com estoque baixo retornada com sucesso.',
+    type: PageDto,
+  })
+  getLowStock(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Inventory>> {
+    return this.inventoryService.findLowStock(pageOptionsDto);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar um registro de inventário pelo ID' })
   @ApiResponse({

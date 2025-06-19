@@ -147,6 +147,29 @@ export class InventoryService {
     }
   }
 
+  async findLowStock(
+    pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Inventory>> {
+    this.logger.log('Buscando itens com estoque baixo.');
+    const queryBuilder = this.inventoryRepository.createQueryBuilder('inventory');
+
+    queryBuilder
+      .leftJoinAndSelect('inventory.item', 'item')
+      .where('inventory.quantity <= inventory.alertLevel')
+      .andWhere('inventory.alertLevel > 0')
+      // CORREÇÃO: Ordenar pela coluna 'quantity' do inventário, usando a direção de pageOptionsDto.order
+      .orderBy('inventory.quantity', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take);
+
+    const itemCount = await queryBuilder.getCount();
+    const { entities } = await queryBuilder.getRawAndEntities();
+
+    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto });
+
+    return new PageDto(entities, pageMetaDto);
+  }
+
   @LogMethod()
   async findByItemId(itemId: string): Promise<Inventory> {
     this.logger.debug(`Buscando registro de inventário para o item: ${itemId}`);

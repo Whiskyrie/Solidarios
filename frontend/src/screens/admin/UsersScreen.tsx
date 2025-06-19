@@ -60,7 +60,12 @@ const UsersScreen: React.FC = () => {
 
   // Aplicar filtros e busca aos usuários
   useEffect(() => {
-    if (!users) return;
+    // CORREÇÃO: Garante que o código só continue se 'users' for um array.
+    // Isso previne o erro "iterator method is not callable".
+    if (!Array.isArray(users)) {
+      setFilteredUsers([]); // Limpa a lista para evitar mostrar dados antigos ou incorretos.
+      return; // Interrompe a execução se 'users' não for um array.
+    }
 
     let result = [...users];
 
