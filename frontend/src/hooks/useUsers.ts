@@ -31,24 +31,31 @@ export const useUsers = () => {
     totalItems: 0,
   });
 
-  // Função para limpar erros
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  // Função para obter todos os usuários com paginação
   const fetchUsers = useCallback(async (pageOptions?: PageOptionsDto) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await UsersService.getAll(pageOptions);
-      setUsers(response.data);
+
+      setUsers((prevUsers) => {
+        if (response.meta.page === 1) {
+          return response.data;
+        }
+        const existingUsers = Array.isArray(prevUsers) ? prevUsers : [];
+        return [...existingUsers, ...response.data];
+      });
+
       setPagination({
         page: response.meta.page,
         totalPages: response.meta.pageCount,
         totalItems: response.meta.itemCount,
       });
+      
       return response;
     } catch (err: any) {
       setError(err.message || "Erro ao buscar usuários");
@@ -58,7 +65,9 @@ export const useUsers = () => {
     }
   }, []);
 
-  // Função para obter um usuário por ID
+
+
+
   const fetchUserById = useCallback(async (id: string) => {
     setIsLoading(true);
     setError(null);
