@@ -1,15 +1,20 @@
 /**
  * Serviço de usuários - comunicação com as rotas de usuários do backend
  */
-import api from "./api";
-import {
-  User,
-  CreateUserDto,
+
+import api from './api';
+import { 
+  PageOptionsDto, 
+  PageDto, 
+  ApiResponse // <--- Importação adicionada
+} from '../types/common.types';
+import { 
+  User, 
+  CreateUserDto, 
   UpdateUserDto,
-  UsersPage,
   UserStats,
-} from "../types/users.types";
-import { PageOptionsDto } from "../types/common.types";
+  UsersPage
+} from '../types/users.types';
 
 // Namespace para agrupar as funções do serviço
 const UsersService = {
@@ -18,11 +23,14 @@ const UsersService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de usuários
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<UsersPage> => {
-    const response = await api.get<UsersPage>("/users", {
-      params: pageOptions,
+  async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<User>> {
+    // A 'response' completa do axios
+    const response = await api.get<ApiResponse<PageDto<User>>>('/users', { 
+      params: pageOptions 
     });
-    return response.data;
+    
+    // CORREÇÃO: Nós retornamos apenas a parte de dentro do 'envelope'
+    return response.data.data; 
   },
 
   /**
