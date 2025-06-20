@@ -3,7 +3,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -85,7 +84,7 @@ export class ItemsService {
     return this.itemsRepository.find({ relations: ['donor'] });
   }
 
-@LogMethod()
+  @LogMethod()
   async findAvailablePaginated(
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
@@ -99,7 +98,7 @@ export class ItemsService {
         .leftJoinAndSelect('item.donor', 'donor')
         .leftJoinAndSelect('item.category', 'category')
         // FILTRO DE SEGURANÇA: Garante que apenas itens disponíveis sejam retornados
-        .where('item.status = :status', { status: 'disponivel' }) 
+        .where('item.status = :status', { status: 'disponivel' })
         .orderBy('item.receivedDate', pageOptionsDto.order)
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);
@@ -121,7 +120,6 @@ export class ItemsService {
       throw error;
     }
   }
-
 
   // Novo método com paginação
   @LogMethod()
@@ -164,7 +162,6 @@ export class ItemsService {
     donorId: string,
     pageOptionsDto: PageOptionsDto,
   ): Promise<PageDto<Item>> {
-
     this.logger.debug(`Buscando itens do doador ${donorId}`);
 
     try {
@@ -174,7 +171,6 @@ export class ItemsService {
         .leftJoinAndSelect('item.category', 'category')
         .where('item.donorId = :donorId', { donorId })
         .orderBy('item.receivedDate', pageOptionsDto.order)
-
 
         .skip(pageOptionsDto.skip)
         .take(pageOptionsDto.take);

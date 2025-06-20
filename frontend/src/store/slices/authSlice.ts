@@ -19,6 +19,63 @@ import {
 } from "../../utils/tokenManager";
 import { refreshTokens as refreshTokensUtil } from "../../utils/tokenUtils";
 
+const validateTokenPayload = (token: string): boolean => {
+  if (!token) return false;
+
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+
+    const payload = JSON.parse(atob(parts[1]));
+
+    // Verificar campos obrigatórios
+    if (!payload.sub || !payload.email) {
+      console.error("[authSlice] Token sem campos obrigatórios:", {
+        hasSub: !!payload.sub,
+        hasEmail: !!payload.email,
+        sub: payload.sub,
+        email: payload.email,
+      });
+      return false;
+    }
+
+    // Verificar se sub é um UUID válido
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(payload.sub)) {
+      console.error("[authSlice] Token com UUID inválido:", {
+        sub: payload.sub,
+        typeofSub: typeof payload.sub,
+      });
+      return false;
+    }
+
+    console.log("[authSlice] Token validado com sucesso:", {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
+
+    return true;
+  } catch (error) {
+    console.error("[authSlice] Erro ao validar token:", error);
+    return false;
+  }
+};
+
+const clearAuthenticationState = (state: any, reason: string) => {
+  console.warn(`[authSlice] Limpando estado de autenticação: ${reason}`);
+
+  state.user = null;
+  state.accessToken = null;
+  state.refreshToken = null;
+  state.isAuthenticated = false;
+  state.isLoading = false;
+  state.error = reason;
+
+  cancelTokenRefresh();
+};
+
 // Estado inicial
 const initialState: AuthState = {
   user: null,
@@ -345,19 +402,59 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
+
       .addCase(login.fulfilled, (state, action) => {
-        state.user = action.payload.user;
-        state.accessToken = action.payload.accessToken;
-        state.refreshToken = action.payload.refreshToken;
+        const { user, accessToken, refreshToken } = action.payload || {};
+
+        if (!user || !accessToken || !refreshToken) {
+          console.error(
+            "[authSlice] Dados de login incompletos:",
+            action.payload
+          );
+          clearAuthenticationState(state, "Dados de login incompletos");
+          return;
+        }
+
+        if (!validateTokenPayload(accessToken)) {
+          console.error("[authSlice] Token de login inválido");
+          clearAuthenticationState(state, "Token de login inválido");
+          return;
+        }
+
+        try {
+          const tokenPayload = JSON.parse(atob(accessToken.split(".")[1]));
+          if (tokenPayload.sub !== user.id) {
+            console.error("[authSlice] Inconsistência login token/user:", {
+              tokenSub: tokenPayload.sub,
+              userId: user.id,
+            });
+            clearAuthenticationState(
+              state,
+              "Inconsistência token/user no login"
+            );
+            return;
+          }
+        } catch (error) {
+          console.error(
+            "[authSlice] Erro ao validar consistência login:",
+            error
+          );
+        }
+
+        state.user = user;
+        state.accessToken = accessToken;
+        state.refreshToken = refreshToken;
         state.isAuthenticated = true;
         state.isLoading = false;
         state.error = null;
 
         // Programar renovação automática após login bem-sucedido
         scheduleTokenRefresh();
-        console.log(
-          "[authSlice] Login realizado e renovação automática programada"
-        );
+
+        console.log("[authSlice] Login validado e realizado com sucesso:", {
+          userId: user.id,
+          email: user.email,
+        });
       })
       .addCase(login.rejected, (state, action) => {
         state.user = null;
@@ -437,17 +534,44 @@ const authSlice = createSlice({
         // Não mostrar loading para renovação automática de tokens
         state.error = null;
       })
+
       .addCase(refreshTokens.fulfilled, (state, action) => {
-        state.accessToken = action.payload.accessToken;
-        state.refreshToken = action.payload.refreshToken;
+        console.log("[authSlice] Tokens renovados recebidos:", {
+          hasAccessToken: !!action.payload?.accessToken,
+          hasRefreshToken: !!action.payload?.refreshToken,
+        });
+
+        const { accessToken, refreshToken } = action.payload || {};
+
+        if (!accessToken || !refreshToken) {
+          console.error(
+            "[authSlice] Tokens renovados inválidos:",
+            action.payload
+          );
+          clearAuthenticationState(state, "Tokens renovados inválidos");
+          return;
+        }
+
+        if (!validateTokenPayload(accessToken)) {
+          console.error("[authSlice] Access token renovado inválido");
+          clearAuthenticationState(state, "Access token renovado inválido");
+          return;
+        }
+
+        if (state.accessToken === accessToken) {
+          console.warn(
+            "[authSlice] Token renovado é idêntico ao anterior - possível problema"
+          );
+        }
+
+        state.accessToken = accessToken;
+        state.refreshToken = refreshToken;
         state.isLoading = false;
         state.error = null;
 
-        // Programar próxima renovação
         scheduleTokenRefresh();
-        console.log(
-          "[authSlice] Tokens renovados e próxima renovação programada"
-        );
+
+        console.log("[authSlice] Tokens renovados e validados com sucesso");
       })
       .addCase(refreshTokens.rejected, (state, action) => {
         // Se falhar ao renovar tokens, fazer logout
@@ -469,10 +593,57 @@ const authSlice = createSlice({
       .addCase(getProfile.pending, (state) => {
         state.isLoading = true;
       })
+
       .addCase(getProfile.fulfilled, (state, action) => {
+        if (!action.payload) {
+          console.error("[authSlice] Perfil vazio recebido");
+          state.isLoading = false;
+          state.error = "Dados do perfil inválidos";
+          return;
+        }
+
+        if (!action.payload.id) {
+          console.error("[authSlice] Perfil sem ID válido:", action.payload);
+          state.isLoading = false;
+          state.error = "Perfil sem ID válido";
+          return;
+        }
+
+        if (state.accessToken) {
+          try {
+            const tokenPayload = JSON.parse(
+              atob(state.accessToken.split(".")[1])
+            );
+            if (tokenPayload.sub !== action.payload.id) {
+              console.error(
+                "[authSlice] Inconsistência entre token e perfil:",
+                {
+                  tokenSub: tokenPayload.sub,
+                  profileId: action.payload.id,
+                }
+              );
+              clearAuthenticationState(
+                state,
+                "Inconsistência entre token e perfil"
+              );
+              return;
+            }
+          } catch (error) {
+            console.error(
+              "[authSlice] Erro ao validar consistência token/perfil:",
+              error
+            );
+          }
+        }
+
         state.user = action.payload;
         state.isLoading = false;
         state.error = null;
+
+        console.log("[authSlice] Perfil validado e carregado:", {
+          userId: action.payload.id,
+          email: action.payload.email,
+        });
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false;
