@@ -1,5 +1,6 @@
 /**
  * Hook personalizado para gerenciamento de autenticação
+ * Atualizado para integrar com o sistema de renovação automática
  */
 import React, {
   useCallback,
@@ -14,11 +15,12 @@ import {
   logout as logoutAction,
   getProfile as getProfileAction,
   refreshTokens as refreshTokensAction,
-  clearErrors as clearErrorsAction,
+  clearError as clearErrorAction,
   updateProfile as updateProfileAction,
 } from "../store/slices/authSlice";
 import { useAppDispatch, useAppSelector } from "../store";
 import { UserRole, UpdateUserRequest } from "../types/users.types";
+import { useTokenManager } from "./useTokenManager";
 
 // Definição do tipo para o contexto de autenticação
 type AuthContextType = {
@@ -40,6 +42,12 @@ type AuthContextType = {
   isDoador: () => boolean;
   isBeneficiario: () => boolean;
   updateProfile: (data: UpdateUserRequest) => Promise<boolean>;
+  // NOVOS: informações do token manager
+  tokenStatus: {
+    isExpired: boolean;
+    timeUntilExpiry: number;
+    hasValidTokens: boolean;
+  };
 };
 
 // Criar o contexto
@@ -54,15 +62,18 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const dispatch = useAppDispatch();
 
-  // Selecionar estado de autenticação da store
+  // Selecionar estado de autenticação do Redux
   const { user, accessToken, refreshToken, isAuthenticated, isLoading, error } =
     useAppSelector((state) => state.auth);
 
-  // Função para login
+  // NOVO: Integrar token manager
+  const tokenManager = useTokenManager();
+
+  // Função de login
   const login = useCallback(
     async (credentials: LoginDto): Promise<boolean> => {
       try {
-        console.log("[useAuth] Disparando ação de login");
+        console.log("[useAuth] Iniciando login");
         await dispatch(loginAction(credentials)).unwrap();
         console.log("[useAuth] Login realizado com sucesso");
         return true;
@@ -74,11 +85,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [dispatch]
   );
 
-  // Função para registrar novo usuário
+  // Função de registro
   const register = useCallback(
     async (userData: RegisterDto): Promise<boolean> => {
       try {
-        console.log("[useAuth] Disparando ação de registro");
+        console.log("[useAuth] Iniciando registro");
         await dispatch(registerAction(userData)).unwrap();
         console.log("[useAuth] Registro realizado com sucesso");
         return true;
@@ -90,23 +101,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [dispatch]
   );
 
-  // Função para fazer logout
+  // Função de logout
   const logout = useCallback(async (): Promise<boolean> => {
     try {
-      console.log("[useAuth] Fazendo logout");
+      console.log("[useAuth] Iniciando logout");
       await dispatch(logoutAction()).unwrap();
+      console.log("[useAuth] Logout realizado com sucesso");
       return true;
     } catch (error) {
       console.error("[useAuth] Erro no logout:", error);
-      return false;
+      // Mesmo com erro, considerar logout bem-sucedido
+      return true;
     }
   }, [dispatch]);
 
-  // Função para obter perfil do usuário
+  // Função para obter perfil
   const getProfile = useCallback(async (): Promise<any | null> => {
     try {
       console.log("[useAuth] Obtendo perfil do usuário");
       const profile = await dispatch(getProfileAction()).unwrap();
+      console.log("[useAuth] Perfil obtido com sucesso");
       return profile;
     } catch (error) {
       console.error("[useAuth] Erro ao obter perfil:", error);
@@ -114,32 +128,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [dispatch]);
 
-  // Função para renovar tokens
+  // ATUALIZADA: Função para renovar tokens usando o sistema integrado
   const refreshTokens = useCallback(async (): Promise<boolean> => {
-    if (!refreshToken) {
-      console.warn("[useAuth] Refresh token não disponível");
-      return false;
-    }
-
     try {
       console.log("[useAuth] Renovando tokens");
-      await dispatch(refreshTokensAction(refreshToken)).unwrap();
+      await dispatch(refreshTokensAction()).unwrap();
+      console.log("[useAuth] Tokens renovados com sucesso");
       return true;
     } catch (error) {
       console.error("[useAuth] Erro ao renovar tokens:", error);
       return false;
     }
-  }, [dispatch, refreshToken]);
+  }, [dispatch]);
 
   // Função para limpar erros
   const clearErrors = useCallback(() => {
-    dispatch(clearErrorsAction());
+    dispatch(clearErrorAction());
   }, [dispatch]);
 
-  // Verificar se o usuário tem uma determinada role
+  // Função para verificar roles
   const hasRole = useCallback(
     (role: UserRole | UserRole[]): boolean => {
-      if (!user) return false;
+      if (!user || !user.role) return false;
 
       if (Array.isArray(role)) {
         return role.includes(user.role);
@@ -150,27 +160,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [user]
   );
 
-  // Verificar se o usuário é admin
-  const isAdmin = useCallback((): boolean => {
-    return hasRole(UserRole.ADMIN);
-  }, [hasRole]);
+  // Helpers para verificar roles específicos
+  const isAdmin = useCallback(() => hasRole(UserRole.ADMIN), [hasRole]);
+  const isFuncionario = useCallback(
+    () => hasRole(UserRole.FUNCIONARIO),
+    [hasRole]
+  );
+  const isDoador = useCallback(() => hasRole(UserRole.DOADOR), [hasRole]);
+  const isBeneficiario = useCallback(
+    () => hasRole(UserRole.BENEFICIARIO),
+    [hasRole]
+  );
 
-  // Verificar se o usuário é funcionário
-  const isFuncionario = useCallback((): boolean => {
-    return hasRole(UserRole.FUNCIONARIO);
-  }, [hasRole]);
-
-  // Verificar se o usuário é doador
-  const isDoador = useCallback((): boolean => {
-    return hasRole(UserRole.DOADOR);
-  }, [hasRole]);
-
-  // Verificar se o usuário é beneficiário
-  const isBeneficiario = useCallback((): boolean => {
-    return hasRole(UserRole.BENEFICIARIO);
-  }, [hasRole]);
-
-  // Função para atualizar perfil do usuário
+  // Função para atualizar perfil
   const updateProfile = useCallback(
     async (data: UpdateUserRequest): Promise<boolean> => {
       if (!user) {
@@ -181,15 +183,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log("[useAuth] Atualizando perfil do usuário");
 
-        // Preparar dados para atualização
         const updateData = {
           userId: user.id,
           data: data,
         };
 
-        // Disparar ação de atualização
         await dispatch(updateProfileAction(updateData)).unwrap();
-
         console.log("[useAuth] Perfil atualizado com sucesso");
         return true;
       } catch (error) {
@@ -202,7 +201,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Criar o objeto de valor do contexto
   const authContextValue: AuthContextType = {
-    // Estado
+    // Estado básico
     user,
     accessToken,
     refreshToken,
@@ -219,15 +218,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearErrors,
     updateProfile,
 
-    // Helpers
+    // Helpers de role
     hasRole,
     isAdmin,
     isFuncionario,
     isDoador,
     isBeneficiario,
+
+    // NOVO: Status do token manager
+    tokenStatus: {
+      isExpired: tokenManager.isTokenExpired,
+      timeUntilExpiry: tokenManager.timeUntilExpiry,
+      hasValidTokens: Boolean(tokenManager.hasValidTokens),
+    },
   };
 
-  // Retornar o provedor com o valor do contexto
   return (
     <AuthContext.Provider value={authContextValue}>
       {children}

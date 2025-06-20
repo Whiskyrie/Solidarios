@@ -1,40 +1,104 @@
 /**
- * Utilitários para gerenciamento de tokens sem depender da API auth diretamente
- * para evitar ciclos de dependência
+ * Utilitários para gerenciamento de tokens
+ * Integra com o backend e AsyncStorage
  */
-import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiBaseUrl } from "../api/api"; // Importe a função
+import api from "../api/api";
 
 /**
- * Atualiza tokens usando o refresh token sem depender do módulo auth.ts
- * @param refreshToken O token de atualização
- * @returns Promise contendo os novos tokens
+ * Função utilitária para renovar tokens
+ * Integrada com o backend
  */
 export const refreshTokens = async (refreshToken: string) => {
   try {
-    const response = await axios.post(`${getApiBaseUrl()}/auth/refresh`, {
+    console.log("[tokenUtils] Iniciando renovação de tokens");
+
+    const response = await api.post("/auth/refresh", {
       refreshToken,
     });
 
-    const { accessToken, refreshToken: newRefreshToken } = response.data;
+    // Extrair tokens da resposta conforme estrutura do backend
+    let accessToken, newRefreshToken;
 
-    // Salvar os novos tokens no AsyncStorage
+    if (response.data.data) {
+      // Formato aninhado (resposta com wrapper de sucesso)
+      accessToken = response.data.data.accessToken;
+      newRefreshToken = response.data.data.refreshToken;
+    } else {
+      // Formato direto
+      accessToken = response.data.accessToken;
+      newRefreshToken = response.data.refreshToken;
+    }
+
+    if (!accessToken || !newRefreshToken) {
+      throw new Error("Resposta de renovação incompleta do servidor");
+    }
+
+    // Salvar novos tokens no AsyncStorage
     await AsyncStorage.setItem("@auth_token", accessToken);
     await AsyncStorage.setItem("@refresh_token", newRefreshToken);
 
-    return { accessToken, refreshToken: newRefreshToken };
-  } catch (error) {
-    // Remover tokens caso ocorra um erro
-    await clearTokens();
+    console.log("[tokenUtils] Tokens renovados e salvos com sucesso");
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+    };
+  } catch (error: any) {
+    console.error("[tokenUtils] Erro ao renovar tokens:", error);
+
+    // Se o refresh token está inválido (401), limpar tokens
+    if (error.response?.status === 401) {
+      console.log("[tokenUtils] Refresh token inválido, limpando tokens");
+      await clearTokens();
+    }
+
     throw error;
   }
 };
 
 /**
- * Remove os tokens de autenticação sem depender do módulo auth.ts
+ * Limpar todos os tokens do armazenamento
  */
 export const clearTokens = async () => {
-  await AsyncStorage.removeItem("@auth_token");
-  await AsyncStorage.removeItem("@refresh_token");
+  try {
+    await AsyncStorage.removeItem("@auth_token");
+    await AsyncStorage.removeItem("@refresh_token");
+    console.log("[tokenUtils] Tokens removidos do armazenamento");
+  } catch (error) {
+    console.error("[tokenUtils] Erro ao limpar tokens:", error);
+  }
+};
+
+/**
+ * Obter tokens atuais do armazenamento
+ */
+export const getCurrentTokens = async () => {
+  try {
+    const accessToken = await AsyncStorage.getItem("@auth_token");
+    const refreshToken = await AsyncStorage.getItem("@refresh_token");
+
+    if (accessToken && refreshToken) {
+      return { accessToken, refreshToken };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[tokenUtils] Erro ao obter tokens:", error);
+    return null;
+  }
+};
+
+/**
+ * Salvar tokens no armazenamento
+ */
+export const saveTokens = async (accessToken: string, refreshToken: string) => {
+  try {
+    await AsyncStorage.setItem("@auth_token", accessToken);
+    await AsyncStorage.setItem("@refresh_token", refreshToken);
+    console.log("[tokenUtils] Tokens salvos no armazenamento");
+  } catch (error) {
+    console.error("[tokenUtils] Erro ao salvar tokens:", error);
+    throw error;
+  }
 };
