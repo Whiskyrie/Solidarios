@@ -27,6 +27,7 @@ const DEFAULT_CONFIG: TokenManagerConfig = {
 let currentConfig = DEFAULT_CONFIG;
 let refreshTimer: NodeJS.Timeout | null = null;
 let isRefreshing = false;
+let isInitializing = false; // Flag para controlar inicialização
 
 /**
  * Configura o gerenciador de tokens
@@ -108,6 +109,11 @@ export const getTokenTimeRemaining = (token: string): number => {
  * Programa a renovação automática do token
  */
 export const scheduleTokenRefresh = async () => {
+  if (isInitializing) {
+    console.log("[tokenManager] Ignorando agendamento durante inicialização");
+    return;
+  }
+
   try {
     // Verificar se o sistema está pronto
     if (!isAuthSystemReady()) {
@@ -274,4 +280,12 @@ export const stopTokenManager = () => {
   if (currentConfig.enableDebugLogs) {
     console.log("[tokenManager] Gerenciador de tokens parado");
   }
+};
+
+/**
+ * Define o modo de inicialização do gerenciador de tokens
+ */
+export const setInitializationMode = (mode: boolean) => {
+  isInitializing = mode;
+  console.log(`[tokenManager] Modo inicialização: ${mode}`);
 };

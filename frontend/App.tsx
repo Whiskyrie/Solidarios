@@ -10,43 +10,39 @@ import { Provider } from "react-redux";
 import { store } from "./src/store";
 import * as SplashScreen from "expo-splash-screen";
 
-// Provedores de contexto
+// Componentes e navegação
 import { AuthProvider } from "./src/hooks/useAuth";
 import { AuthListener } from "./src/utils/authListener";
-
-// Sistema de autenticação
-import { initializeAuth } from "./src/utils/authInit";
-import { restoreAuthState } from "./src/store/slices/authSlice";
-import { configureTokenManager } from "./src/utils/tokenManager";
-
-// Navegadores
+import { AuthInitializer } from "./src/components/common/AuthInitializer";
 import MainNavigator from "./src/navigation/MainNavigator";
-
-// Componentes globais
 import { NotificationBanner } from "./src/components/feedback/barrelFeedback";
+
+// Configuração do token manager
+import { configureTokenManager } from "./src/utils/tokenManager";
 
 // Manter a splash screen visível enquanto carregamos recursos
 SplashScreen.preventAutoHideAsync();
 
 // Sistema de notificações global
-export const NotificationContext = React.createContext({
-  showNotification: (_: {
+export const NotificationContext = React.createContext<{
+  showNotification: (params: {
     type: "success" | "error" | "warning" | "info";
     message: string;
     description?: string;
-  }) => {},
+  }) => void;
+  hideNotification: () => void;
+}>({
+  showNotification: () => {},
   hideNotification: () => {},
 });
 
-/**
- * Componente interno que contém a navegação e o AuthListener
- * Necessário para garantir que o AuthListener tenha acesso ao NavigationContainer
- */
 const AppContent: React.FC = () => {
   return (
     <NavigationContainer>
       <AuthListener>
-        <MainNavigator />
+        <AuthInitializer>
+          <MainNavigator />
+        </AuthInitializer>
       </AuthListener>
     </NavigationContainer>
   );
@@ -61,51 +57,25 @@ export default function App() {
     description: "",
   });
 
-  // Carregar recursos e inicializar sistema de autenticação
   useEffect(() => {
     async function prepare() {
       try {
-        console.log("[App] Iniciando preparação da aplicação...");
+        console.log("[App] Configurando sistema base...");
 
-        // 1. Configurar token manager
-        console.log("[App] Configurando token manager...");
+        // Configurar apenas o token manager, não inicializar auth aqui
         configureTokenManager({
-          renewalTimeBeforeExpiry: 5, // 5 minutos antes da expiração
+          renewalTimeBeforeExpiry: 5,
           enableDebugLogs: __DEV__,
           maxRetryAttempts: 3,
           retryDelay: 1000,
         });
 
-        // 2. Inicializar sistema de autenticação
-        console.log("[App] Inicializando sistema de autenticação...");
-        const authInitialized = await initializeAuth({
-          renewalTimeBeforeExpiry: 5,
-          enableDebugLogs: __DEV__,
-          loginRouteName: "Login",
-          tokenCheckInterval: 30, // Verificar tokens a cada 30 minutos
-        });
+        // Aguardar um pouco para dar tempo das configurações
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        if (authInitialized) {
-          console.log(
-            "[App] Sistema de autenticação inicializado - usuário possivelmente autenticado"
-          );
-        } else {
-          console.log(
-            "[App] Sistema de autenticação inicializado - usuário não autenticado"
-          );
-        }
-
-        // 3. Restaurar estado de autenticação no Redux
-        console.log("[App] Restaurando estado de autenticação no Redux...");
-        store.dispatch(restoreAuthState());
-
-        // 4. Aguardar um pouco para transição suave
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        console.log("[App] Inicialização completa com sucesso");
+        console.log("[App] Configuração básica completa");
       } catch (error) {
-        console.error("[App] Erro durante inicialização:", error);
-        console.log("[App] Continuando inicialização apesar do erro");
+        console.error("[App] Erro durante configuração:", error);
       } finally {
         setAppIsReady(true);
       }
@@ -116,7 +86,6 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      console.log("[App] Layout pronto, escondendo splash screen");
       await SplashScreen.hideAsync();
     }
   }, [appIsReady]);
@@ -149,12 +118,12 @@ export default function App() {
 
   return (
     <Provider store={store}>
-      <SafeAreaProvider onLayout={onLayoutRootView}>
-        <StatusBar style="auto" />
-        <AuthProvider>
+      <AuthProvider>
+        <SafeAreaProvider onLayout={onLayoutRootView}>
           <NotificationContext.Provider
             value={{ showNotification, hideNotification }}
           >
+            <StatusBar style="auto" />
             <AppContent />
             <NotificationBanner
               visible={notification.visible}
@@ -162,13 +131,10 @@ export default function App() {
               message={notification.message}
               description={notification.description}
               onClose={hideNotification}
-              position="top"
-              autoClose
-              duration={3000}
             />
           </NotificationContext.Provider>
-        </AuthProvider>
-      </SafeAreaProvider>
+        </SafeAreaProvider>
+      </AuthProvider>
     </Provider>
   );
 }

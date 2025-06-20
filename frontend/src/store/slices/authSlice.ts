@@ -2,7 +2,12 @@
  * Redux slice para gerenciamento do estado de autenticação
  * Integrado com o sistema de renovação automática de tokens
  */
-import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  PayloadAction,
+  createAction,
+} from "@reduxjs/toolkit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LoginDto, RegisterDto, AuthState } from "../../types/auth.types";
 import { UpdateUserRequest } from "../../types/users.types";
@@ -274,6 +279,22 @@ export const restoreAuthState = createAsyncThunk(
   }
 );
 
+// Ações adicionais para o AuthManager
+export const setAuthState = createAction<{
+  accessToken: string;
+  refreshToken: string;
+  isAuthenticated: boolean;
+}>("auth/setAuthState");
+
+export const clearAuthState = createAction("auth/clearAuthState");
+
+export const setUser = createAction<any>("auth/setUser");
+
+export const updateTokensAction = createAction<{
+  accessToken: string;
+  refreshToken: string;
+}>("auth/updateTokens");
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
@@ -508,6 +529,28 @@ const authSlice = createSlice({
         console.log(
           "[authSlice] Falha ao restaurar estado, usuário não autenticado"
         );
+      })
+      .addCase(setAuthState, (state, action) => {
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = action.payload.isAuthenticated;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(clearAuthState, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(setUser, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(updateTokensAction, (state, action) => {
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
       });
   },
 });

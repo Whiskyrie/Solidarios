@@ -45,6 +45,15 @@ const processQueue = (error: any, token: string | null = null) => {
  */
 api.interceptors.request.use(
   async (config) => {
+    // Não adicionar token para endpoints de auth
+    if (
+      config.url?.includes("/auth/login") ||
+      config.url?.includes("/auth/register") ||
+      config.url?.includes("/auth/refresh")
+    ) {
+      return config;
+    }
+
     try {
       const token = await AsyncStorage.getItem("@auth_token");
       if (token) {
@@ -73,7 +82,11 @@ api.interceptors.response.use(
     };
 
     // Verificar se é erro 401 e se não é uma tentativa de retry
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/auth/")
+    ) {
       console.log("[API] Erro 401 detectado, iniciando processo de renovação");
 
       // Se já está renovando, adicionar à fila de espera
