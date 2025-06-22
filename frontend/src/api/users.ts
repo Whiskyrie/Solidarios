@@ -38,9 +38,12 @@ const UsersService = {
    * @param id ID do usuário
    * @returns Usuário encontrado
    */
-  getById: async (id: string): Promise<User> => {
-    const response = await api.get<User>(`/users/${id}`);
-    return response.data;
+  async getById(id: string): Promise<User> {
+    // 1. Especificamos o tipo correto da resposta "envelopada" da API
+    const response = await api.get<ApiResponse<User>>(`/users/${id}`);
+    
+    // 2. Retornamos apenas o objeto 'User' que está dentro do 'data.data'
+    return response.data.data;
   },
 
   /**
