@@ -26,7 +26,7 @@ import {
   Badge,
   Avatar,
   NotificationBanner,
-  ConfirmationDialog, // Adicionado para a confirmação
+  ConfirmationDialog,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
@@ -63,8 +63,11 @@ const UserDetailScreen: React.FC = () => {
 
   // Carregar detalhes do usuário
   const loadUser = useCallback(async () => {
-    await fetchUserById(id);
-  }, [fetchUserById, id]);
+    // Adiciona uma condição para evitar o loop, só busca se o usuário for diferente
+    if (!isLoading && (!user || user.id !== id)) {
+        await fetchUserById(id);
+    }
+  }, [fetchUserById, id, user, isLoading]);
 
   // Carregar dados ao focar na tela
   useFocusEffect(
@@ -117,13 +120,13 @@ const UserDetailScreen: React.FC = () => {
 
   if (!user) {
     return (
-       <View style={styles.container}>
+      <View style={styles.container}>
         <Header title="Usuário não encontrado" onBackPress={() => navigation.goBack()} />
         <ErrorState
-            title="Usuário não encontrado"
-            description="O usuário solicitado não pode ser carregado."
-            actionLabel="Voltar para a lista"
-            onAction={() => navigation.goBack()}
+          title="Usuário não encontrado"
+          description="O usuário solicitado não pode ser carregado."
+          actionLabel="Voltar para a lista"
+          onAction={() => navigation.goBack()}
         />
       </View>
     );
@@ -151,19 +154,6 @@ const UserDetailScreen: React.FC = () => {
         title="Detalhes do Usuário"
         onBackPress={() => navigation.goBack()}
         backgroundColor={theme.colors.primary.main}
-        rightComponent={
-          <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerButton} onPress={handleEditUser}>
-                <Typography 
-                  variant="small" 
-                  color={theme.colors.neutral.white}
-                  numberOfLines={1} // Garante que o texto fique em uma única linha
-                >
-                  Editar
-                </Typography>
-              </TouchableOpacity>
-          </View>
-        }
       />
 
       {/* Notificação */}
@@ -196,27 +186,47 @@ const UserDetailScreen: React.FC = () => {
         <Card title="Informações Adicionais" style={styles.card}>
           {user.phone && (
             <View style={styles.detailRow}>
-              <Typography variant="body" style={{ fontWeight: 'bold' }}>Telefone:</Typography>
+              <Typography variant="body" style={styles.detailLabel}>Telefone:</Typography>
               <Typography variant="body">{user.phone}</Typography>
             </View>
           )}
 
           {user.address && typeof user.address === 'object' && user.address.street && (
             <View style={styles.detailRow}>
-              <Typography variant="body" style={{ fontWeight: 'bold' }}>Endereço:</Typography>
-              <Typography variant="body" style={{textAlign: 'right', flex: 1}}>
+              <Typography variant="body" style={styles.detailLabel}>Endereço:</Typography>
+              <Typography variant="body" style={styles.detailValue}>
                 {`${user.address.street}, ${user.address.number}\n${user.address.city} - ${user.address.state}`}
               </Typography>
             </View>
           )}
 
           <View style={styles.detailRow}>
-            <Typography variant="body" style={{ fontWeight: 'bold' }}>Data de Cadastro:</Typography>
+            <Typography variant="body" style={styles.detailLabel}>Data de Cadastro:</Typography>
             <Typography variant="body">
               {new Date(user.createdAt).toLocaleDateString('pt-BR')}
             </Typography>
           </View>
         </Card>
+
+        {/* =============================================== */}
+        {/* BOTÕES DE AÇÃO ADICIONADOS AQUI       */}
+        {/* =============================================== */}
+        <View style={styles.actionsContainer}>
+          <Button
+            title="Editar Usuário"
+            onPress={handleEditUser}
+            variant="primary"
+            style={styles.actionButton}
+          />
+          <Button
+            title="Excluir Usuário"
+            onPress={() => setShowDeleteConfirmation(true)}
+            variant="secondary" // Usando a variante secundária
+            // CORREÇÃO: A prop 'color' foi removida e a cor foi aplicada via 'style'
+            style={[styles.actionButton, { backgroundColor: theme.colors.status.error }]}
+          />
+        </View>
+
       </ScrollView>
       
       <ConfirmationDialog 
@@ -238,20 +248,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: theme.spacing.s,
     paddingBottom: theme.spacing.xxl,
-  },
-  headerActions: {
-    flexDirection: "row",
-  },
-  headerButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    // Aumentamos o padding para dar mais "corpo" ao botão
-    paddingVertical: theme.spacing.xs,     // Antes era xxs
-    paddingHorizontal: theme.spacing.s,  // Antes era xs
-    borderRadius: theme.borderRadius.small,
-    marginLeft: theme.spacing.xs,
-    // Adicionado para garantir que o texto fique perfeitamente centralizado
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   card: {
     marginBottom: theme.spacing.s,
@@ -276,8 +272,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.s,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.neutral.lightGray
+  },
+  detailLabel: {
+    fontWeight: 'bold',
+    marginRight: theme.spacing.s,
+  },
+  detailValue: {
+    textAlign: 'right',
+    flex: 1,
+  },
+  actionsContainer: {
+    marginTop: theme.spacing.m,
+    paddingHorizontal: theme.spacing.s,
+  },
+  actionButton: {
+    marginBottom: theme.spacing.s,
   },
 });
 
