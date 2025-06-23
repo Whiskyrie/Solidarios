@@ -6,7 +6,7 @@ import api from './api';
 import { 
   PageOptionsDto, 
   PageDto, 
-  ApiResponse // <--- Importação adicionada
+  ApiResponse 
 } from '../types/common.types';
 import { 
   User, 

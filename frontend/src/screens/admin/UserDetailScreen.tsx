@@ -182,7 +182,6 @@ const UserDetailScreen: React.FC = () => {
           </View>
         </Card>
 
-        {/* Detalhes adicionais */}
         <Card title="Informações Adicionais" style={styles.card}>
           {user.phone && (
             <View style={styles.detailRow}>
@@ -208,9 +207,6 @@ const UserDetailScreen: React.FC = () => {
           </View>
         </Card>
 
-        {/* =============================================== */}
-        {/* BOTÕES DE AÇÃO ADICIONADOS AQUI       */}
-        {/* =============================================== */}
         <View style={styles.actionsContainer}>
           <Button
             title="Editar Usuário"
@@ -221,8 +217,7 @@ const UserDetailScreen: React.FC = () => {
           <Button
             title="Excluir Usuário"
             onPress={() => setShowDeleteConfirmation(true)}
-            variant="secondary" // Usando a variante secundária
-            // CORREÇÃO: A prop 'color' foi removida e a cor foi aplicada via 'style'
+            variant="secondary" 
             style={[styles.actionButton, { backgroundColor: theme.colors.status.error }]}
           />
         </View>

@@ -10,7 +10,10 @@ import {
   ItemsApiResponse,
   DonorStatsDto, // <-- Add this line
 } from "../types/items.types";
-import { PageOptionsDto } from "../types/common.types";
+import { 
+  PageOptionsDto,   
+  PageDto, 
+  ApiResponse } from "../types/common.types";
 
 // Namespace para agrupar as funções do serviço
 const ItemsService = {
@@ -19,11 +22,13 @@ const ItemsService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de itens
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<ItemsPage> => {
-    const response = await api.get<ItemsPage>("/items", {
+  async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Item>> {
+    // Especifica o tipo de resposta completa da API
+    const response = await api.get<ApiResponse<PageDto<Item>>>('/items', {
       params: pageOptions,
     });
-    return response.data;
+    // Retorna apenas o conteúdo 'data' de dentro do 'envelope' da API
+    return response.data.data;
   },
 
   /**
