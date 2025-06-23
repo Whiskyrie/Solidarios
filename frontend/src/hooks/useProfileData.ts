@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Animated } from "react-native";
 import { useAuth } from "./useAuth";
 import api from "../api/api";
-import { ANIMATION_DURATIONS } from "../components/constants/profileConstants";
 
 interface ProfileStats {
   totalDonations: number;
@@ -13,92 +11,96 @@ interface ProfileStats {
 
 export const useProfileData = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<ProfileStats>({
     totalDonations: 0,
     distributedItems: 0,
     peopleHelped: 0,
-    impactScore: 0, // Inicializando com 0
+    impactScore: 0,
   });
 
-  // Animações
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  // ✅ Ref para controlar se já carregou dados
+  const hasLoadedRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
 
-  const loadProfileData = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
+  // ✅ Função de load simplificada SEM dependências problemáticas
+  const loadProfileData = useCallback(
+    async (force = false) => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
+      // Evitar carregamentos múltiplos desnecessários
+      if (hasLoadedRef.current && !force) {
+        return;
+      }
 
-      console.log("useProfileData - Carregando dados para user:", user.id);
+      try {
+        setLoading(true);
+        setError(null);
 
-      // Usar o endpoint de stats do usuário
-      const response = await api.get(`/users/${user.id}/stats`);
-      console.log("useProfileData - Resposta da API:", response.data);
+        console.log("useProfileData - Carregando dados para user:", user.id);
+        const response = await api.get(`/users/${user.id}/stats`);
+        console.log("useProfileData - Resposta da API:", response.data);
 
-      const apiData = response.data;
-      const mappedStats: ProfileStats = {
-        totalDonations: apiData.totalDonations || 0,
-        distributedItems: apiData.distributedItems || 0,
-        peopleHelped: apiData.peopleHelped || 0,
-        impactScore: apiData.impactScore || 0, // Garantir que impactScore seja sempre um número
-      };
+        if (!isMountedRef.current) return;
 
-      console.log("useProfileData - Stats mapeados:", mappedStats);
-      setStats(mappedStats);
+        const apiData = response.data;
+        const mappedStats: ProfileStats = {
+          totalDonations: apiData.totalDonations || 0,
+          distributedItems: apiData.distributedItems || 0,
+          peopleHelped: apiData.peopleHelped || 0,
+          impactScore: apiData.impactScore || 0,
+        };
 
-      // Iniciar animações
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: ANIMATION_DURATIONS.fadeIn,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: ANIMATION_DURATIONS.slideIn,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } catch (err) {
-      console.error("useProfileData - Erro:", err);
-      setError("Não foi possível carregar os dados do perfil");
+        console.log("useProfileData - Stats mapeados:", mappedStats);
+        setStats(mappedStats);
+        hasLoadedRef.current = true;
+      } catch (err) {
+        console.error("useProfileData - Erro:", err);
+        if (!isMountedRef.current) return;
 
-      // Manter valores zerados em caso de erro
-      setStats({
-        totalDonations: 0,
-        distributedItems: 0,
-        peopleHelped: 0,
-        impactScore: 0,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, fadeAnim, slideAnim]);
+        setError("Não foi possível carregar os dados do perfil");
+        setStats({
+          totalDonations: 0,
+          distributedItems: 0,
+          peopleHelped: 0,
+          impactScore: 0,
+        });
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [user?.id]
+  ); // ✅ APENAS user?.id como dependência
 
+  // ✅ useEffect simplificado
   useEffect(() => {
-    loadProfileData();
-  }, [loadProfileData]);
+    isMountedRef.current = true;
+    hasLoadedRef.current = false;
 
-  const retry = useCallback(() => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(50);
     loadProfileData();
-  }, [fadeAnim, slideAnim, loadProfileData]);
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [user?.id]); // ✅ APENAS user?.id
+
+  // ✅ Função de retry que força reload
+  const retry = useCallback(() => {
+    hasLoadedRef.current = false;
+    loadProfileData(true);
+  }, [loadProfileData]);
 
   return {
     user,
     loading,
     error,
     stats,
-    fadeAnim,
-    slideAnim,
     retry,
   };
 };
