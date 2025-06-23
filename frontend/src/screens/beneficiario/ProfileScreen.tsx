@@ -53,7 +53,7 @@ const ProfileScreen: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  // Carregar dados do perfil - SEGUINDO PADRÃO EXATO DAS TELAS CORRIGIDAS
+  // Carregar dados do perfil
   const loadProfileData = useCallback(async () => {
     if (!user?.id) return;
 
@@ -90,7 +90,7 @@ const ProfileScreen: React.FC = () => {
     }
   }, [user?.id, fetchDistributionsByBeneficiary, distributions]);
 
-  // Animação de entrada - SEGUINDO PADRÃO EXATO
+  // Animação de entrada
   useFocusEffect(
     useCallback(() => {
       Animated.parallel([
@@ -113,7 +113,7 @@ const ProfileScreen: React.FC = () => {
     }, [fadeAnim, slideAnim, dataLoaded, loadProfileData])
   );
 
-  // Refresh - SEGUINDO PADRÃO EXATO
+  // Refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -145,16 +145,15 @@ const ProfileScreen: React.FC = () => {
 
   // Navegar para editar perfil
   const navigateToEditProfile = useCallback(() => {
-    // navigation.navigate(BENEFICIARIO_ROUTES.EDIT_PROFILE);
-    Alert.alert("Em breve", "Funcionalidade de edição de perfil em desenvolvimento");
-  }, []);
+    navigation.navigate(BENEFICIARIO_ROUTES.EDIT_PROFILE);
+  }, [navigation]);
 
   // Navegar para histórico
   const navigateToHistory = useCallback(() => {
     navigation.navigate(BENEFICIARIO_ROUTES.RECEIPT_HISTORY);
   }, [navigation]);
 
-  // Header Component - SEGUINDO PADRÃO EXATO
+  // Header Component
   const Header = () => (
     <>
       <StatusBar
@@ -395,7 +394,6 @@ const ProfileScreen: React.FC = () => {
               title="Sair da conta"
               onPress={handleLogout}
               variant="secondary"
-              icon="logout"
               style={styles.logoutButton}
             />
           </View>
