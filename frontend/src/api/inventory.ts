@@ -20,12 +20,15 @@ const InventoryService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de registros de inventário
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<InventoryPage> => {
-    const response = await api.get<InventoryPage>("/inventory", {
-      params: pageOptions,
-    });
-    return response.data;
-  },
+    async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Inventory>> {
+      // Especifica o tipo de resposta completa da API
+      const response = await api.get<ApiResponse<PageDto<Inventory>>>(
+        '/inventory',
+        { params: pageOptions },
+      );
+      // Retorna apenas o conteúdo 'data' de dentro do 'envelope' da API
+      return response.data.data;
+    },
 
   /**
    * Obter registro de inventário por ID

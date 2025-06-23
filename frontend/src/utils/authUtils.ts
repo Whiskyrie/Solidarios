@@ -1,4 +1,4 @@
-/**d
+/**
  * Utilitários de autenticação com tratamento inteligente de erros
  * Inclui funções para login, logout e renovação de tokens
  */
