@@ -23,11 +23,9 @@ const ItemsService = {
    * @returns Lista paginada de itens
    */
   async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Item>> {
-    // Especifica o tipo de resposta completa da API
     const response = await api.get<ApiResponse<PageDto<Item>>>('/items', {
       params: pageOptions,
     });
-    // Retorna apenas o conteúdo 'data' de dentro do 'envelope' da API
     return response.data.data;
   },
 

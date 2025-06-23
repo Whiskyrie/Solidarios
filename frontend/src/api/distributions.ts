@@ -21,12 +21,10 @@ const DistributionsService = {
    * @returns Lista paginada de distribuições
    */
   async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Distribution>> {
-    // Especifica o tipo de resposta completa da API
     const response = await api.get<ApiResponse<PageDto<Distribution>>>(
       '/distributions',
       { params: pageOptions },
     );
-    // Retorna apenas o conteúdo 'data' de dentro do 'envelope' da API
     return response.data.data;
   },
 

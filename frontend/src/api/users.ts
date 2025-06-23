@@ -24,12 +24,10 @@ const UsersService = {
    * @returns Lista paginada de usuários
    */
   async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<User>> {
-    // A 'response' completa do axios
     const response = await api.get<ApiResponse<PageDto<User>>>('/users', { 
       params: pageOptions 
     });
     
-    // CORREÇÃO: Nós retornamos apenas a parte de dentro do 'envelope'
     return response.data.data; 
   },
 
