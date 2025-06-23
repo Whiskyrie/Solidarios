@@ -134,16 +134,6 @@ const UsersScreen: React.FC = () => {
       <Header
         title="Gerenciamento de Usuários"
         backgroundColor={theme.colors.primary.main}
-        rightComponent={
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate(ADMIN_ROUTES.CREATE_USER as any)}
-          >
-            <Typography variant="small" color={theme.colors.neutral.white}>
-              + Novo
-            </Typography>
-          </TouchableOpacity>
-        }
       />
 
       {/* Conteúdo */}
