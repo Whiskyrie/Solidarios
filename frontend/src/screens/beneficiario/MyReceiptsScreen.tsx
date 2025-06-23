@@ -262,6 +262,7 @@ const MyReceiptsScreen: React.FC = () => {
 
   const handleErrorRetry = useCallback(() => {
     clearError();
+    setDataLoaded(false);
     loadReceipts(1);
   }, [clearError, loadReceipts]);
 
@@ -322,55 +323,13 @@ const MyReceiptsScreen: React.FC = () => {
     return `item-${index}`;
   }, []);
 
-  // Estado de carregamento inicial
-  if (isLoading && !dataLoaded && !refreshing) {
-    return (
-      <View style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="#173F5F"
-          translucent
-        />
-        <Loading visible={true} message="Carregando seus recebimentos..." />
-      </View>
-    );
-  }
-
-  // Estado de erro
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="#173F5F"
-          translucent
-        />
-        <ErrorState
-          title="Erro ao carregar recebimentos"
-          description={error}
-          icon={
-            <View style={styles.errorIconContainer}>
-              <MaterialIcons
-                name="error-outline"
-                size={70}
-                color={theme.colors.status.error}
-              />
-            </View>
-          }
-          actionLabel="Tentar novamente"
-          onAction={handleErrorRetry}
-        />
-      </View>
-    );
-  }
-
-  // Componente EmptyState
+  // Renderiza EmptyState
   const NoReceiptsView = () => (
     <View style={styles.emptyStateContainer}>
       <EmptyState
         title="Nenhum recebimento encontrado"
         description={
-          searchQuery && searchQuery.trim()
+          searchQuery
             ? "Tente ajustar sua busca ou filtros"
             : "Você ainda não recebeu nenhuma doação. Explore os itens disponíveis!"
         }
@@ -389,7 +348,172 @@ const MyReceiptsScreen: React.FC = () => {
     </View>
   );
 
-  // Renderização principal com estrutura corrigida
+  // Header Component
+  const Header = () => (
+    <LinearGradient
+      colors={["#173F5F", "#006E58"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.headerGradient}
+    >
+      {/* Seção de boas-vindas */}
+      <View style={styles.welcomeSection}>
+        <View>
+          <Typography
+            variant="h2"
+            style={styles.welcomeText}
+            color={theme.colors.neutral.white}
+          >
+            Meus Recebimentos
+          </Typography>
+          <Typography
+            variant="bodySecondary"
+            color="rgba(255,255,255,0.8)"
+            style={styles.greetingText}
+          >
+            Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
+          </Typography>
+        </View>
+
+        {/* Contador de recebimentos */}
+        <View style={styles.receiptCounter}>
+          <Typography
+            variant="h2"
+            color={theme.colors.neutral.white}
+            style={styles.counterNumber}
+          >
+            {validatedDistributions?.length || 0}
+          </Typography>
+          <Typography variant="caption" color="rgba(255,255,255,0.8)">
+            recebimentos
+          </Typography>
+        </View>
+      </View>
+
+      {/* Seção integrada de busca e filtros */}
+      <View style={styles.searchFilterSection}>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <MaterialIcons
+              name="search"
+              size={20}
+              color="rgba(255,255,255,0.6)"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Buscar recebimentos..."
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              style={styles.searchInput}
+              selectionColor="rgba(255,255,255,0.8)"
+              underlineColorAndroid="transparent"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={toggleFilterDropdown}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="filter-list"
+              size={20}
+              color={theme.colors.neutral.white}
+            />
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: filterRotation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "180deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <MaterialIcons
+                name="expand-more"
+                size={16}
+                color={theme.colors.neutral.white}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Indicador de filtro ativo */}
+        {activeFilter !== "all" && (
+          <View style={styles.activeFilterIndicator}>
+            <MaterialIcons
+              name={
+                STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
+                "filter-list"
+              }
+              size={14}
+              color={theme.colors.primary.secondary}
+            />
+            <Typography
+              variant="caption"
+              color={theme.colors.primary.secondary}
+              style={styles.activeFilterText}
+            >
+              {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label ||
+                "Filtro ativo"}
+            </Typography>
+          </View>
+        )}
+
+        {/* Dropdown de filtros */}
+        {showFilterDropdown && (
+          <Animated.View style={styles.filterDropdown}>
+            {STATUS_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter.value}
+                style={[
+                  styles.filterOption,
+                  activeFilter === filter.value && styles.filterOptionActive,
+                ]}
+                onPress={() => {
+                  setActiveFilter(filter.value);
+                  setShowFilterDropdown(false);
+                  Animated.timing(filterRotation, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                  }).start();
+                }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name={filter.icon}
+                  size={18}
+                  color={
+                    activeFilter === filter.value
+                      ? theme.colors.primary.secondary
+                      : theme.colors.neutral.darkGray
+                  }
+                />
+                <Typography
+                  variant="bodySecondary"
+                  color={
+                    activeFilter === filter.value
+                      ? theme.colors.primary.secondary
+                      : theme.colors.neutral.black
+                  }
+                  style={styles.filterOptionText}
+                >
+                  {filter.label}
+                </Typography>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+        )}
+      </View>
+    </LinearGradient>
+  );
+
+  // ESTRUTURA SIMPLIFICADA SEGUINDO PADRÃO EXATO DO MyDonationsScreen
   return (
     <View style={styles.container}>
       <StatusBar
@@ -398,171 +522,8 @@ const MyReceiptsScreen: React.FC = () => {
         translucent
       />
       
-      {/* Header fixo */}
-      <LinearGradient
-        colors={["#173F5F", "#006E58"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        {/* Seção de boas-vindas */}
-        <View style={styles.welcomeSection}>
-          <View>
-            <Typography
-              variant="h2"
-              style={styles.welcomeText}
-              color={theme.colors.neutral.white}
-            >
-              Meus Recebimentos
-            </Typography>
-            <Typography
-              variant="bodySecondary"
-              color="rgba(255,255,255,0.8)"
-              style={styles.greetingText}
-            >
-              Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
-            </Typography>
-          </View>
-
-          {/* Contador de recebimentos */}
-          <View style={styles.receiptCounter}>
-            <Typography
-              variant="h2"
-              color={theme.colors.neutral.white}
-              style={styles.counterNumber}
-            >
-              {validatedDistributions?.length || 0}
-            </Typography>
-            <Typography variant="caption" color="rgba(255,255,255,0.8)">
-              recebimentos
-            </Typography>
-          </View>
-        </View>
-
-        {/* Seção integrada de busca e filtros */}
-        <View style={styles.searchFilterSection}>
-          <View style={styles.searchContainer}>
-            <View style={styles.searchBar}>
-              <MaterialIcons
-                name="search"
-                size={20}
-                color="rgba(255,255,255,0.6)"
-                style={styles.searchIcon}
-              />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Buscar recebimentos..."
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                style={styles.searchInput}
-                selectionColor="rgba(255,255,255,0.8)"
-                underlineColorAndroid="transparent"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={toggleFilterDropdown}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons
-                name="filter-list"
-                size={20}
-                color={theme.colors.neutral.white}
-              />
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      rotate: filterRotation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ["0deg", "180deg"],
-                      }),
-                    },
-                  ],
-                }}
-              >
-                <MaterialIcons
-                  name="expand-more"
-                  size={16}
-                  color={theme.colors.neutral.white}
-                />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Indicador de filtro ativo */}
-          {activeFilter !== "all" && (
-            <View style={styles.activeFilterIndicator}>
-              <MaterialIcons
-                name={
-                  STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
-                  "filter-list"
-                }
-                size={14}
-                color={theme.colors.primary.secondary}
-              />
-              <Typography
-                variant="caption"
-                color={theme.colors.primary.secondary}
-                style={styles.activeFilterText}
-              >
-                {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label ||
-                  "Filtro ativo"}
-              </Typography>
-            </View>
-          )}
-
-          {/* Dropdown de filtros */}
-          {showFilterDropdown && (
-            <Animated.View style={styles.filterDropdown}>
-              {STATUS_FILTERS.map((filter) => (
-                <TouchableOpacity
-                  key={filter.value}
-                  style={[
-                    styles.filterOption,
-                    activeFilter === filter.value &&
-                      styles.filterOptionActive,
-                  ]}
-                  onPress={() => {
-                    setActiveFilter(filter.value);
-                    setShowFilterDropdown(false);
-                    Animated.timing(filterRotation, {
-                      toValue: 0,
-                      duration: 200,
-                      useNativeDriver: true,
-                    }).start();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons
-                    name={filter.icon}
-                    size={18}
-                    color={
-                      activeFilter === filter.value
-                        ? theme.colors.primary.secondary
-                        : theme.colors.neutral.darkGray
-                    }
-                  />
-                  <Typography
-                    variant="bodySecondary"
-                    color={
-                      activeFilter === filter.value
-                        ? theme.colors.primary.secondary
-                        : theme.colors.neutral.black
-                    }
-                    style={styles.filterOptionText}
-                  >
-                    {filter.label}
-                  </Typography>
-                </TouchableOpacity>
-              ))}
-            </Animated.View>
-          )}
-        </View>
-      </LinearGradient>
-
-      {/* Conteúdo scrollável */}
+      <Header />
+      
       <View style={styles.content}>
         <Animated.View
           style={[
@@ -573,70 +534,96 @@ const MyReceiptsScreen: React.FC = () => {
             },
           ]}
         >
-          {dataLoaded && filteredDistributions.length === 0 ? (
-            <ScrollView 
-              style={styles.scrollContainer}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <NoReceiptsView />
-            </ScrollView>
-          ) : (
-            <FlatList
-              data={filteredDistributions}
-              keyExtractor={keyExtractor}
-              renderItem={renderItem}
-              contentContainerStyle={styles.listContent}
-              style={styles.flatList}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  colors={[theme.colors.primary.secondary]}
-                  tintColor={theme.colors.primary.secondary}
-                />
+          {/* Loading inicial */}
+          {isLoading && !dataLoaded && !refreshing && (
+            <View style={styles.loadingContainer}>
+              <Loading visible={true} message="Buscando seus recebimentos..." />
+            </View>
+          )}
+
+          {/* Erro */}
+          {error && (
+            <ErrorState
+              title="Erro ao carregar recebimentos"
+              description={error}
+              icon={
+                <View style={styles.errorIconContainer}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={70}
+                    color={theme.colors.status.error}
+                  />
+                </View>
               }
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={
-                isLoadingMore ? (
-                  <View style={styles.loadingMoreContainer}>
-                    <Loading visible size="small" message="Carregando mais..." />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                dataLoaded && filteredDistributions.length === 0 ? (
-                  <NoReceiptsView />
-                ) : null
-              }
-              showsVerticalScrollIndicator={false}
+              actionLabel="Tentar novamente"
+              onAction={handleErrorRetry}
             />
           )}
-        </Animated.View>
 
-        {/* Botão flutuante para itens disponíveis */}
-        <TouchableOpacity
-          style={styles.floatingButtonContainer}
-          onPress={navigateToAvailableItems}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={["#173F5F", "#006E58"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.floatingButton}
+          {/* Conteúdo principal */}
+          {!isLoading && !error && (
+            <>
+              {dataLoaded && filteredDistributions.length === 0 ? (
+                <ScrollView 
+                  style={styles.scrollContainer}
+                  contentContainerStyle={styles.scrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <NoReceiptsView />
+                </ScrollView>
+              ) : (
+                <FlatList
+                  data={filteredDistributions}
+                  keyExtractor={keyExtractor}
+                  renderItem={renderItem}
+                  contentContainerStyle={styles.listContent}
+                  style={styles.flatList}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={handleRefresh}
+                      colors={[theme.colors.primary.secondary]}
+                      tintColor={theme.colors.primary.secondary}
+                    />
+                  }
+                  onEndReached={handleLoadMore}
+                  onEndReachedThreshold={0.5}
+                  ListFooterComponent={
+                    isLoadingMore ? (
+                      <View style={styles.loadingMoreContainer}>
+                        <Loading visible size="small" message="Carregando mais..." />
+                      </View>
+                    ) : null
+                  }
+                  showsVerticalScrollIndicator={false}
+                />
+              )}
+            </>
+          )}
+
+          {/* Botão flutuante */}
+          <TouchableOpacity
+            style={styles.floatingButtonContainer}
+            onPress={navigateToAvailableItems}
+            activeOpacity={0.8}
           >
-            <MaterialIcons name="search" size={20} color="#fff" />
-            <Typography
-              variant="bodySecondary"
-              color={theme.colors.neutral.white}
-              style={styles.buttonText}
+            <LinearGradient
+              colors={["#173F5F", "#006E58"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.floatingButton}
             >
-              Ver Disponíveis
-            </Typography>
-          </LinearGradient>
-        </TouchableOpacity>
+              <MaterialIcons name="search" size={20} color="#fff" />
+              <Typography
+                variant="bodySecondary"
+                color={theme.colors.neutral.white}
+                style={styles.buttonText}
+              >
+                Ver Disponíveis
+              </Typography>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </View>
   );
@@ -784,7 +771,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: theme.spacing.s,
     paddingHorizontal: theme.spacing.s,
-    paddingBottom: theme.spacing.xl + 80, // Espaço extra para o botão flutuante
+    paddingBottom: theme.spacing.xl + 80,
   },
   cardContainer: {
     marginBottom: theme.spacing.s,
@@ -815,6 +802,12 @@ const styles = StyleSheet.create({
   loadingMoreContainer: {
     paddingVertical: theme.spacing.m,
     alignItems: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing.xl,
   },
   errorIconContainer: {
     width: 120,
