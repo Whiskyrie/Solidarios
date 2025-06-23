@@ -65,6 +65,13 @@ const InventoryScreen: React.FC = () => {
   useEffect(() => {
     if (!inventoryItems) return;
 
+
+    if (!Array.isArray(inventoryItems)) {
+      setFilteredInventory([]);
+      return;
+    }
+
+
     let result = [...inventoryItems];
 
     // Aplicar busca
