@@ -8,6 +8,7 @@ interface ProfileStats {
   totalDonations: number;
   distributedItems: number;
   peopleHelped: number;
+  impactScore: number;
 }
 
 export const useProfileData = () => {
@@ -18,6 +19,7 @@ export const useProfileData = () => {
     totalDonations: 0,
     distributedItems: 0,
     peopleHelped: 0,
+    impactScore: 0, // Inicializando com 0
   });
 
   // Animações
@@ -45,6 +47,7 @@ export const useProfileData = () => {
         totalDonations: apiData.totalDonations || 0,
         distributedItems: apiData.distributedItems || 0,
         peopleHelped: apiData.peopleHelped || 0,
+        impactScore: apiData.impactScore || 0, // Garantir que impactScore seja sempre um número
       };
 
       console.log("useProfileData - Stats mapeados:", mappedStats);
@@ -72,6 +75,7 @@ export const useProfileData = () => {
         totalDonations: 0,
         distributedItems: 0,
         peopleHelped: 0,
+        impactScore: 0,
       });
     } finally {
       setLoading(false);
