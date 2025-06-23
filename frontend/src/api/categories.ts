@@ -1,74 +1,68 @@
-/**
- * Serviço de categorias - comunicação com as rotas de categorias do backend
- */
-import api from "./api";
+import api from './api';
 import {
-  Category,
-  CreateCategoryDto,
-  UpdateCategoryDto,
-  CategoriesPage,
-} from "../types/categories.types";
-import { PageOptionsDto } from "../types/common.types";
+  ApiResponse,
+  PageDto,
+  PageOptionsDto,
+} from '../types/common.types';
+import { Category, CreateCategoryDto, UpdateCategoryDto } from '../types/categories.types';
 
-// Namespace para agrupar as funções do serviço
-const CategoriesService = {
+class CategoriesService {
   /**
-   * Obter todas as categorias com paginação
-   * @param pageOptions Opções de paginação
-   * @returns Lista paginada de categorias
+   * Busca todas as categorias com paginação.
+   * @param pageOptionsDto - Opções de paginação.
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<CategoriesPage> => {
-    const response = await api.get<CategoriesPage>("/categories", {
-      params: pageOptions,
-    });
-    return response.data;
-  },
-
-  /**
-   * Obter categoria por ID
-   * @param id ID da categoria
-   * @returns Categoria encontrada
-   */
-  getById: async (id: string): Promise<Category> => {
-    const response = await api.get<Category>(`/categories/${id}`);
-    return response.data;
-  },
-
-  /**
-   * Criar nova categoria
-   * @param categoryData Dados da nova categoria
-   * @returns Categoria criada
-   */
-  create: async (categoryData: CreateCategoryDto): Promise<Category> => {
-    const response = await api.post<Category>("/categories", categoryData);
-    return response.data;
-  },
-
-  /**
-   * Atualizar categoria existente
-   * @param id ID da categoria
-   * @param categoryData Dados atualizados
-   * @returns Categoria atualizada
-   */
-  update: async (
-    id: string,
-    categoryData: UpdateCategoryDto
-  ): Promise<Category> => {
-    const response = await api.patch<Category>(
-      `/categories/${id}`,
-      categoryData
+  async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Category>> {
+    const response = await api.get<ApiResponse<PageDto<Category>>>(
+      '/categories',
+      {
+        params: pageOptions,
+      },
     );
-    return response.data;
-  },
+    // CORREÇÃO: Retorna o conteúdo de 'data' de dentro do 'envelope' da API
+    return response.data.data;
+  }
 
   /**
-   * Remover categoria
-   * @param id ID da categoria a ser removida
-   * @returns void
+   * Busca uma categoria pelo ID.
+   * @param id - O ID da categoria.
    */
-  remove: async (id: string): Promise<void> => {
-    await api.delete(`/categories/${id}`);
-  },
-};
+  async getById(id: string): Promise<Category> {
+    const response = await api.get<ApiResponse<Category>>(`/categories/${id}`);
+    return response.data.data;
+  }
 
-export default CategoriesService;
+  /**
+   * Cria uma nova categoria.
+   * @param categoryData - Os dados para a nova categoria.
+   */
+  async create(categoryData: CreateCategoryDto): Promise<Category> {
+    const response = await api.post<ApiResponse<Category>>(
+      '/categories',
+      categoryData,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Atualiza uma categoria existente.
+   * @param id - O ID da categoria.
+   * @param categoryData - Os dados de atualização.
+   */
+  async update(id: string, categoryData: UpdateCategoryDto): Promise<Category> {
+    const response = await api.patch<ApiResponse<Category>>(
+      `/categories/${id}`,
+      categoryData,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Remove uma categoria.
+   * @param id - O ID da categoria.
+   */
+  async remove(id: string): Promise<void> {
+    await api.delete(`/categories/${id}`);
+  }
+}
+
+export default new CategoriesService();

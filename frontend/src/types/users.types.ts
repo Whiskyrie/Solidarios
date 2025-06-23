@@ -1,6 +1,7 @@
+// frontend/src/types/user.ts
 /**
  * Definição de tipos para usuários
- * Baseado nas entidades do backend
+ * Baseado nas entidades do backend com suporte a respostas da API
  */
 
 export enum UserRole {
@@ -10,18 +11,10 @@ export enum UserRole {
   BENEFICIARIO = "BENEFICIARIO",
 }
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: UserAddress;
-  profileImage?: string;
-  userType: UserType;
-  role: UserRole; // Adicionar propriedade role para consistência
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+export enum UserType {
+  DOADOR = "doador",
+  RECEPTOR = "receptor",
+  ADMIN = "admin",
 }
 
 export interface UserAddress {
@@ -37,11 +30,48 @@ export interface UserAddress {
   longitude?: number;
 }
 
-export enum UserType {
-  DOADOR = "doador",
-  RECEPTOR = "receptor",
-  ADMIN = "admin",
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: UserAddress | string; // Pode vir como string do backend
+  profileImage?: string;
+  userType?: UserType; // Opcional pois pode não vir sempre
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  password?: string; // Opcional, geralmente não retornado
 }
+
+// Tipos para respostas da API
+export interface ApiResponse<T> {
+  data: T;
+  message: string;
+  statusCode: number;
+  timestamp: string;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+  message: string | string[];
+  statusCode: number;
+  timestamp: string;
+}
+
+// Resposta específica para perfil do usuário
+export interface ProfileApiResponse {
+  data: {
+    data: User;
+    message: string;
+    statusCode: number;
+    timestamp: string;
+  };
+}
+
+// Tipo para o resultado da ação getProfile do Redux
+export type GetProfileResult = User | ProfileApiResponse | ApiResponse<User>;
 
 export interface UserProfile extends User {
   donationStats?: DonorStats;
@@ -111,7 +141,6 @@ export interface UserPreferences {
   };
 }
 
-// Tipo para estatísticas do usuário
 export interface UserStats {
   userId: string;
   totalDonations: number;
@@ -135,10 +164,8 @@ export interface PageDto<T> {
   meta: PageMeta;
 }
 
-// Tipo para usuários paginados
 export type UsersPage = PageDto<User>;
 
-// Erros de validação do perfil
 export interface ProfileValidationErrors {
   name?: string;
   email?: string;
@@ -152,3 +179,99 @@ export interface ProfileValidationErrors {
     zipCode?: string;
   };
 }
+
+// Utility functions para extrair dados de diferentes formatos de resposta
+export const extractUserFromResponse = (
+  response: GetProfileResult
+): User | null => {
+  try {
+    // Caso 1: Resposta aninhada { data: { data: User } }
+    if ("data" in response && response.data && "data" in response.data) {
+      return response.data.data as User;
+    }
+
+    // Caso 2: Resposta com wrapper { data: User }
+    if (
+      "data" in response &&
+      response.data &&
+      typeof response.data === "object"
+    ) {
+      // Verificar se data tem propriedades de User
+      const userData = response.data as any;
+      if (userData.id && userData.email) {
+        return userData as User;
+      }
+    }
+
+    // Caso 3: User direto
+    if ("id" in response && "email" in response) {
+      return response as User;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[extractUserFromResponse] Erro ao extrair usuário:", error);
+    return null;
+  }
+};
+
+// Type guards para verificar tipos
+export const isUser = (obj: any): obj is User => {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    typeof obj.id === "string" &&
+    typeof obj.email === "string" &&
+    typeof obj.name === "string"
+  );
+};
+
+export const isApiResponse = <T>(obj: any): obj is ApiResponse<T> => {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "data" in obj &&
+    "message" in obj &&
+    "statusCode" in obj
+  );
+};
+
+export const isProfileApiResponse = (obj: any): obj is ProfileApiResponse => {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "data" in obj &&
+    obj.data &&
+    "data" in obj.data &&
+    isUser(obj.data.data)
+  );
+};
+
+// Função para normalizar dados do usuário vindos da API
+export const normalizeUserData = (userData: any): User | null => {
+  if (!userData) return null;
+
+  try {
+    // Garantir que role seja do enum correto
+    const role = userData.role || userData.userType || UserRole.DOADOR;
+
+    const normalizedUser: User = {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      phone: userData.phone || undefined,
+      address: userData.address || undefined,
+      profileImage: userData.profileImage || undefined,
+      userType: userData.userType || undefined,
+      role: Object.values(UserRole).includes(role) ? role : UserRole.DOADOR,
+      isActive: userData.isActive !== undefined ? userData.isActive : true,
+      createdAt: userData.createdAt || new Date().toISOString(),
+      updatedAt: userData.updatedAt || new Date().toISOString(),
+    };
+
+    return normalizedUser;
+  } catch (error) {
+    console.error("[normalizeUserData] Erro ao normalizar dados:", error);
+    return null;
+  }
+};

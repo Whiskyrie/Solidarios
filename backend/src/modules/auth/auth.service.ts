@@ -107,6 +107,7 @@ export class AuthService {
     this.logger.debug(`Tentando renovar token`);
 
     try {
+      // Buscar o refresh token no banco
       const refreshTokenDoc = await this.findRefreshToken(refreshToken);
 
       // Verificar se o token existe, não foi revogado e não expirou
@@ -124,14 +125,66 @@ export class AuthService {
         throw new UnauthorizedException('Refresh token inválido ou expirado');
       }
 
-      const user = await this.usersService.findOne(refreshTokenDoc.userId);
-      this.logger.logAuth('token_refresh', user.id, true);
+      // ✅ CORREÇÃO: Usar refreshTokenDoc.userId diretamente para garantir consistência
+      const userId = refreshTokenDoc.userId;
+
+      if (!userId) {
+        this.logger.error('UserId não encontrado no refresh token');
+        throw new UnauthorizedException('Token de refresh inválido');
+      }
+
+      // ✅ CORREÇÃO: Buscar usuário e validar sua existência
+      const user = await this.usersService.findOne(userId);
+
+      if (!user) {
+        this.logger.error(`Usuário não encontrado: ${userId}`);
+        throw new UnauthorizedException('Usuário não encontrado');
+      }
+
+      // ✅ CORREÇÃO: Garantir que o user.id está correto antes da geração
+      if (!user.id || user.id !== userId) {
+        this.logger.error(
+          `Inconsistência no ID do usuário: esperado ${userId}, obtido ${user.id}`,
+        );
+        // Forçar o ID correto
+        user.id = userId;
+      }
+
+      // ✅ LOG: Adicionar logs detalhados para debug
+      this.logger.debug('Estado do refresh token:', undefined, {
+        tokenExists: !!refreshTokenDoc,
+        isRevoked: refreshTokenDoc.isRevoked,
+        isExpired: refreshTokenDoc.isExpired(),
+        userId: refreshTokenDoc.userId,
+      });
+
+      this.logger.debug('Estado do usuário encontrado:', undefined, {
+        userExists: !!user,
+        userId: user.id,
+        userEmail: user.email,
+        typeofUserId: typeof user.id,
+      });
+
+      this.logger.logAuth('token_refresh', userId, true);
 
       // Revogar o token atual
       await this.revokeRefreshToken(refreshTokenDoc.id);
 
-      // Gerar novos tokens
+      // ✅ CORREÇÃO: Gerar novos tokens com validação adicional
       const tokens = await this.generateTokens(user);
+
+      // ✅ VALIDAÇÃO: Verificar se os tokens foram gerados corretamente
+      if (!tokens.accessToken || !tokens.refreshToken) {
+        this.logger.error('Falha na geração de novos tokens');
+        throw new Error('Erro interno na geração de tokens');
+      }
+
+      this.logger.debug('Tokens gerados com sucesso:', undefined, {
+        hasAccessToken: !!tokens.accessToken,
+        hasRefreshToken: !!tokens.refreshToken,
+        userId: userId,
+      });
+
       return tokens;
     } catch (error) {
       this.logger.error(
@@ -141,7 +194,6 @@ export class AuthService {
       throw error;
     }
   }
-
   @LogMethod()
   async revokeAllUserTokens(userId: string) {
     this.logger.debug(`Revogando todos os tokens do usuário: ${userId}`);
@@ -163,8 +215,71 @@ export class AuthService {
 
   @LogMethod()
   async findRefreshToken(token: string): Promise<RefreshToken | null> {
-    this.logger.debug('Buscando refresh token');
-    return this.refreshTokenRepository.findOne({ where: { token } });
+    if (!token) {
+      this.logger.debug('Token vazio fornecido para busca');
+      return null;
+    }
+
+    try {
+      // ✅ MELHORIA: Incluir o relacionamento com User para validação
+      const refreshToken = await this.refreshTokenRepository.findOne({
+        where: { token },
+        relations: ['user'], // Carregar relacionamento para validação
+      });
+
+      if (!refreshToken) {
+        this.logger.debug('Refresh token não encontrado no banco');
+        return null;
+      }
+
+      // ✅ VALIDAÇÃO: Verificar se o usuário ainda existe e está ativo
+      if (refreshToken.user) {
+        if (!refreshToken.user.id) {
+          this.logger.warn(
+            `RefreshToken encontrado mas usuário inválido: ${refreshToken.userId}`,
+          );
+          return null;
+        }
+
+        // ✅ VALIDAÇÃO: Verificar consistência entre userId do token e user.id
+        if (refreshToken.userId !== refreshToken.user.id) {
+          this.logger.error(
+            `Inconsistência entre refreshToken.userId (${refreshToken.userId}) e user.id (${refreshToken.user.id})`,
+          );
+          return null;
+        }
+      } else {
+        // Se não carregou o user, verificar se o userId existe
+        this.logger.warn(
+          `RefreshToken encontrado mas relacionamento user não carregado. userId: ${refreshToken.userId}`,
+        );
+
+        // Verificar se o usuário ainda existe no banco
+        const userExists = await this.usersService.findOne(refreshToken.userId);
+        if (!userExists) {
+          this.logger.warn(
+            `Usuário referenciado pelo refresh token não existe mais: ${refreshToken.userId}`,
+          );
+          return null;
+        }
+      }
+
+      this.logger.debug('Refresh token encontrado e validado', undefined, {
+        tokenId: refreshToken.id,
+        userId: refreshToken.userId,
+        isRevoked: refreshToken.isRevoked,
+        isExpired: refreshToken.isExpired(),
+        userExists: !!refreshToken.user,
+      });
+
+      return refreshToken;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar refresh token: ${error.message}`,
+        error.stack,
+      );
+      return null;
+    }
   }
 
   @LogMethod()
@@ -199,13 +314,97 @@ export class AuthService {
   }
 
   private generateAccessToken(user: Partial<User>): string {
+    // ✅ VALIDAÇÃO: Garantir que dados essenciais estão presentes
+    if (!user.id) {
+      this.logger.error(
+        'User ID não fornecido para geração de access token',
+        undefined,
+        'AuthService',
+        {
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            typeofId: typeof user.id,
+          },
+        },
+      );
+      throw new Error('User ID é obrigatório para geração do token');
+    }
+
+    if (!user.email) {
+      this.logger.error(
+        'User email não fornecido para geração de access token',
+        undefined,
+        'AuthService',
+        {
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+          },
+        },
+      );
+      throw new Error('User email é obrigatório para geração do token');
+    }
+
+    // ✅ VALIDAÇÃO: Verificar se o ID é um UUID válido
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(user.id)) {
+      this.logger.error(
+        'User ID não é um UUID válido',
+        undefined,
+        'AuthService',
+        {
+          userId: user.id,
+          typeofId: typeof user.id,
+        },
+      );
+      throw new Error('User ID deve ser um UUID válido');
+    }
+
     const payload = {
       email: user.email,
       sub: user.id,
       role: user.role,
     };
 
-    return this.jwtService.sign(payload);
+    // ✅ LOG: Para debug em desenvolvimento
+    this.logger.debug(
+      `Gerando access token para usuário: ${user.id}`,
+      undefined,
+      {
+        payload: {
+          email: payload.email,
+          sub: payload.sub,
+          role: payload.role,
+          typeofSub: typeof payload.sub,
+        },
+      },
+    );
+
+    try {
+      const token = this.jwtService.sign(payload);
+
+      // ✅ VALIDAÇÃO: Verificar se o token foi criado corretamente
+      if (!token) {
+        this.logger.error('JWT Service retornou token vazio');
+        throw new Error('Falha na criação do token JWT');
+      }
+
+      return token;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao assinar JWT: ${error.message}`,
+        error.stack,
+        'AuthService',
+        {
+          payload,
+        },
+      );
+      throw new Error('Falha na assinatura do token JWT');
+    }
   }
 
   @LogMethod()
@@ -316,6 +515,90 @@ export class AuthService {
         error.stack,
       );
       throw error;
+    }
+  }
+  @LogMethod()
+  async debugRefreshToken(refreshToken: string) {
+    // ✅ SEGURANÇA: Só executar em desenvolvimento
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
+    try {
+      console.log('=== DEBUG REFRESH TOKEN ===');
+      console.log('Token recebido:', refreshToken ? 'Presente' : 'Ausente');
+
+      if (!refreshToken) {
+        console.log('=== FIM DEBUG - TOKEN AUSENTE ===');
+        return;
+      }
+
+      const refreshTokenDoc = await this.findRefreshToken(refreshToken);
+
+      console.log('RefreshToken doc:', {
+        exists: !!refreshTokenDoc,
+        id: refreshTokenDoc?.id,
+        userId: refreshTokenDoc?.userId,
+        isRevoked: refreshTokenDoc?.isRevoked,
+        isExpired: refreshTokenDoc?.isExpired(),
+        expiresAt: refreshTokenDoc?.expiresAt,
+        typeofUserId: typeof refreshTokenDoc?.userId,
+      });
+
+      if (refreshTokenDoc) {
+        try {
+          const user = await this.usersService.findOne(refreshTokenDoc.userId);
+          console.log('User encontrado:', {
+            exists: !!user,
+            id: user?.id,
+            email: user?.email,
+            role: user?.role,
+            typeofId: typeof user?.id,
+            idMatch: user?.id === refreshTokenDoc.userId,
+          });
+
+          // Verificar se o user.id é um UUID válido
+          const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (user?.id) {
+            console.log('UUID validation:', {
+              isValidUUID: uuidRegex.test(user.id),
+              idLength: user.id.length,
+              idValue: user.id,
+            });
+          }
+
+          // Testar geração de token
+          if (user) {
+            try {
+              const testPayload = {
+                email: user.email,
+                sub: user.id,
+                role: user.role,
+              };
+              console.log('Payload de teste:', testPayload);
+
+              const testToken = this.jwtService.sign(testPayload);
+              console.log('Token de teste gerado:', !!testToken);
+
+              // Decodificar o token para verificar
+              const decoded = this.jwtService.decode(testToken);
+              console.log('Token decodificado:', decoded);
+            } catch (tokenError) {
+              console.log(
+                'Erro na geração de token de teste:',
+                tokenError.message,
+              );
+            }
+          }
+        } catch (userError) {
+          console.log('Erro ao buscar usuário:', userError.message);
+        }
+      }
+
+      console.log('=== FIM DEBUG ===');
+    } catch (error) {
+      console.error('Erro no debug:', error);
     }
   }
 }

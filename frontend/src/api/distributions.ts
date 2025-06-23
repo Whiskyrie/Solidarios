@@ -8,7 +8,10 @@ import {
   UpdateDistributionDto,
   DistributionsPage,
 } from "../types/distributions.types";
-import { PageOptionsDto } from "../types/common.types";
+import { 
+  PageOptionsDto,   
+  PageDto, 
+  ApiResponse } from "../types/common.types";
 
 // Namespace para agrupar as funções do serviço
 const DistributionsService = {
@@ -17,11 +20,12 @@ const DistributionsService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de distribuições
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<DistributionsPage> => {
-    const response = await api.get<DistributionsPage>("/distributions", {
-      params: pageOptions,
-    });
-    return response.data;
+  async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<Distribution>> {
+    const response = await api.get<ApiResponse<PageDto<Distribution>>>(
+      '/distributions',
+      { params: pageOptions },
+    );
+    return response.data.data;
   },
 
   /**

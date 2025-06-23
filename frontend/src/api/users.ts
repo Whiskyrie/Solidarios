@@ -1,15 +1,20 @@
 /**
  * Serviço de usuários - comunicação com as rotas de usuários do backend
  */
-import api from "./api";
-import {
-  User,
-  CreateUserDto,
+
+import api from './api';
+import { 
+  PageOptionsDto, 
+  PageDto, 
+  ApiResponse 
+} from '../types/common.types';
+import { 
+  User, 
+  CreateUserDto, 
   UpdateUserDto,
-  UsersPage,
   UserStats,
-} from "../types/users.types";
-import { PageOptionsDto } from "../types/common.types";
+  UsersPage
+} from '../types/users.types';
 
 // Namespace para agrupar as funções do serviço
 const UsersService = {
@@ -18,11 +23,12 @@ const UsersService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de usuários
    */
-  getAll: async (pageOptions?: PageOptionsDto): Promise<UsersPage> => {
-    const response = await api.get<UsersPage>("/users", {
-      params: pageOptions,
+  async getAll(pageOptions?: PageOptionsDto): Promise<PageDto<User>> {
+    const response = await api.get<ApiResponse<PageDto<User>>>('/users', { 
+      params: pageOptions 
     });
-    return response.data;
+    
+    return response.data.data; 
   },
 
   /**
@@ -30,9 +36,12 @@ const UsersService = {
    * @param id ID do usuário
    * @returns Usuário encontrado
    */
-  getById: async (id: string): Promise<User> => {
-    const response = await api.get<User>(`/users/${id}`);
-    return response.data;
+  async getById(id: string): Promise<User> {
+    // 1. Especificamos o tipo correto da resposta "envelopada" da API
+    const response = await api.get<ApiResponse<User>>(`/users/${id}`);
+    
+    // 2. Retornamos apenas o objeto 'User' que está dentro do 'data.data'
+    return response.data.data;
   },
 
   /**

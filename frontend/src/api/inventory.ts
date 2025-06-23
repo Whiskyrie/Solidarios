@@ -8,7 +8,10 @@ import {
   UpdateInventoryDto,
   InventoryPage,
 } from "../types/inventory.types";
-import { PageOptionsDto } from "../types/common.types";
+import { 
+  PageOptionsDto,   
+  PageDto, 
+  ApiResponse } from "../types/common.types";
 
 // Namespace para agrupar as funções do serviço
 const InventoryService = {
@@ -107,11 +110,14 @@ const InventoryService = {
    * @param pageOptions Opções de paginação
    * @returns Lista paginada de registros de inventário com estoque baixo
    */
-  getLowStock: async (pageOptions?: PageOptionsDto): Promise<InventoryPage> => {
-    const response = await api.get<InventoryPage>("/inventory/low-stock", {
-      params: pageOptions,
-    });
-    return response.data;
+  async getLowStock(pageOptions?: PageOptionsDto): Promise<PageDto<Inventory>> {
+    // Especifica o tipo de resposta completa da API
+    const response = await api.get<ApiResponse<PageDto<Inventory>>>(
+      '/inventory/low-stock',
+      { params: pageOptions },
+    );
+    // Retorna apenas o conteúdo 'data' de dentro do 'envelope' da API
+    return response.data.data;
   },
 
   /**
