@@ -1,5 +1,5 @@
-// src/screens/admin/DashboardScreen.tsx
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { CompositeScreenProps } from "@react-navigation/native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -22,6 +22,7 @@ import {
   DistributionCard,
   Loading,
   ErrorState,
+  EmptyState,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
@@ -42,7 +43,7 @@ import {
 } from "../../navigation/types";
 import { Item } from "../../types/items.types";
 import { Distribution } from "../../types/distributions.types";
-import { UserRole } from "../../types/users.types";
+import { User, UserRole } from "../../types/users.types";
 import { Inventory } from "../../types/inventory.types";
 import { StatData } from "../../components/cards/StatsCard";
 
@@ -68,11 +69,11 @@ const DashboardScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Hooks para dados
-  const itemsHook = useItems();
-  const inventoryHook = useInventory();
-  const distributionsHook = useDistributions();
-  const usersHook = useUsers();
+  // Desestruturando as funções dos hooks para usar como dependências
+  const { fetchItems } = useItems();
+  const { fetchLowStock } = useInventory();
+  const { fetchDistributions } = useDistributions();
+  const { fetchUsers } = useUsers();
 
   // Dados agregados para dashboard
   const [stats, setStats] = useState({
@@ -87,86 +88,85 @@ const DashboardScreen: React.FC = () => {
 
   // Dados para cards
   const [recentItems, setRecentItems] = useState<Item[]>([]);
-  const [recentDistributions, setRecentDistributions] = useState<
-    Distribution[]
-  >([]);
+  const [recentDistributions, setRecentDistributions] = useState<Distribution[]>([]);
   const [lowStockInventory, setLowStockInventory] = useState<Inventory[]>([]);
 
-  // Carregar dados
-  const loadData = async () => {
+  // Função para carregar os dados
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Carregar dados em paralelo
+      // Carrega todos os dados em paralelo
       const [
         itemsResponse,
-        inventoryResponse,
         distributionsResponse,
         usersResponse,
         lowStockResponse,
       ] = await Promise.all([
-        itemsHook.fetchItems({ page: 1, take: 50 }),
-        inventoryHook.fetchInventory({ page: 1, take: 50 }),
-        distributionsHook.fetchDistributions({ page: 1, take: 10 }),
-        usersHook.fetchUsers({ page: 1, take: 50 }),
-        inventoryHook.fetchLowStock({ page: 1, take: 5 }),
+        fetchItems({ page: 1, take: 50 }),
+        fetchDistributions({ page: 1, take: 10 }),
+        fetchUsers({ page: 1, take: 50 }),
+        fetchLowStock({ page: 1, take: 5 }),
       ]);
 
-      // Calcular estatísticas
-      if (
-        itemsResponse &&
-        inventoryResponse &&
-        distributionsResponse &&
-        usersResponse
-      ) {
-        const items = itemsResponse.data;
-        const availableItems = items.filter(
-          (item) => item.status === "disponivel"
-        ).length;
-        const beneficiaries = usersResponse.data.filter(
-          (user) => user.role === UserRole.BENEFICIARIO
-        ).length;
-        const donors = usersResponse.data.filter(
-          (user) => user.role === UserRole.DOADOR
-        ).length;
+      // Extrai os dados e a paginação (meta) de forma segura de cada resposta
+      const allItems = itemsResponse?.data || [];
+      const itemsMeta = itemsResponse?.meta;
 
-        setStats({
-          totalItems: itemsResponse.meta.itemCount,
-          availableItems,
-          totalDistributions: distributionsResponse.meta.itemCount,
-          lowStockItems: lowStockResponse ? lowStockResponse.meta.itemCount : 0,
-          totalUsers: usersResponse.meta.itemCount,
-          totalBeneficiaries: beneficiaries,
-          totalDonors: donors,
-        });
+      const allDistributions = distributionsResponse?.data || [];
+      const distributionsMeta = distributionsResponse?.meta;
 
-        // Definir itens recentes
-        setRecentItems(items.slice(0, 3));
+      const allUsers = usersResponse?.data || [];
+      const usersMeta = usersResponse?.meta;
+      
+      const allLowStock = lowStockResponse?.data || [];
+      const lowStockMeta = lowStockResponse?.meta;
 
-        // Definir distribuições recentes
-        setRecentDistributions(distributionsResponse.data.slice(0, 3));
+      // Calcula as estatísticas
+      const availableItemsCount = allItems.filter(
+        (item: Item) => item.status === "disponivel"
+      ).length;
 
-        // Definir itens com estoque baixo
-        if (lowStockResponse) {
-          setLowStockInventory(lowStockResponse.data.slice(0, 3));
-        }
-      }
-    } catch (err) {
+      const beneficiariesCount = allUsers.filter(
+        (u: User) => u.role === UserRole.BENEFICIARIO
+      ).length;
+      
+      const donorsCount = allUsers.filter(
+        (u: User) => u.role === UserRole.DOADOR
+      ).length;
+
+      // Atualiza o estado com os dados corretos
+      setStats({
+        totalItems: itemsMeta?.itemCount ?? allItems.length,
+        availableItems: availableItemsCount,
+        totalDistributions: distributionsMeta?.itemCount ?? allDistributions.length,
+        lowStockItems: lowStockMeta?.itemCount ?? allLowStock.length,
+        totalUsers: usersMeta?.itemCount ?? allUsers.length,
+        totalBeneficiaries: beneficiariesCount,
+        totalDonors: donorsCount,
+      });
+
+      // Define os dados para os cards
+      setRecentItems(allItems.slice(0, 3));
+      setRecentDistributions(allDistributions.slice(0, 3));
+      setLowStockInventory(allLowStock.slice(0, 3));
+
+    } catch (err: any) {
       console.error("Erro ao carregar dados do dashboard:", err);
-      setError(
-        "Não foi possível carregar os dados do dashboard. Tente novamente."
-      );
+      setError(err.message || "Não foi possível carregar os dados. Tente novamente.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [fetchItems, fetchDistributions, fetchUsers, fetchLowStock]);
 
-  // Carregar dados ao montar componente
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Carrega os dados quando a tela entra em foco
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   // Função para pull-to-refresh
   const handleRefresh = () => {
@@ -174,287 +174,142 @@ const DashboardScreen: React.FC = () => {
     loadData();
   };
 
-  // Renderizar loading state
+  // Renderiza o estado de carregamento
   if (loading && !refreshing) {
     return <Loading visible={true} message="Carregando dashboard..." overlay />;
   }
 
-  // Renderizar erro
+  // Renderiza o estado de erro
   if (error) {
     return (
-      <ErrorState
-        title="Erro ao carregar dashboard"
-        description={error}
-        actionLabel="Tentar novamente"
-        onAction={loadData}
-      />
+      <View style={{flex: 1}}>
+        <Header
+            title="Dashboard"
+            subtitle={`Olá, ${user?.name?.split(" ")[0] || "Administrador"}`}
+        />
+        <ErrorState
+            title="Erro ao carregar dashboard"
+            description={error}
+            actionLabel="Tentar novamente"
+            onAction={loadData}
+        />
+      </View>
     );
   }
 
-  // Formatar dados para o card de estatísticas
+  // Formata os dados para os cards de estatísticas
   const statsData: StatData[] = [
-    {
-      title: "Total de Itens",
-      value: stats.totalItems,
-      type: "number",
-      color: theme.colors.primary.main,
-    },
-    {
-      title: "Disponíveis",
-      value: stats.availableItems,
-      type: "number",
-      color: theme.colors.status.success,
-    },
-    {
-      title: "Distribuições",
-      value: stats.totalDistributions,
-      type: "number",
-      color: theme.colors.primary.secondary,
-    },
-    {
-      title: "Estoque Baixo",
-      value: stats.lowStockItems,
-      type: "number",
-      color:
-        stats.lowStockItems > 0
-          ? theme.colors.status.warning
-          : theme.colors.neutral.darkGray,
-    },
+    { title: "Total de Itens", value: stats.totalItems, type: "number", color: theme.colors.primary.main },
+    { title: "Disponíveis", value: stats.availableItems, type: "number", color: theme.colors.status.success },
+    { title: "Distribuições", value: stats.totalDistributions, type: "number", color: theme.colors.primary.secondary },
+    { title: "Estoque Baixo", value: stats.lowStockItems, type: "number", color: stats.lowStockItems > 0 ? theme.colors.status.warning : theme.colors.neutral.darkGray },
   ];
 
   const usersData: StatData[] = [
-    {
-      title: "Total de Usuários",
-      value: stats.totalUsers,
-      type: "number",
-      color: theme.colors.primary.main,
-    },
-    {
-      title: "Beneficiários",
-      value: stats.totalBeneficiaries,
-      type: "number",
-      color: theme.colors.status.info,
-    },
-    {
-      title: "Doadores",
-      value: stats.totalDonors,
-      type: "number",
-      color: theme.colors.primary.secondary,
-    },
+    { title: "Total de Usuários", value: stats.totalUsers, type: "number", color: theme.colors.primary.main },
+    { title: "Beneficiários", value: stats.totalBeneficiaries, type: "number", color: theme.colors.status.info },
+    { title: "Doadores", value: stats.totalDonors, type: "number", color: theme.colors.primary.secondary },
   ];
 
+  // Renderiza o componente principal
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
       <Header
         title="Dashboard"
         subtitle={`Olá, ${user?.name?.split(" ")[0] || "Administrador"}`}
         backgroundColor={theme.colors.primary.main}
       />
 
-      {/* Conteúdo */}
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {/* Cards de estatísticas */}
+        <StatsCard title="Estatísticas do Sistema" stats={statsData} style={styles.statsCard} />
         <StatsCard
-          title="Estatísticas do Sistema"
-          stats={statsData}
-          style={styles.statsCard}
-        />
-
-        <StatsCard
-          title="Usuários"
+          title="Comunidade"
           stats={usersData}
           style={styles.statsCard}
           actionLabel="Ver todos os usuários"
-          onActionPress={() =>
-            navigation.navigate("Users", { screen: "UsersList" })
-          }
+          onActionPress={() => navigation.navigate("Users", { screen: "UsersList" })}
         />
 
-        {/* Itens recentes */}
         <Card
           title="Itens recentes"
           style={styles.card}
           rightHeaderContent={
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("Items", { screen: "ItemsList" })
-              }
-            >
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.primary.secondary}
-              >
-                Ver todos
-              </Typography>
+            <TouchableOpacity onPress={() => navigation.navigate("Items", { screen: "ItemsList" })}>
+              <Typography variant="bodySecondary" color={theme.colors.primary.secondary}>Ver todos</Typography>
             </TouchableOpacity>
           }
         >
-          <View>
             {recentItems.length > 0 ? (
               recentItems.map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
-                  onPress={() => {
-                    navigation.navigate("Items", {
-                      screen: "ItemDetail",
-                      params: { id: item.id },
-                    });
-                  }}
+                  onPress={() => navigation.navigate("Items", { screen: "ItemDetail", params: { id: item.id } })}
                   compact
                 />
               ))
-            ) : (
-              <Typography variant="bodySecondary" style={styles.emptyText}>
-                Nenhum item cadastrado recentemente.
-              </Typography>
-            )}
-
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => {
-                navigation.navigate("Items", {
-                  screen: "CreateItem",
-                });
-              }}
-            >
-              <Typography variant="body" color={theme.colors.primary.secondary}>
-                + Adicionar novo item
-              </Typography>
-            </TouchableOpacity>
-          </View>
+            ) : ( <EmptyState title="Nenhum item recente" description="Itens cadastrados aparecerão aqui." /> )}
         </Card>
 
-        {/* Distribuições recentes */}
         <Card
           title="Distribuições recentes"
           style={styles.card}
           rightHeaderContent={
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("Distributions", {
-                  screen: "DistributionsList",
-                })
-              }
-            >
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.primary.secondary}
-              >
-                Ver todas
-              </Typography>
+            <TouchableOpacity onPress={() => navigation.navigate("Distributions", { screen: "DistributionsList" })}>
+              <Typography variant="bodySecondary" color={theme.colors.primary.secondary}>Ver todas</Typography>
             </TouchableOpacity>
           }
         >
-          <View>
             {recentDistributions.length > 0 ? (
               recentDistributions.map((distribution) => (
                 <DistributionCard
                   key={distribution.id}
                   distribution={distribution}
-                  onPress={() => {
-                    navigation.navigate("Distributions", {
-                      screen: "DistributionDetail",
-                      params: { id: distribution.id },
-                    });
-                  }}
+                  onPress={() => navigation.navigate("Distributions", { screen: "DistributionDetail", params: { id: distribution.id } })}
                   compact
                   showItems={false}
                 />
               ))
-            ) : (
-              <Typography variant="bodySecondary" style={styles.emptyText}>
-                Nenhuma distribuição realizada recentemente.
-              </Typography>
-            )}
-
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => {
-                navigation.navigate("Distributions", {
-                  screen: "CreateDistribution",
-                });
-              }}
-            >
-              <Typography variant="body" color={theme.colors.primary.secondary}>
-                + Criar nova distribuição
-              </Typography>
-            </TouchableOpacity>
-          </View>
+            ) : ( <EmptyState title="Nenhuma distribuição" description="Distribuições recentes aparecerão aqui." /> )}
         </Card>
 
-        {/* Itens com estoque baixo */}
         <Card
           title="Itens com estoque baixo"
           style={styles.card}
           rightHeaderContent={
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("Inventory", { screen: "InventoryList" })
-              }
-            >
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.primary.secondary}
-              >
-                Ver todos
-              </Typography>
+            <TouchableOpacity onPress={() => navigation.navigate("Inventory", { screen: "InventoryList" })}>
+              <Typography variant="bodySecondary" color={theme.colors.primary.secondary}>Ver todos</Typography>
             </TouchableOpacity>
           }
         >
-          <View>
             {lowStockInventory.length > 0 ? (
               lowStockInventory.map((inv) => (
                 <TouchableOpacity
                   key={inv.id}
                   style={styles.lowStockItem}
-                  onPress={() => {
-                    navigation.navigate("Inventory", {
-                      screen: "InventoryDetail",
-                      params: { id: inv.id },
-                    });
-                  }}
+                  onPress={() => navigation.navigate("Inventory", { screen: "InventoryDetail", params: { id: inv.id } })}
                 >
                   <View style={styles.lowStockInfo}>
-                    <Typography variant="body" numberOfLines={1}>
-                      {inv.item.description}
-                    </Typography>
-                    <Typography
-                      variant="small"
-                      color={theme.colors.neutral.darkGray}
-                    >
-                      Qtd: {inv.quantity} | Alerta: {inv.alertLevel}
-                    </Typography>
+                    <Typography variant="body" numberOfLines={1}>{inv.item.description}</Typography>
+                    <Typography variant="small" color={theme.colors.neutral.darkGray}>Qtd: {inv.quantity} | Alerta: {inv.alertLevel}</Typography>
                   </View>
                   <View style={styles.lowStockBadge}>
-                    <Typography
-                      variant="small"
-                      color={theme.colors.status.error}
-                    >
-                      Estoque Baixo
-                    </Typography>
+                    <Typography variant="small" color={theme.colors.status.error}>Estoque Baixo</Typography>
                   </View>
                 </TouchableOpacity>
               ))
-            ) : (
-              <Typography variant="bodySecondary" style={styles.emptyText}>
-                Não há itens com estoque baixo.
-              </Typography>
-            )}
-          </View>
+            ) : ( <EmptyState title="Nenhum item em alerta" description="Itens com estoque baixo aparecerão aqui." /> )}
         </Card>
       </ScrollView>
     </View>
   );
 };
 
+// Estilos do componente
 const styles = StyleSheet.create({
   container: {
     flex: 1,
