@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,6 +6,10 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  Animated,
+  StatusBar,
+  Platform,
+  RefreshControl,
 } from "react-native";
 import {
   RouteProp,
@@ -15,11 +19,12 @@ import {
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { FuncionarioBeneficiariesStackParamList } from "../../navigation/types";
+import { LinearGradient } from "expo-linear-gradient";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 // Componentes
 import {
   Typography,
-  Header,
   Card,
   Badge,
   Avatar,
@@ -36,8 +41,6 @@ import theme from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { useUsers } from "../../hooks/useUsers";
 import { useDistributions } from "../../hooks/useDistributions";
-
-// Tipos e rotas
 
 // Interface para a rota
 type BeneficiaryDetailScreenRouteProp = RouteProp<
@@ -74,6 +77,10 @@ const BeneficiaryDetailScreen: React.FC = () => {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Animações
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   // Carregar beneficiário e suas distribuições
   const loadBeneficiaryData = useCallback(async () => {
     await fetchUserById(id);
@@ -97,6 +104,22 @@ const BeneficiaryDetailScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  // Animação de entrada
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   // Carregar dados ao focar na tela
   useFocusEffect(
     useCallback(() => {
@@ -106,7 +129,6 @@ const BeneficiaryDetailScreen: React.FC = () => {
 
   // Criar nova distribuição para este beneficiário
   const handleCreateDistribution = () => {
-    // Usando um tipo mais específico para a navegação entre stacks
     (navigation as any).navigate("Distributions", {
       screen: "CreateDistribution",
       params: { preselectedBeneficiaryId: id },
@@ -132,7 +154,6 @@ const BeneficiaryDetailScreen: React.FC = () => {
         {
           text: "Ligar",
           onPress: () => {
-            // Aqui normalmente iria uma integração com a API de telefone
             Alert.alert("Simulação", `Discando para ${beneficiary.phone}`);
           },
         },
@@ -140,54 +161,102 @@ const BeneficiaryDetailScreen: React.FC = () => {
     );
   };
 
+  // Componente de cabeçalho redesenhado
+  const Header = () => (
+    <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
+      />
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Typography variant="h2" color="#fff" style={styles.headerTitle}>
+            Beneficiário
+          </Typography>
+          <View style={{ width: 40 }} />
+        </View>
+      </LinearGradient>
+    </>
+  );
+
   // Se estiver carregando inicialmente, mostrar loading
   if (
     (isLoadingUser || isLoadingDistributions) &&
     !refreshing &&
     !beneficiary
   ) {
-    return <Loading visible={true} message="Carregando dados..." overlay />;
+    return (
+      <View style={styles.container}>
+        <Header />
+        <Loading visible={true} message="Carregando dados..." />
+      </View>
+    );
   }
 
   // Se houver erro, mostrar tela de erro
   if (userError) {
     return (
-      <ErrorState
-        title="Erro ao carregar beneficiário"
-        description={userError}
-        actionLabel="Tentar novamente"
-        onAction={() => {
-          clearUserError();
-          loadBeneficiaryData();
-        }}
-      />
+      <View style={styles.container}>
+        <Header />
+        <ErrorState
+          title="Erro ao carregar beneficiário"
+          description={userError}
+          actionLabel="Tentar novamente"
+          onAction={() => {
+            clearUserError();
+            loadBeneficiaryData();
+          }}
+        />
+      </View>
     );
   }
 
   // Se o beneficiário não existir
   if (!beneficiary) {
     return (
-      <ErrorState
-        title="Beneficiário não encontrado"
-        description="O beneficiário solicitado não está disponível."
-        actionLabel="Voltar"
-        onAction={() => navigation.goBack()}
-      />
+      <View style={styles.container}>
+        <Header />
+        <ErrorState
+          title="Beneficiário não encontrado"
+          description="O beneficiário solicitado não está disponível."
+          actionLabel="Voltar"
+          onAction={() => navigation.goBack()}
+        />
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
-      <Header
-        title="Detalhes do Beneficiário"
-        onBackPress={() => navigation.goBack()}
-        backgroundColor={theme.colors.primary.secondary}
-      />
+      <Header />
 
-      <ScrollView
-        style={styles.content}
+      <Animated.ScrollView
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary.secondary]}
+            tintColor={theme.colors.primary.secondary}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         {/* Card do perfil do beneficiário */}
@@ -199,8 +268,14 @@ const BeneficiaryDetailScreen: React.FC = () => {
               style={styles.avatar}
             />
             <View style={styles.profileInfo}>
-              <Typography variant="h3">{beneficiary.name}</Typography>
-              <Typography variant="bodySecondary">
+              <Typography variant="h3" style={styles.beneficiaryName}>
+                {beneficiary.name}
+              </Typography>
+              <Typography 
+                variant="bodySecondary"
+                color={theme.colors.neutral.darkGray}
+                style={styles.beneficiaryEmail}
+              >
                 {beneficiary.email}
               </Typography>
               <Badge
@@ -214,53 +289,95 @@ const BeneficiaryDetailScreen: React.FC = () => {
 
           <Divider spacing={theme.spacing.s} />
 
-          {/* Informações de contato */}
+          {/* Informações de contato com ícones */}
           <View style={styles.contactInfo}>
             <Typography
-              variant="bodySecondary"
-              color={theme.colors.neutral.darkGray}
+              variant="h4"
+              color={theme.colors.primary.main}
               style={styles.sectionTitle}
             >
-              Informações de contato
+              Informações de Contato
             </Typography>
 
             <View style={styles.infoRow}>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Telefone:
-              </Typography>
-              <Typography variant="body">
-                {beneficiary.phone || "Não informado"}
-              </Typography>
+              <View style={styles.infoIcon}>
+                <MaterialIcons
+                  name="phone"
+                  size={20}
+                  color={theme.colors.primary.secondary}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Typography
+                  variant="bodySecondary"
+                  color={theme.colors.neutral.darkGray}
+                >
+                  Telefone
+                </Typography>
+                <Typography variant="body">
+                  {beneficiary.phone || "Não informado"}
+                </Typography>
+              </View>
             </View>
 
             <View style={styles.infoRow}>
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.darkGray}
-              >
-                Endereço:
-              </Typography>
-              <Typography variant="body" style={styles.address}>
-                {beneficiary.address || "Não informado"}
-              </Typography>
+              <View style={styles.infoIcon}>
+                <MaterialIcons
+                  name="location-on"
+                  size={20}
+                  color={theme.colors.primary.secondary}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Typography
+                  variant="bodySecondary"
+                  color={theme.colors.neutral.darkGray}
+                >
+                  Endereço
+                </Typography>
+                <Typography variant="body" style={styles.address}>
+                  {beneficiary.address || "Não informado"}
+                </Typography>
+              </View>
             </View>
           </View>
 
-          {/* Botões de ação */}
+          {/* Botões de ação com gradiente */}
           <View style={styles.actionButtons}>
-            <Button
-              title="Nova Distribuição"
+            <TouchableOpacity
+              style={styles.primaryButtonContainer}
               onPress={handleCreateDistribution}
-              style={styles.primaryButton}
-            />
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#173F5F", "#006E58"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.primaryButton}
+              >
+                <MaterialIcons name="add" size={20} color="white" />
+                <Typography
+                  variant="body"
+                  color={theme.colors.neutral.white}
+                  style={styles.buttonText}
+                >
+                  Nova Distribuição
+                </Typography>
+              </LinearGradient>
+            </TouchableOpacity>
+
             <Button
               title="Contatar"
               onPress={handleContactBeneficiary}
               variant="secondary"
               style={styles.secondaryButton}
+              leftIcon={
+                <MaterialIcons
+                  name="phone"
+                  size={16}
+                  color={theme.colors.primary.secondary}
+                />
+              }
             />
           </View>
         </Card>
@@ -296,7 +413,7 @@ const BeneficiaryDetailScreen: React.FC = () => {
               )}
               scrollEnabled={false}
               ItemSeparatorComponent={() => (
-                <Divider spacing={theme.spacing.xs} />
+                <View style={styles.distributionSeparator} />
               )}
               onEndReached={handleLoadMoreDistributions}
               onEndReachedThreshold={0.5}
@@ -310,7 +427,7 @@ const BeneficiaryDetailScreen: React.FC = () => {
                       variant="bodySecondary"
                       color={theme.colors.primary.secondary}
                     >
-                      Ver mais
+                      Carregar mais
                     </Typography>
                   </TouchableOpacity>
                 ) : null
@@ -320,21 +437,62 @@ const BeneficiaryDetailScreen: React.FC = () => {
             <EmptyState
               title="Sem histórico"
               description="Este beneficiário ainda não recebeu nenhuma doação"
+              icon={
+                <View style={styles.emptyStateIconContainer}>
+                  <MaterialIcons
+                    name="history"
+                    size={48}
+                    color={theme.colors.primary.secondary}
+                  />
+                </View>
+              }
               actionLabel="Nova Distribuição"
               onAction={handleCreateDistribution}
             />
           )}
         </Card>
 
-        {/* Necessidades registradas */}
-        <Card title="Necessidades Registradas" style={styles.needsCard}>
-          {/* Este é um exemplo - você pode implementar a funcionalidade real ou remover */}
-          <EmptyState
-            title="Nenhuma necessidade registrada"
-            description="O beneficiário ainda não registrou suas necessidades"
-          />
+        {/* Card de estatísticas do beneficiário */}
+        <Card title="Estatísticas" style={styles.statsCard}>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <View style={[styles.statIcon, { backgroundColor: `${theme.colors.status.success}15` }]}>
+                <MaterialIcons
+                  name="redeem"
+                  size={24}
+                  color={theme.colors.status.success}
+                />
+              </View>
+              <View style={styles.statInfo}>
+                <Typography variant="h3" color={theme.colors.status.success}>
+                  {distributions?.length || 0}
+                </Typography>
+                <Typography variant="small" color={theme.colors.neutral.darkGray}>
+                  Doações recebidas
+                </Typography>
+              </View>
+            </View>
+
+            <View style={styles.statItem}>
+              <View style={[styles.statIcon, { backgroundColor: `${theme.colors.primary.secondary}15` }]}>
+                <MaterialIcons
+                  name="event"
+                  size={24}
+                  color={theme.colors.primary.secondary}
+                />
+              </View>
+              <View style={styles.statInfo}>
+                <Typography variant="h3" color={theme.colors.primary.secondary}>
+                  {distributions?.length > 0 ? "Ativo" : "Novo"}
+                </Typography>
+                <Typography variant="small" color={theme.colors.neutral.darkGray}>
+                  Status do beneficiário
+                </Typography>
+              </View>
+            </View>
+          </View>
         </Card>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -342,7 +500,30 @@ const BeneficiaryDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.neutral.white,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  headerGradient: {
+    paddingTop:
+      Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: theme.spacing.m,
+    ...theme.shadows.strong,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.m,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontWeight: "bold",
   },
   content: {
     flex: 1,
@@ -353,11 +534,16 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     marginBottom: theme.spacing.s,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: theme.spacing.xs,
+    padding: theme.spacing.s,
   },
   avatar: {
     marginRight: theme.spacing.s,
@@ -365,53 +551,128 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
+  beneficiaryName: {
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  beneficiaryEmail: {
+    marginBottom: theme.spacing.xs,
+  },
   badge: {
     alignSelf: "flex-start",
-    marginTop: theme.spacing.xs,
   },
   contactInfo: {
-    marginTop: theme.spacing.s,
-    padding: theme.spacing.xs,
+    padding: theme.spacing.s,
   },
   sectionTitle: {
-    marginBottom: theme.spacing.s,
-    fontWeight: "500",
+    marginBottom: theme.spacing.m,
+    fontWeight: "600",
   },
   infoRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.s,
+  },
+  infoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: theme.spacing.s,
+  },
+  infoContent: {
+    flex: 1,
   },
   address: {
-    flex: 1,
-    textAlign: "right",
+    marginTop: 2,
   },
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: theme.spacing.m,
-    paddingHorizontal: theme.spacing.xs,
+    margin: theme.spacing.s,
+    gap: theme.spacing.s,
+  },
+  primaryButtonContainer: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   primaryButton: {
-    flex: 1,
-    marginRight: theme.spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing.s,
+    gap: theme.spacing.xs,
+  },
+  buttonText: {
+    fontWeight: "600",
   },
   secondaryButton: {
     flex: 1,
-    marginLeft: theme.spacing.xs,
   },
   historyCard: {
     marginBottom: theme.spacing.s,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
-  needsCard: {
-    marginBottom: theme.spacing.s,
+  distributionSeparator: {
+    height: 1,
+    backgroundColor: theme.colors.neutral.lightGray,
+    marginVertical: theme.spacing.xs,
   },
   loadMoreButton: {
     padding: theme.spacing.s,
     alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: theme.colors.neutral.lightGray,
+    marginTop: theme.spacing.xs,
+  },
+  emptyStateIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.spacing.s,
+  },
+  statsCard: {
+    marginBottom: theme.spacing.s,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: theme.spacing.s,
+  },
+  statItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  statInfo: {
+    alignItems: "center",
   },
 });
 
