@@ -77,25 +77,45 @@ export const useItems = () => {
       
       console.log("[useItems] Resposta da API:", response);
 
-      // Se for a primeira página, substituir os itens
-      if (pageOptions?.page === 1 || !pageOptions?.page) {
-        setItems(response.data || []);
-      } else {
-        // Concatenar com itens existentes para paginação
-        setItems((prevItems) => [
-          ...(Array.isArray(prevItems) ? prevItems : []),
-          ...(response.data || [])
-        ]);
+      // Extrair dados com validação aprimorada
+      const items = extractItemsData(response);
+      const meta = extractItemsMeta(response);
+
+      // Validação adicional
+      if (!Array.isArray(items)) {
+        console.warn("[useItems] Dados retornados não são um array:", items);
+        setItems([]);
+        setPagination({
+          page: 1,
+          totalPages: 1,
+          totalItems: 0,
+        });
+        return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
       }
 
-      // Atualizar paginação
+      // Se for a primeira página, substituir os itens
+      if (pageOptions?.page === 1 || !pageOptions?.page) {
+        setItems(items);
+      } else {
+        // Concatenar com itens existentes para paginação
+        setItems((prevItems) => {
+          const currentItems = Array.isArray(prevItems) ? prevItems : [];
+          // Evitar duplicatas
+          const newItems = items.filter(
+            (item) => !currentItems.some((existing) => existing.id === item.id)
+          );
+          return [...currentItems, ...newItems];
+        });
+      }
+
+      // Atualizar paginação com valores seguros
       setPagination({
-        page: response.meta?.page || 1,
-        totalPages: response.meta?.pageCount || 1,
-        totalItems: response.meta?.itemCount || 0,
+        page: meta.page || 1,
+        totalPages: meta.pageCount || 1,
+        totalItems: meta.itemCount || 0,
       });
 
-      return response;
+      return { data: items, meta };
     } catch (err: any) {
       console.error("[useItems] Erro ao buscar itens disponíveis:", err);
       const errorMessage =
@@ -314,30 +334,68 @@ export const useItems = () => {
     []
   );
 
-  // Função para obter itens por status
-  const fetchItemsByStatus = useCallback(
-    async (status: ItemStatus, pageOptions?: PageOptionsDto) => {
-      setIsLoading(true);
-      setError(null);
+  // Função para buscar itens por status
+  const fetchItemsByStatus = useCallback(async (status: string, pageOptions?: PageOptionsDto) => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        const response = await ItemsService.getByStatus(status, pageOptions);
-        setItems(response.data);
+    try {
+      console.log("[useItems] Buscando itens por status:", status, pageOptions);
+      
+      const response = await ItemsService.getByStatus(status, pageOptions);
+      
+      console.log("[useItems] Resposta da API:", response);
+
+      // Extrair dados com validação aprimorada
+      const items = extractItemsData(response);
+      const meta = extractItemsMeta(response);
+
+      // Validação adicional
+      if (!Array.isArray(items)) {
+        console.warn("[useItems] Dados retornados não são um array:", items);
+        setItems([]);
         setPagination({
-          page: response.meta.page,
-          totalPages: response.meta.pageCount,
-          totalItems: response.meta.itemCount,
+          page: 1,
+          totalPages: 1,
+          totalItems: 0,
         });
-        return response;
-      } catch (err: any) {
-        setError(err.message || "Erro ao buscar itens por status");
-        return null;
-      } finally {
-        setIsLoading(false);
+        return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
       }
-    },
-    []
-  );
+
+      // Gerenciar paginação
+      if (pageOptions?.page === 1 || !pageOptions?.page) {
+        setItems(items);
+      } else {
+        setItems((prevItems) => {
+          const currentItems = Array.isArray(prevItems) ? prevItems : [];
+          // Evitar duplicatas
+          const newItems = items.filter(
+            (item) => !currentItems.some((existing) => existing.id === item.id)
+          );
+          return [...currentItems, ...newItems];
+        });
+      }
+
+      // Atualizar paginação com valores seguros
+      setPagination({
+        page: meta.page || 1,
+        totalPages: meta.pageCount || 1,
+        totalItems: meta.itemCount || 0,
+      });
+
+      return { data: items, meta };
+    } catch (err: any) {
+      console.error("[useItems] Erro ao buscar itens por status:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Erro ao buscar itens por status";
+      setError(errorMessage);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Função para upload de fotos para um item
   const uploadPhotos = useCallback(async (id: string, files: FormData) => {

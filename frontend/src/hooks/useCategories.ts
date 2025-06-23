@@ -92,39 +92,55 @@ export const useCategories = () => {
 
       globalLoadingPromise = (async () => {
         try {
-          // O serviço retorna o objeto PageDto: { data: [], meta: {} }
-          const pageDto = await CategoriesService.getAll(pageOptions);
-
-          // ## INÍCIO DA CORREÇÃO ##
-
-          // CORREÇÃO 1: Verificar se a resposta tem o formato de PageDto
-          if (!pageDto || !Array.isArray(pageDto.data) || !pageDto.meta) {
-            throw new Error("Resposta inválida da API. Formato de paginação esperado não foi encontrado.");
+          const response = await CategoriesService.getAll(pageOptions);
+          
+          let categoriesData: Category[] = [];
+          
+          // Handle different response formats
+          if (Array.isArray(response)) {
+            categoriesData = response;
+          } else if (response && typeof response === 'object') {
+            if (Array.isArray(response.data)) {
+              categoriesData = response.data;
+            }
           }
-
+          
+          // Validate each category object
+          const validCategories = categoriesData.filter(
+            (cat) => cat && typeof cat === 'object' && cat.id && cat.name
+          );
+          
           if (isMountedRef.current) {
-            // CORREÇÃO 2: Usar pageDto.data para as categorias
-            updateCategoriesState(pageDto.data);
-
-            // CORREÇÃO 3: Usar pageDto.meta para a paginação
-            setPagination({
-              page: pageDto.meta.page || 1,
-              totalPages: pageDto.meta.pageCount || 1,
-              totalItems: pageDto.meta.itemCount || 0,
-            });
+            setCategories(validCategories);
+            setError(null);
+            
+            // Set basic pagination if available
+            if (response && response.meta) {
+              setPagination({
+                page: response.meta.page || 1,
+                totalPages: response.meta.pageCount || 1,
+                totalItems: response.meta.itemCount || validCategories.length,
+              });
+            } else {
+              setPagination({
+                page: 1,
+                totalPages: 1,
+                totalItems: validCategories.length,
+              });
+            }
           }
 
-          // ## FIM DA CORREÇÃO ##
-
-          return pageDto;
-        } catch (err: any) {
-          const errorMessage = err.message || "Erro ao buscar categorias";
+          return { data: validCategories, meta: response?.meta };
+        } catch (err) {
+          console.error("[useCategories] Erro ao buscar categorias:", err);
+          const errorMessage = (err instanceof Error && err.message) ? err.message : "Erro ao buscar categorias";
+          
           if (isMountedRef.current) {
             setError(errorMessage);
+            setCategories([]); // Ensure categories is always an array
           }
-          categoriesCache.isValid = false;
-          console.error("[useCategories] Erro ao buscar categorias:", err);
-          throw err;
+          
+          throw new Error(errorMessage);
         } finally {
           globalLoadingPromise = null;
           if (isMountedRef.current) {

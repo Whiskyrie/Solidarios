@@ -1,5 +1,6 @@
 // src/screens/beneficiario/AvailableItemsScreen.tsx
-import React, { useState, useEffect, useCallback } from "react";
+
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -8,12 +9,12 @@ import { BeneficiarioStackParamList } from "../../navigation/types";
 // Componentes
 import {
   Header,
-  ItemCard,
   SearchBar,
+  Select,
+  ItemCard,
   EmptyState,
   Loading,
   ErrorState,
-  Select,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
@@ -34,12 +35,11 @@ const AvailableItemsScreen: React.FC = () => {
     items,
     isLoading,
     error,
-    fetchItems,
-    fetchItemsByStatus,
+    fetchAvailableItems, // Mudança aqui: usar fetchAvailableItems
     pagination,
     clearError,
   } = useItems();
-  const { categories, fetchCategories } = useCategories();
+  const { categories } = useCategories(); // APENAS LEITURA, sem fetchCategories
 
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
@@ -48,25 +48,30 @@ const AvailableItemsScreen: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [filteredItems, setFilteredItems] = useState<Item[]>([]);
 
-  // Carregar itens disponíveis
+  // Carregar itens disponíveis - SEGUINDO PADRÃO EXATO DO DonationHistoryScreen
   const loadAvailableItems = useCallback(
     async (page = 1) => {
-      await fetchItemsByStatus(ItemStatus.DISPONIVEL, { page, take: 20 });
-      await fetchCategories();
+      await fetchAvailableItems({ // Mudança aqui: usar fetchAvailableItems
+        page,
+        take: 20,
+      });
     },
-    [fetchItemsByStatus, fetchCategories]
+    [fetchAvailableItems] // Mudança aqui: dependência atualizada
   );
 
-  // Carregar ao focar na tela
+  // Carregar ao focar na tela - SEGUINDO PADRÃO EXATO DO DonationHistoryScreen
   useFocusEffect(
     useCallback(() => {
       loadAvailableItems();
     }, [loadAvailableItems])
   );
 
-  // Aplicar filtros e busca aos itens
+  // Aplicar filtros e busca aos itens - SEGUINDO PADRÃO DO MyDonationsScreen
   useEffect(() => {
-    if (!items) return;
+    if (!items || !Array.isArray(items)) {
+      setFilteredItems([]);
+      return;
+    }
 
     let result = [...items];
 
@@ -85,7 +90,7 @@ const AvailableItemsScreen: React.FC = () => {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (item) =>
-          item.description.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query) ||
           item.conservationState?.toLowerCase().includes(query) ||
           item.size?.toLowerCase().includes(query)
       );
@@ -94,36 +99,75 @@ const AvailableItemsScreen: React.FC = () => {
     setFilteredItems(result);
   }, [items, typeFilter, categoryFilter, searchQuery]);
 
-  // Função para pull-to-refresh
+  // Função para pull-to-refresh - SEGUINDO PADRÃO EXATO DO DonationHistoryScreen
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadAvailableItems(1);
     setRefreshing(false);
   };
 
-  // Função para carregar mais itens
+  // Função para carregar mais itens - SEGUINDO PADRÃO EXATO DO DonationHistoryScreen
   const handleLoadMore = () => {
     if (pagination && pagination.page < pagination.totalPages) {
       loadAvailableItems(pagination.page + 1);
     }
   };
 
-  // Se estiver carregando inicialmente, mostrar loading
-  if (isLoading && !refreshing && !items.length) {
+  // Opções de filtro de tipo - SEGUINDO PADRÃO DO NewDonationScreen
+  const typeOptions = useMemo(
+    () => [
+      { label: "Todos os tipos", value: "all" },
+      ...Object.entries(ItemType).map(([_, value]) => ({
+        label:
+          value === ItemType.ROUPA
+            ? "Roupas"
+            : value === ItemType.CALCADO
+            ? "Calçados"
+            : value === ItemType.UTENSILIO
+            ? "Utensílios"
+            : "Outros",
+        value,
+      })),
+    ],
+    []
+  );
+
+  // Opções de filtro de categoria - SEGUINDO PADRÃO DEFENSIVO DO MyDonationsScreen
+  const categoryOptions = useMemo(() => {
+    const baseOptions = [{ label: "Todas as categorias", value: "all" }];
+
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return baseOptions;
+    }
+
+    const validCategories = categories
+      .filter(
+        (category) =>
+          category &&
+          typeof category === "object" &&
+          category.id &&
+          category.name
+      )
+      .map((category) => ({
+        label: category.name,
+        value: category.id,
+      }));
+
+    return [...baseOptions, ...validCategories];
+  }, [categories]);
+
+  // Se estiver carregando inicialmente - SEGUINDO PADRÃO DO DonationHistoryScreen
+  if (isLoading && !refreshing && !items?.length) {
     return (
-      <Loading
-        visible={true}
-        message="Carregando itens disponíveis..."
-        overlay
-      />
+      <Loading visible={true} message="Carregando itens disponíveis..." overlay />
     );
   }
 
-  // Se houver erro, mostrar tela de erro
+  // Se houver erro - SEGUINDO PADRÃO DO DonationHistoryScreen
   if (error) {
     return (
       <ErrorState
-        title="Erro ao carregar itens"
+        title="Erro ao carregar itens disponíveis"
         description={error}
         actionLabel="Tentar novamente"
         onAction={() => {
@@ -133,31 +177,6 @@ const AvailableItemsScreen: React.FC = () => {
       />
     );
   }
-
-  // Opções de filtro de tipo
-  const typeOptions = [
-    { label: "Todos os tipos", value: "all" },
-    ...Object.entries(ItemType).map(([_, value]) => ({
-      label:
-        value === ItemType.ROUPA
-          ? "Roupas"
-          : value === ItemType.CALCADO
-          ? "Calçados"
-          : value === ItemType.UTENSILIO
-          ? "Utensílios"
-          : "Outros",
-      value,
-    })),
-  ];
-
-  // Opções de filtro de categoria
-  const categoryOptions = [
-    { label: "Todas as categorias", value: "all" },
-    ...categories.map((category) => ({
-      label: category.name,
-      value: category.id,
-    })),
-  ];
 
   return (
     <View style={styles.container}>
