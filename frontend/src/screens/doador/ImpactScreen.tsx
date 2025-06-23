@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   StyleSheet,
@@ -27,27 +33,24 @@ import theme from "../../theme";
 
 // Hooks
 import { useAuth } from "../../hooks/useAuth";
-import { useProfileData } from "../../hooks/useProfileData"; // Usar este em vez de useItems
+import { useProfileData } from "../../hooks/useProfileData";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Tipos das estatísticas de impacto
-type ImpactStats = {
+interface ImpactStats {
   totalDonations: number;
   distributedItems: number;
   peopleHelped: number;
   impactScore: number;
-};
+}
 
-// Simulação de dados de categorias (já que não temos esses dados específicos)
-type CategoryStats = {
+interface CategoryStats {
   roupa: number;
   calcado: number;
   utensilio: number;
   outro: number;
-};
+}
 
-// Configuração das conquistas/badges
 const ACHIEVEMENTS = [
   {
     id: 1,
@@ -90,6 +93,7 @@ const ImpactScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<DoadorProfileStackParamList, "Impact">>();
   useAuth();
+
   const {
     stats: profileStats,
     loading: profileLoading,
@@ -98,165 +102,152 @@ const ImpactScreen: React.FC = () => {
   } = useProfileData();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState<ImpactStats>({
-    totalDonations: 0,
-    distributedItems: 0,
-    peopleHelped: 0,
-    impactScore: 0,
-  });
 
-  // Animações
+  // Animações para os cards principais
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
-  // Mapeamento de categorias para ícones e labels
-  const getCategoryConfig = (category: string) => {
-    const configMap = {
+  const triggerAnimations = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim, scaleAnim]);
+
+  useEffect(() => {
+    if (!profileLoading) {
+      const timer = setTimeout(triggerAnimations, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [profileLoading, triggerAnimations]);
+
+  const getCategoryStats = useCallback((total: number): CategoryStats => {
+    if (total === 0) return { roupa: 0, calcado: 0, utensilio: 0, outro: 0 };
+    return {
+      roupa: Math.floor(total * 0.4),
+      calcado: Math.floor(total * 0.25),
+      utensilio: Math.floor(total * 0.25),
+      outro: Math.floor(total * 0.1),
+    };
+  }, []);
+
+  const getCategoryConfig = useCallback((category: string) => {
+    const configMap: Record<string, any> = {
       roupa: {
         icon: "checkroom",
         label: "Roupas",
-        color: "#FF6B6B",
-        gradient: ["#FF6B6B", "#FF8E8E"] as const,
+        gradient: ["#FF6B6B", "#FF8E8E"],
       },
       calcado: {
         icon: "directions-walk",
         label: "Calçados",
-        color: "#4ECDC4",
-        gradient: ["#4ECDC4", "#70D7D1"] as const,
+        gradient: ["#4ECDC4", "#70D7D1"],
       },
       utensilio: {
         icon: "kitchen",
         label: "Utensílios",
-        color: "#45B7D1",
-        gradient: ["#45B7D1", "#6BC7DD"] as const,
+        gradient: ["#45B7D1", "#6BC7DD"],
       },
       outro: {
         icon: "category",
         label: "Outros",
-        color: "#96CEB4",
-        gradient: ["#96CEB4", "#A8D3C4"] as const,
+        gradient: ["#96CEB4", "#A8D3C4"],
       },
     };
-    return configMap[category as keyof typeof configMap] || configMap.outro;
-  };
+    return configMap[category] || configMap.outro;
+  }, []);
 
-  // Simular distribuição de categorias baseada no total de doações
-  const getCategoryStats = (totalDonations: number): CategoryStats => {
-    if (totalDonations === 0) {
-      return { roupa: 0, calcado: 0, utensilio: 0, outro: 0 };
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfileData();
+    } finally {
+      setRefreshing(false);
     }
+  }, [refreshProfileData]);
 
-    // Distribuição baseada em padrões típicos de doação
-    const roupaPercentage = 0.4; // 40% roupas
-    const calcadoPercentage = 0.25; // 25% calçados
-    const utensilioPercentage = 0.25; // 25% utensílios
-    const outroPercentage = 0.1; // 10% outros
-
-    return {
-      roupa: Math.floor(totalDonations * roupaPercentage),
-      calcado: Math.floor(totalDonations * calcadoPercentage),
-      utensilio: Math.floor(totalDonations * utensilioPercentage),
-      outro: Math.floor(totalDonations * outroPercentage),
-    };
-  };
-
-  // Animação de entrada
-  useEffect(() => {
-    if (!profileLoading) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [profileLoading]);
-
-  // Atualizar stats quando profileStats mudar
-  useEffect(() => {
-    if (profileStats) {
-      console.log(
-        "ImpactScreen - Atualizando stats com profileStats:",
-        profileStats
-      );
-      setStats({
-        totalDonations: profileStats.totalDonations || 0,
-        distributedItems: profileStats.distributedItems || 0,
-        peopleHelped: profileStats.peopleHelped || 0,
-        impactScore: profileStats.impactScore || 0,
-      });
-    }
-  }, [profileStats]);
-
-  // Header melhorado com gradiente e sombra
-  const Header = () => (
-    <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#173F5F"
-        translucent
-      />
-      <LinearGradient
-        colors={["#173F5F", "#006E58", "#20B2AA"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="arrow-back"
-              size={24}
-              color={theme.colors.neutral.white}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.headerTitleContainer}>
-            <Typography
-              variant="h3"
-              color={theme.colors.neutral.white}
-              style={styles.headerTitle}
-            >
-              Meu Impacto
-            </Typography>
-            <Typography variant="caption" color="rgba(255,255,255,0.8)">
-              Transformando vidas juntos
-            </Typography>
-          </View>
-
-          <TouchableOpacity style={styles.shareButton} activeOpacity={0.7}>
-            <MaterialIcons
-              name="share"
-              size={20}
-              color={theme.colors.neutral.white}
-            />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </>
+  const stats = useMemo<ImpactStats>(
+    () => ({
+      totalDonations: profileStats?.totalDonations ?? 0,
+      distributedItems: profileStats?.distributedItems ?? 0,
+      peopleHelped: profileStats?.peopleHelped ?? 0,
+      impactScore: profileStats?.impactScore ?? 0,
+    }),
+    [profileStats]
   );
 
-  // Loading melhorado com shimmer effect
+  const Header = useCallback(
+    () => (
+      <>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="#173F5F"
+          translucent
+        />
+        <LinearGradient
+          colors={["#173F5F", "#006E58", "#20B2AA"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <View style={styles.headerContent}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name="arrow-back"
+                size={24}
+                color={theme.colors.neutral.white}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.headerTitleContainer}>
+              <Typography
+                variant="h3"
+                color={theme.colors.neutral.white}
+                style={styles.headerTitle}
+              >
+                Meu Impacto
+              </Typography>
+              <Typography variant="caption" color="rgba(255,255,255,0.8)">
+                Transformando vidas juntos
+              </Typography>
+            </View>
+
+            <TouchableOpacity style={styles.shareButton} activeOpacity={0.7}>
+              <MaterialIcons
+                name="share"
+                size={20}
+                color={theme.colors.neutral.white}
+              />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </>
+    ),
+    [navigation]
+  );
+
   const LoadingState = () => {
     const shimmerAnim = useRef(new Animated.Value(0)).current;
 
-    React.useEffect(() => {
+    useEffect(() => {
       const shimmer = Animated.loop(
         Animated.timing(shimmerAnim, {
           toValue: 1,
@@ -266,7 +257,7 @@ const ImpactScreen: React.FC = () => {
       );
       shimmer.start();
       return () => shimmer.stop();
-    }, []);
+    }, [shimmerAnim]);
 
     const shimmerTranslate = shimmerAnim.interpolate({
       inputRange: [0, 1],
@@ -292,17 +283,8 @@ const ImpactScreen: React.FC = () => {
     );
   };
 
-  // Estado vazio quando não há doações
   const EmptyState = () => (
-    <Animated.View
-      style={[
-        styles.animatedCard,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
-      ]}
-    >
+    <View style={styles.emptyStateContainer}>
       <Card style={styles.emptyStateCard}>
         <LinearGradient
           colors={[
@@ -370,13 +352,38 @@ const ImpactScreen: React.FC = () => {
           </View>
         </LinearGradient>
       </Card>
-    </Animated.View>
+    </View>
   );
 
-  // Card principal com animação e melhor hierarquia visual
-  const MainImpactCard = () => {
+  const StatItem = ({
+    value,
+    label,
+    color,
+    icon,
+  }: {
+    value: number;
+    label: string;
+    color: string;
+    icon: string;
+  }) => (
+    <View style={styles.statItem}>
+      <View
+        style={[styles.statIconContainer, { backgroundColor: color + "20" }]}
+      >
+        <MaterialIcons name={icon} size={20} color={color} />
+      </View>
+      <Typography variant="h1" color={color} center style={styles.statValue}>
+        {value}
+      </Typography>
+      <Typography variant="bodySecondary" center style={styles.statLabel}>
+        {label}
+      </Typography>
+    </View>
+  );
+
+  const MainImpactCard = useCallback(() => {
     const currentAchievement = ACHIEVEMENTS.filter(
-      (a) => stats.totalDonations >= a.threshold
+      (achievement) => stats.totalDonations >= achievement.threshold
     ).pop();
 
     return (
@@ -393,7 +400,6 @@ const ImpactScreen: React.FC = () => {
           colors={["#FFFFFF", "#F8FFFE"]}
           style={styles.mainImpactCard}
         >
-          {/* Badge de conquista */}
           {currentAchievement && (
             <View
               style={[
@@ -455,44 +461,16 @@ const ImpactScreen: React.FC = () => {
         </LinearGradient>
       </Animated.View>
     );
-  };
+  }, [stats, fadeAnim, slideAnim, scaleAnim]);
 
-  // Componente para item de estatística
-  const StatItem = ({
-    value,
-    label,
-    color,
-    icon,
-  }: {
-    value: number;
-    label: string;
-    color: string;
-    icon: string;
-  }) => (
-    <View style={styles.statItem}>
-      <View
-        style={[styles.statIconContainer, { backgroundColor: color + "20" }]}
-      >
-        <MaterialIcons name={icon} size={20} color={color} />
-      </View>
-      <Typography variant="h1" color={color} center style={styles.statValue}>
-        {value}
-      </Typography>
-      <Typography variant="bodySecondary" center style={styles.statLabel}>
-        {label}
-      </Typography>
-    </View>
-  );
-
-  // Card de categorias melhorado com gradientes
-  const CategoryBreakdownCard = () => {
+  const CategoryBreakdownCard = useCallback(() => {
     const categoryStats = getCategoryStats(stats.totalDonations);
     const total = Object.values(categoryStats).reduce(
       (sum, count) => sum + count,
       0
     );
 
-    if (total === 0) return null; // Não mostrar se não há doações
+    if (total === 0) return null;
 
     return (
       <Animated.View
@@ -519,8 +497,7 @@ const ImpactScreen: React.FC = () => {
           <View style={styles.categoryGrid}>
             {Object.entries(categoryStats).map(([category, count]) => {
               const config = getCategoryConfig(category);
-              const percentage =
-                total > 0 ? Math.round((count / total) * 100) : 0;
+              const percentage = Math.round((count / total) * 100);
 
               return (
                 <View key={category} style={styles.categoryCard}>
@@ -554,10 +531,15 @@ const ImpactScreen: React.FC = () => {
         </Card>
       </Animated.View>
     );
-  };
+  }, [
+    stats.totalDonations,
+    getCategoryStats,
+    getCategoryConfig,
+    fadeAnim,
+    slideAnim,
+  ]);
 
-  // Card de progresso aprimorado
-  const ProgressCard = () => {
+  const ProgressCard = useCallback(() => {
     const monthlyGoal = 10;
     const progressPercentage = Math.min(
       (stats.totalDonations / monthlyGoal) * 100,
@@ -565,7 +547,7 @@ const ImpactScreen: React.FC = () => {
     );
     const isGoalReached = stats.totalDonations >= monthlyGoal;
 
-    if (stats.totalDonations === 0) return null; // Não mostrar se não há doações
+    if (stats.totalDonations === 0) return null;
 
     return (
       <Animated.View
@@ -610,7 +592,7 @@ const ImpactScreen: React.FC = () => {
                   style={[
                     styles.progressBarFill,
                     {
-                      width: `${progressPercentage}%`,
+                      width: `${Math.round(progressPercentage)}%`,
                       backgroundColor: isGoalReached
                         ? theme.colors.status.success
                         : theme.colors.primary.secondary,
@@ -634,11 +616,10 @@ const ImpactScreen: React.FC = () => {
         </Card>
       </Animated.View>
     );
-  };
+  }, [stats.totalDonations, fadeAnim, slideAnim]);
 
-  // Card de agradecimento com call-to-action
-  const ThankYouCard = () => {
-    if (stats.totalDonations === 0) return null; // Não mostrar se não há doações
+  const ThankYouCard = useCallback(() => {
+    if (stats.totalDonations === 0) return null;
 
     return (
       <Animated.View
@@ -658,13 +639,12 @@ const ImpactScreen: React.FC = () => {
             ]}
             style={styles.thankYouGradient}
           >
-            <View style={styles.heartAnimation}>
-              <MaterialIcons
-                name="favorite"
-                size={40}
-                color={theme.colors.primary.secondary}
-              />
-            </View>
+            <MaterialIcons
+              name="favorite"
+              size={40}
+              color={theme.colors.primary.secondary}
+              style={styles.heartAnimation}
+            />
 
             <Typography variant="h4" center style={styles.thankYouTitle}>
               Obrigado por fazer a diferença!
@@ -717,20 +697,7 @@ const ImpactScreen: React.FC = () => {
         </Card>
       </Animated.View>
     );
-  };
-
-  // Pull to refresh
-  const onRefresh = async () => {
-    console.log("ImpactScreen - Iniciando refresh dos dados");
-    setRefreshing(true);
-    try {
-      await refreshProfileData();
-    } catch (error) {
-      console.error("ImpactScreen - Erro no refresh:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  }, [stats, fadeAnim, slideAnim]);
 
   if (profileError) {
     return (
@@ -846,13 +813,12 @@ const styles = StyleSheet.create({
     padding: theme.spacing.m,
     paddingBottom: theme.spacing.xl,
   },
-
-  // Animações
   animatedCard: {
     marginBottom: theme.spacing.m,
   },
-
-  // Empty State
+  emptyStateContainer: {
+    marginBottom: theme.spacing.m,
+  },
   emptyStateCard: {
     borderRadius: 20,
     overflow: "hidden",
@@ -865,6 +831,7 @@ const styles = StyleSheet.create({
   emptyStateGradient: {
     padding: theme.spacing.xl,
     alignItems: "center",
+    borderRadius: 10,
   },
   emptyStateIcon: {
     marginBottom: theme.spacing.l,
@@ -880,6 +847,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.l,
     opacity: 0.8,
+  },
+  ctaButton: {
+    marginTop: theme.spacing.s,
+  },
+  ctaGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 25,
   },
   benefitsContainer: {
     marginTop: theme.spacing.l,
@@ -900,8 +878,25 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.s,
     flex: 1,
   },
-
-  // Cards
+  loadingContainer: {
+    flex: 1,
+  },
+  skeletonCard: {
+    height: 200,
+    backgroundColor: theme.colors.neutral.mediumGray + "20",
+    borderRadius: 16,
+    overflow: "hidden",
+    position: "relative",
+  },
+  shimmerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    width: screenWidth,
+  },
   mainImpactCard: {
     borderRadius: 20,
     padding: theme.spacing.l,
@@ -971,8 +966,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neutral.mediumGray + "30",
     marginHorizontal: theme.spacing.s,
   },
-
-  // Categorias
   breakdownCard: {
     borderRadius: 16,
     padding: theme.spacing.m,
@@ -1005,8 +998,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
   },
-
-  // Progresso
   progressCard: {
     borderRadius: 16,
     padding: theme.spacing.m,
@@ -1051,8 +1042,6 @@ const styles = StyleSheet.create({
     top: -20,
     fontWeight: "600",
   },
-
-  // Agradecimento
   thankYouCard: {
     borderRadius: 20,
     overflow: "hidden",
@@ -1088,38 +1077,6 @@ const styles = StyleSheet.create({
   },
   impactText: {
     textAlign: "center",
-  },
-  ctaButton: {
-    marginTop: theme.spacing.s,
-  },
-  ctaGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-  },
-
-  // Loading
-  loadingContainer: {
-    flex: 1,
-  },
-  skeletonCard: {
-    height: 200,
-    backgroundColor: theme.colors.neutral.mediumGray + "20",
-    borderRadius: 16,
-    overflow: "hidden",
-    position: "relative",
-  },
-  shimmerOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255,255,255,0.4)",
-    width: screenWidth,
   },
 });
 
