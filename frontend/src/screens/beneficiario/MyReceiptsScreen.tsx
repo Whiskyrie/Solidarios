@@ -15,6 +15,7 @@ import {
   Animated,
   StatusBar,
   Platform,
+  TextInput,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -25,7 +26,6 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 // Componentes
 import {
   Typography,
-  SearchBar,
   EmptyState,
   Loading,
   ErrorState,
@@ -40,15 +40,14 @@ import { useDistributions } from "../../hooks/useDistributions";
 // Tipos e rotas
 import { Distribution } from "../../types/distributions.types";
 import { BENEFICIARIO_ROUTES } from "../../navigation/routes";
-import { Item } from "react-native-paper/lib/typescript/components/Drawer/Drawer";
 import { ItemStatus } from "../../types/items.types";
 
 // Filtros de status dos recebimentos
 const STATUS_FILTERS = [
-  { label: "Todos", value: "all" },
-  { label: "Recentes", value: "recent" },
-  { label: "Pendentes", value: "pending" },
-  { label: "Recebidos", value: "completed" },
+  { label: "Todos", value: "all", icon: "inbox" },
+  { label: "Recentes", value: "recent", icon: "schedule" },
+  { label: "Pendentes", value: "pending", icon: "hourglass-empty" },
+  { label: "Recebidos", value: "completed", icon: "check-circle" },
 ];
 
 const MyReceiptsScreen: React.FC = () => {
@@ -70,13 +69,14 @@ const MyReceiptsScreen: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Refs para animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const filterRotation = useRef(new Animated.Value(0)).current;
 
-  // CORREÇÃO 1: Mover a função de validação para fora do componente
-  // para evitar recriação a cada render
+  // Validação de dados
   const validateDistributionsArray = useCallback(
     (data: any): Distribution[] => {
       if (!data) {
@@ -87,7 +87,6 @@ const MyReceiptsScreen: React.FC = () => {
         return data;
       }
 
-      // Se data tem uma propriedade 'data' que é array
       if (
         data &&
         typeof data === "object" &&
@@ -105,7 +104,6 @@ const MyReceiptsScreen: React.FC = () => {
     []
   );
 
-  // CORREÇÃO 2: useMemo para validar distributions apenas quando realmente mudar
   const validatedDistributions = useMemo(() => {
     const result = validateDistributionsArray(distributions);
     console.log(
@@ -115,7 +113,6 @@ const MyReceiptsScreen: React.FC = () => {
     return result;
   }, [distributions, validateDistributionsArray]);
 
-  // CORREÇÃO 3: useMemo para filtrar distribuições apenas quando necessário
   const filteredDistributions = useMemo(() => {
     console.log("[MyReceiptsScreen] Aplicando filtros...");
 
@@ -135,7 +132,6 @@ const MyReceiptsScreen: React.FC = () => {
           });
           break;
         case "pending":
-          // Assumindo que distribuições sem data de conclusão são pendentes
           result = result.filter((distribution) => {
             const distDate = new Date(distribution.date);
             return (
@@ -196,7 +192,6 @@ const MyReceiptsScreen: React.FC = () => {
     return result;
   }, [validatedDistributions, searchQuery, activeFilter]);
 
-  // CORREÇÃO 4: useCallback para loadReceipts para evitar recriação
   const loadReceipts = useCallback(
     async (page = 1) => {
       if (user?.id) {
@@ -222,7 +217,6 @@ const MyReceiptsScreen: React.FC = () => {
   // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
-      // Iniciar animações
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -236,12 +230,10 @@ const MyReceiptsScreen: React.FC = () => {
         }),
       ]).start();
 
-      // Carregar recebimentos
       loadReceipts(1);
     }, [loadReceipts, fadeAnim, slideAnim])
   );
 
-  // CORREÇÃO 5: useCallback para handleRefresh
   const handleRefresh = useCallback(async () => {
     console.log("[MyReceiptsScreen] Executando refresh");
     setRefreshing(true);
@@ -255,7 +247,6 @@ const MyReceiptsScreen: React.FC = () => {
     }
   }, [loadReceipts, clearError]);
 
-  // CORREÇÃO 6: useCallback para handleLoadMore
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || isLoading || refreshing) return;
 
@@ -269,13 +260,26 @@ const MyReceiptsScreen: React.FC = () => {
     }
   }, [pagination, isLoading, loadReceipts, isLoadingMore, refreshing]);
 
-  // CORREÇÃO 7: useCallback para handleErrorRetry
   const handleErrorRetry = useCallback(() => {
     clearError();
     loadReceipts(1);
   }, [clearError, loadReceipts]);
 
-  // CORREÇÃO 8: useCallback para renderItem
+  const navigateToAvailableItems = useCallback(() => {
+    navigation.navigate(BENEFICIARIO_ROUTES.AVAILABLE_ITEMS);
+  }, [navigation]);
+
+  // Toggle dropdown de filtros
+  const toggleFilterDropdown = () => {
+    const toValue = showFilterDropdown ? 0 : 1;
+    Animated.timing(filterRotation, {
+      toValue,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+    setShowFilterDropdown(!showFilterDropdown);
+  };
+
   const renderItem = useCallback(
     ({ item, index }: { item: Distribution; index: number }) => {
       if (!item || typeof item !== "object") {
@@ -311,7 +315,6 @@ const MyReceiptsScreen: React.FC = () => {
     [navigation]
   );
 
-  // CORREÇÃO 9: useCallback para keyExtractor
   const keyExtractor = useCallback((item: Distribution, index: number) => {
     if (item && typeof item === "object" && item.id) {
       return item.id;
@@ -319,59 +322,16 @@ const MyReceiptsScreen: React.FC = () => {
     return `item-${index}`;
   }, []);
 
-  // CORREÇÃO 10: useCallback para navegação para itens disponíveis
-  const navigateToAvailableItems = useCallback(() => {
-    navigation.navigate(BENEFICIARIO_ROUTES.AVAILABLE_ITEMS);
-  }, [navigation]);
-
-  // Ajuste do componente Header
-
-  // Componente de cabeçalho com gradiente
-  const Header = () => (
-    <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={Platform.OS === 'android' ? "#4A90E2" : "transparent"}
-        translucent={Platform.OS === 'ios'}
-      />
-      <View style={styles.headerContainer}>
-        <LinearGradient
-          colors={["#4A90E2", "#7BB3F0", "#A8D0FF"]}
-          locations={[0, 0.4, 0.8]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.header}>
-            <View style={styles.welcomeContainer}>
-              <Typography
-                variant="h1"
-                style={styles.welcomeText}
-                color={theme.colors.neutral.white}
-              >
-                Meus Recebimentos
-              </Typography>
-              <Typography
-                variant="bodySecondary"
-                color="rgba(255, 255, 255, 0.9)"
-              >
-                Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
-              </Typography>
-            </View>
-          </View>
-        </LinearGradient>
-      </View>
-    </>
-  );
-
   // Estado de carregamento inicial
   if (isLoading && !dataLoaded && !refreshing) {
     return (
       <View style={styles.container}>
-        <Header />
-        <View style={[styles.content, styles.loadingContainer]}>
-          <Loading visible={true} message="Carregando seus recebimentos..." />
-        </View>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="#173F5F"
+          translucent
+        />
+        <Loading visible={true} message="Carregando seus recebimentos..." />
       </View>
     );
   }
@@ -380,29 +340,31 @@ const MyReceiptsScreen: React.FC = () => {
   if (error) {
     return (
       <View style={styles.container}>
-        <Header />
-        <View style={styles.content}>
-          <ErrorState
-            title="Erro ao carregar recebimentos"
-            description={error}
-            icon={
-              <View style={styles.errorIconContainer}>
-                <MaterialIcons
-                  name="error-outline"
-                  size={70}
-                  color={theme.colors.status.error}
-                />
-              </View>
-            }
-            actionLabel="Tentar novamente"
-            onAction={handleErrorRetry}
-          />
-        </View>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="#173F5F"
+          translucent
+        />
+        <ErrorState
+          title="Erro ao carregar recebimentos"
+          description={error}
+          icon={
+            <View style={styles.errorIconContainer}>
+              <MaterialIcons
+                name="error-outline"
+                size={70}
+                color={theme.colors.status.error}
+              />
+            </View>
+          }
+          actionLabel="Tentar novamente"
+          onAction={handleErrorRetry}
+        />
       </View>
     );
   }
 
-  // Componente EmptyState melhorado - removendo o botão duplicado
+  // Componente EmptyState
   const NoReceiptsView = () => (
     <View style={styles.emptyStateContainer}>
       <EmptyState
@@ -417,126 +379,264 @@ const MyReceiptsScreen: React.FC = () => {
             <MaterialIcons
               name={searchQuery ? "search-off" : "inbox"}
               size={80}
-              color={theme.colors.primary.main}
+              color={theme.colors.primary.secondary}
             />
           </View>
         }
-        // Remova o botão daqui para evitar duplicação
-        // Usuários podem usar o botão flutuante
+        actionLabel="Ver Itens Disponíveis"
+        onAction={navigateToAvailableItems}
       />
     </View>
   );
 
-  // Renderização principal
+  // Renderização principal com estrutura corrigida
   return (
     <View style={styles.container}>
-      <Header />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
+      />
+      
+      {/* Header fixo */}
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        {/* Seção de boas-vindas */}
+        <View style={styles.welcomeSection}>
+          <View>
+            <Typography
+              variant="h2"
+              style={styles.welcomeText}
+              color={theme.colors.neutral.white}
+            >
+              Meus Recebimentos
+            </Typography>
+            <Typography
+              variant="bodySecondary"
+              color="rgba(255,255,255,0.8)"
+              style={styles.greetingText}
+            >
+              Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
+            </Typography>
+          </View>
 
-      <View style={styles.content}>
-        {/* Barra de pesquisa */}
-        <View style={styles.searchContainer}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Buscar recebimentos..."
-            containerStyle={styles.searchBar}
-          />
+          {/* Contador de recebimentos */}
+          <View style={styles.receiptCounter}>
+            <Typography
+              variant="h2"
+              color={theme.colors.neutral.white}
+              style={styles.counterNumber}
+            >
+              {validatedDistributions?.length || 0}
+            </Typography>
+            <Typography variant="caption" color="rgba(255,255,255,0.8)">
+              recebimentos
+            </Typography>
+          </View>
         </View>
 
-        {/* Filtros */}
-        <View style={styles.filtersContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersScrollContent}
-          >
-            {STATUS_FILTERS.map((filter) => (
-              <TouchableOpacity
-                key={filter.value}
-                onPress={() => setActiveFilter(filter.value)}
-                activeOpacity={0.7}
-              >
-                {activeFilter === filter.value ? (
-                  <LinearGradient
-                    colors={["#4A90E2", "#7BB3F0"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.activeFilterItem}
-                  >
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.white}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.filterItem}>
-                    <Typography
-                      variant="bodySecondary"
-                      color={theme.colors.neutral.darkGray}
-                    >
-                      {filter.label}
-                    </Typography>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Lista de recebimentos */}
-        {dataLoaded && filteredDistributions.length === 0 ? (
-          <NoReceiptsView />
-        ) : (
-          <FlatList
-            data={filteredDistributions}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.colors.primary.main]}
-                tintColor={theme.colors.primary.main}
+        {/* Seção integrada de busca e filtros */}
+        <View style={styles.searchFilterSection}>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <MaterialIcons
+                name="search"
+                size={20}
+                color="rgba(255,255,255,0.6)"
+                style={styles.searchIcon}
               />
-            }
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              isLoadingMore ? (
-                <View style={styles.loadingMoreContainer}>
-                  <Loading visible size="small" message="Carregando mais..." />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={NoReceiptsView}
-          />
-        )}
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar recebimentos..."
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                style={styles.searchInput}
+                selectionColor="rgba(255,255,255,0.8)"
+                underlineColorAndroid="transparent"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={toggleFilterDropdown}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name="filter-list"
+                size={20}
+                color={theme.colors.neutral.white}
+              />
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: filterRotation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["0deg", "180deg"],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <MaterialIcons
+                  name="expand-more"
+                  size={16}
+                  color={theme.colors.neutral.white}
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Indicador de filtro ativo */}
+          {activeFilter !== "all" && (
+            <View style={styles.activeFilterIndicator}>
+              <MaterialIcons
+                name={
+                  STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
+                  "filter-list"
+                }
+                size={14}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography
+                variant="caption"
+                color={theme.colors.primary.secondary}
+                style={styles.activeFilterText}
+              >
+                {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label ||
+                  "Filtro ativo"}
+              </Typography>
+            </View>
+          )}
+
+          {/* Dropdown de filtros */}
+          {showFilterDropdown && (
+            <Animated.View style={styles.filterDropdown}>
+              {STATUS_FILTERS.map((filter) => (
+                <TouchableOpacity
+                  key={filter.value}
+                  style={[
+                    styles.filterOption,
+                    activeFilter === filter.value &&
+                      styles.filterOptionActive,
+                  ]}
+                  onPress={() => {
+                    setActiveFilter(filter.value);
+                    setShowFilterDropdown(false);
+                    Animated.timing(filterRotation, {
+                      toValue: 0,
+                      duration: 200,
+                      useNativeDriver: true,
+                    }).start();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons
+                    name={filter.icon}
+                    size={18}
+                    color={
+                      activeFilter === filter.value
+                        ? theme.colors.primary.secondary
+                        : theme.colors.neutral.darkGray
+                    }
+                  />
+                  <Typography
+                    variant="bodySecondary"
+                    color={
+                      activeFilter === filter.value
+                        ? theme.colors.primary.secondary
+                        : theme.colors.neutral.black
+                    }
+                    style={styles.filterOptionText}
+                  >
+                    {filter.label}
+                  </Typography>
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          )}
+        </View>
+      </LinearGradient>
+
+      {/* Conteúdo scrollável */}
+      <View style={styles.content}>
+        <Animated.View
+          style={[
+            styles.animatedContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          {dataLoaded && filteredDistributions.length === 0 ? (
+            <ScrollView 
+              style={styles.scrollContainer}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <NoReceiptsView />
+            </ScrollView>
+          ) : (
+            <FlatList
+              data={filteredDistributions}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              contentContainerStyle={styles.listContent}
+              style={styles.flatList}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[theme.colors.primary.secondary]}
+                  tintColor={theme.colors.primary.secondary}
+                />
+              }
+              onEndReached={handleLoadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                isLoadingMore ? (
+                  <View style={styles.loadingMoreContainer}>
+                    <Loading visible size="small" message="Carregando mais..." />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                dataLoaded && filteredDistributions.length === 0 ? (
+                  <NoReceiptsView />
+                ) : null
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </Animated.View>
 
         {/* Botão flutuante para itens disponíveis */}
-        <View style={styles.floatingButtonContainer}>
-          <TouchableOpacity
-            onPress={navigateToAvailableItems}
-            activeOpacity={0.8}
+        <TouchableOpacity
+          style={styles.floatingButtonContainer}
+          onPress={navigateToAvailableItems}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={["#173F5F", "#006E58"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.floatingButton}
           >
-            <LinearGradient
-              colors={["#4A90E2", "#7BB3F0"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.floatingButton}
+            <MaterialIcons name="search" size={20} color="#fff" />
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.neutral.white}
+              style={styles.buttonText}
             >
-              <MaterialIcons name="search" size={20} color="#fff" />
-              <Typography
-                variant="bodySecondary"
-                style={styles.buttonText}
-              >
-                Ver Disponíveis
-              </Typography>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+              Ver Disponíveis
+            </Typography>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -547,104 +647,174 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.neutral.white,
   },
-  headerContainer: {
-    width: '100%',
-  },
   headerGradient: {
-    paddingTop: Platform.OS === "ios" ? 60 : 40 + (StatusBar.currentHeight ?? 0),
-    paddingBottom: 30,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    // Garantindo que o gradiente apareça corretamente
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    paddingTop:
+      Platform.OS === "ios" ? 50 : 30 + (StatusBar.currentHeight ?? 0),
+    paddingBottom: 20,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    ...theme.shadows.strong,
   },
-  header: {
+  welcomeSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: theme.spacing.m,
-  },
-  welcomeContainer: {
-    marginBottom: theme.spacing.s,
-    paddingTop: Platform.OS === "ios" ? 0 : 10,
+    marginBottom: theme.spacing.m,
   },
   welcomeText: {
     fontWeight: "bold",
-    fontSize: 28,
-    marginBottom: 5,
-    color: "#FFFFFF",
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 3,
+    fontSize: 24,
+    marginBottom: 2,
+  },
+  greetingText: {
+    fontSize: 14,
+  },
+  receiptCounter: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  counterNumber: {
+    fontWeight: "bold",
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  searchFilterSection: {
+    paddingHorizontal: theme.spacing.m,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 12,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  searchIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.neutral.white,
+    fontSize: 16,
+    paddingVertical: theme.spacing.xs,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs + 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    gap: 4,
+  },
+  activeFilterIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 8,
+    marginTop: theme.spacing.xs,
+    alignSelf: "flex-start",
+    gap: 4,
+  },
+  activeFilterText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  filterDropdown: {
+    position: "absolute",
+    top: 60,
+    right: 0,
+    backgroundColor: theme.colors.neutral.white,
+    borderRadius: 12,
+    paddingVertical: theme.spacing.xs,
+    minWidth: 150,
+    ...theme.shadows.medium,
+    zIndex: 1000,
+  },
+  filterOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: theme.spacing.xs,
+    gap: theme.spacing.xs,
+  },
+  filterOptionActive: {
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+  },
+  filterOptionText: {
+    flex: 1,
+    color: theme.colors.neutral.black,
   },
   content: {
     flex: 1,
-    marginTop: -20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: theme.colors.neutral.white,
-    paddingHorizontal: theme.spacing.s,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
+  animatedContent: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingVertical: theme.spacing.m,
+  },
+  flatList: {
+    flex: 1,
+  },
+  listContent: {
+    flexGrow: 1,
     paddingTop: theme.spacing.s,
-  },
-  searchContainer: {
-    marginTop: theme.spacing.s,
-  },
-  searchBar: {
-    marginVertical: theme.spacing.s,
-    borderRadius: 12,
-    ...theme.shadows.small,
-  },
-  filtersContainer: {
-    marginBottom: theme.spacing.xs,
-  },
-  filtersScrollContent: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.xxs,
-  },
-  filterItem: {
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-    borderRadius: 12,
-    backgroundColor: "#F0F8FF",
-    borderWidth: 1,
-    borderColor: "#E0EFFF",
-    ...theme.shadows.small,
-  },
-  activeFilterItem: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-    borderRadius: 12,
-    ...theme.shadows.small,
+    paddingBottom: theme.spacing.xl + 80, // Espaço extra para o botão flutuante
   },
   cardContainer: {
     marginBottom: theme.spacing.s,
   },
   distributionCard: {
-    borderRadius: 12,
+    borderRadius: 16,
+    backgroundColor: theme.colors.neutral.white,
+    marginHorizontal: theme.spacing.xxs,
     ...theme.shadows.medium,
   },
-  listContent: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xl + 60,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-    minHeight: 500,
-    paddingTop: 100,
+  emptyStateContainer: {
+    flex: 1,
+    minHeight: 400,
     justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xl,
+  },
+  emptyStateIconContainer: {
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.spacing.m,
   },
   loadingMoreContainer: {
     paddingVertical: theme.spacing.m,
     alignItems: "center",
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: theme.spacing.xl,
   },
   errorIconContainer: {
     width: 120,
@@ -655,50 +825,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: theme.spacing.m,
   },
-  emptyStateIconContainer: {
-    backgroundColor: `${theme.colors.primary.main}15`,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: theme.spacing.m,
-  },
-  emptyStateContainer: {
-    flex: 1,
-    minHeight: 500,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: theme.spacing.xl,
-    // Adicionar padding inferior para evitar sobreposição com o botão flutuante
-    paddingBottom: 100, // Aumentando o padding inferior
-  },
   floatingButtonContainer: {
     position: "absolute",
     right: theme.spacing.m,
-    // Mover o botão flutuante para cima para dar mais espaço
-    bottom: theme.spacing.xl,
+    bottom: theme.spacing.m,
     borderRadius: 12,
     overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   floatingButton: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
-    borderRadius: 12,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: {
-    marginLeft: 8,
+    marginLeft: 5,
     fontWeight: "600",
-    color: "#ffffff",
-    fontSize: 14,
   },
 });
 
