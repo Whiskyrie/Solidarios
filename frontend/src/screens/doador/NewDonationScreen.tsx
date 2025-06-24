@@ -869,7 +869,10 @@ const NewDonationScreen: React.FC = () => {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.submitButtonContainer}
+                    style={[
+                      styles.submitButtonContainer,
+                      (!isValid || isLoading) && styles.disabledSubmitButton
+                    ]}
                     onPress={() => {
                       console.log("🔘 Botão de submit clicado!");
                       console.log("📝 Valores atuais:", values);
@@ -897,9 +900,37 @@ const NewDonationScreen: React.FC = () => {
                     activeOpacity={0.8}
                     disabled={isLoading || !isValid}
                   >
-                    <Typography variant="button" color="white">
-                      {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
-                    </Typography>
+                    <LinearGradient
+                      colors={
+                        isLoading || !isValid
+                          ? [theme.colors.neutral.mediumGray, theme.colors.neutral.darkGray]
+                          : ["#173F5F", "#006E58"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.submitButton}
+                    >
+                      {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                          <MaterialIcons 
+                            name="refresh" 
+                            size={20} 
+                            color="white" 
+                            style={{ marginRight: theme.spacing.xs }}
+                          />
+                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                            Cadastrando...
+                          </Typography>
+                        </View>
+                      ) : (
+                        <>
+                          <MaterialIcons name="add" size={20} color="white" />
+                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                            Cadastrar Doação
+                          </Typography>
+                        </>
+                      )}
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1137,9 +1168,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing.xs,
+    minHeight: 48,
   },
   submitButtonText: {
     fontWeight: "600",
+    fontSize: 16,
+  },
+  disabledSubmitButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 
