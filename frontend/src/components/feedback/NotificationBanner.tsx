@@ -198,7 +198,7 @@ const NotificationBanner: React.FC<NotificationBannerProps> = ({
         clearTimeout(timerRef.current);
       }
     };
-  }, [visible, autoClose, duration, onClose, position]);
+  }, [visible, position]); // ⚠️ REMOVIDO: autoClose, onClose, duration para evitar loops
 
   const handleClose = () => {
     if (timerRef.current) {
