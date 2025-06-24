@@ -42,7 +42,7 @@ export class TypeOrmLoggerService implements TypeOrmLogger {
 
     this.loggingService.error(
       `Query failed: ${query}${formattedParams}`,
-      error instanceof Error ? error.stack : error,
+      error instanceof Error ? error.stack : String(error),
       'QueryError',
     );
   }

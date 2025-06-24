@@ -3,12 +3,7 @@
  */
 import { useCallback, useState } from "react";
 import ItemsService from "../api/items";
-import {
-  Item,
-  CreateItemDto,
-  UpdateItemDto,
-  ItemStatus,
-} from "../types/items.types";
+import { Item, CreateItemDto, UpdateItemDto } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
 import { extractItemsData, extractItemsMeta } from "../utils/typeGuards";
 
@@ -65,67 +60,79 @@ export const useItems = () => {
   }, []);
 
   // NOVA FUNÇÃO: Buscar apenas itens disponíveis (para beneficiários)
-  const fetchAvailableItems = useCallback(async (pageOptions?: PageOptionsDto) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchAvailableItems = useCallback(
+    async (pageOptions?: PageOptionsDto) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      console.log("[useItems] Buscando itens disponíveis com opções:", pageOptions);
-      
-      // Usar getByStatus com status "disponivel"
-      const response = await ItemsService.getByStatus("disponivel", pageOptions);
-      
-      console.log("[useItems] Resposta da API:", response);
+      try {
+        console.log(
+          "[useItems] Buscando itens disponíveis com opções:",
+          pageOptions
+        );
 
-      // Extrair dados com validação aprimorada
-      const items = extractItemsData(response);
-      const meta = extractItemsMeta(response);
+        // Usar getByStatus com status "disponivel"
+        const response = await ItemsService.getByStatus(
+          "disponivel",
+          pageOptions
+        );
 
-      // Validação adicional
-      if (!Array.isArray(items)) {
-        console.warn("[useItems] Dados retornados não são um array:", items);
-        setItems([]);
+        console.log("[useItems] Resposta da API:", response);
+
+        // Extrair dados com validação aprimorada
+        const items = extractItemsData(response);
+        const meta = extractItemsMeta(response);
+
+        // Validação adicional
+        if (!Array.isArray(items)) {
+          console.warn("[useItems] Dados retornados não são um array:", items);
+          setItems([]);
+          setPagination({
+            page: 1,
+            totalPages: 1,
+            totalItems: 0,
+          });
+          return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
+        }
+
+        // Se for a primeira página, substituir os itens
+        if (pageOptions?.page === 1 || !pageOptions?.page) {
+          setItems(items);
+        } else {
+          // Concatenar com itens existentes para paginação
+          setItems((prevItems) => {
+            const currentItems = Array.isArray(prevItems) ? prevItems : [];
+            // Evitar duplicatas
+            const newItems = items.filter(
+              (item) =>
+                !currentItems.some((existing) => existing.id === item.id)
+            );
+            return [...currentItems, ...newItems];
+          });
+        }
+
+        // Atualizar paginação com valores seguros
         setPagination({
-          page: 1,
-          totalPages: 1,
-          totalItems: 0,
+          page: meta.page || 1,
+          totalPages: meta.pageCount || 1,
+          totalItems: meta.itemCount || 0,
         });
-        return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
+
+        return { data: items, meta };
+      } catch (err: any) {
+        console.error("[useItems] Erro ao buscar itens disponíveis:", err);
+        const errorMessage =
+          err.response?.data?.message ||
+          err.message ||
+          "Erro ao buscar itens disponíveis";
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
-
-      // Se for a primeira página, substituir os itens
-      if (pageOptions?.page === 1 || !pageOptions?.page) {
-        setItems(items);
-      } else {
-        // Concatenar com itens existentes para paginação
-        setItems((prevItems) => {
-          const currentItems = Array.isArray(prevItems) ? prevItems : [];
-          // Evitar duplicatas
-          const newItems = items.filter(
-            (item) => !currentItems.some((existing) => existing.id === item.id)
-          );
-          return [...currentItems, ...newItems];
-        });
-      }
-
-      // Atualizar paginação com valores seguros
-      setPagination({
-        page: meta.page || 1,
-        totalPages: meta.pageCount || 1,
-        totalItems: meta.itemCount || 0,
-      });
-
-      return { data: items, meta };
-    } catch (err: any) {
-      console.error("[useItems] Erro ao buscar itens disponíveis:", err);
-      const errorMessage =
-        err.response?.data?.message || err.message || "Erro ao buscar itens disponíveis";
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Função para obter um item por ID
   const fetchItemById = useCallback(async (id: string) => {
@@ -165,13 +172,18 @@ export const useItems = () => {
     setError(null);
 
     try {
+      console.log("Hook useItems - dados recebidos:", itemData);
       const data = await ItemsService.create(itemData);
+      console.log("Hook useItems - resposta da API:", data);
+
       setItem(data);
-      // Atualizar a lista de itens se necessário
       setItems((prev) => [...prev, data]);
       return data;
     } catch (err: any) {
-      setError(err.message || "Erro ao criar item");
+      console.error("Hook useItems - erro:", err);
+      const errorMessage =
+        err.response?.data?.message || err.message || "Erro ao criar item";
+      setError(errorMessage);
       return null;
     } finally {
       setIsLoading(false);
@@ -218,26 +230,29 @@ export const useItems = () => {
     }
   }, []);
 
-   // Função para solicitar um item (baseada no padrão do createItem)
-  const requestItem = useCallback(async (itemId: string, beneficiaryId: string) => {
-    setIsLoading(true);
-    setError(null);
+  // Função para solicitar um item (baseada no padrão do createItem)
+  const requestItem = useCallback(
+    async (itemId: string, beneficiaryId: string) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      // Usar o mesmo padrão do createItem, mas para request
-      const data = await ItemsService.requestItem(itemId, beneficiaryId);
-      
-      // Remover o item da lista local (não está mais disponível)
-      setItems((prevItems) => prevItems.filter(item => item.id !== itemId));
-      
-      return data;
-    } catch (err: any) {
-      setError(err.message || "Erro ao solicitar item");
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        // Usar o mesmo padrão do createItem, mas para request
+        const data = await ItemsService.requestItem(itemId, beneficiaryId);
+
+        // Remover o item da lista local (não está mais disponível)
+        setItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
+
+        return data;
+      } catch (err: any) {
+        setError(err.message || "Erro ao solicitar item");
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   // Função para obter itens por doador
   const fetchItemsByDonor = useCallback(
@@ -335,67 +350,75 @@ export const useItems = () => {
   );
 
   // Função para buscar itens por status
-  const fetchItemsByStatus = useCallback(async (status: string, pageOptions?: PageOptionsDto) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchItemsByStatus = useCallback(
+    async (status: string, pageOptions?: PageOptionsDto) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      console.log("[useItems] Buscando itens por status:", status, pageOptions);
-      
-      const response = await ItemsService.getByStatus(status, pageOptions);
-      
-      console.log("[useItems] Resposta da API:", response);
+      try {
+        console.log(
+          "[useItems] Buscando itens por status:",
+          status,
+          pageOptions
+        );
 
-      // Extrair dados com validação aprimorada
-      const items = extractItemsData(response);
-      const meta = extractItemsMeta(response);
+        const response = await ItemsService.getByStatus(status, pageOptions);
 
-      // Validação adicional
-      if (!Array.isArray(items)) {
-        console.warn("[useItems] Dados retornados não são um array:", items);
-        setItems([]);
+        console.log("[useItems] Resposta da API:", response);
+
+        // Extrair dados com validação aprimorada
+        const items = extractItemsData(response);
+        const meta = extractItemsMeta(response);
+
+        // Validação adicional
+        if (!Array.isArray(items)) {
+          console.warn("[useItems] Dados retornados não são um array:", items);
+          setItems([]);
+          setPagination({
+            page: 1,
+            totalPages: 1,
+            totalItems: 0,
+          });
+          return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
+        }
+
+        // Gerenciar paginação
+        if (pageOptions?.page === 1 || !pageOptions?.page) {
+          setItems(items);
+        } else {
+          setItems((prevItems) => {
+            const currentItems = Array.isArray(prevItems) ? prevItems : [];
+            // Evitar duplicatas
+            const newItems = items.filter(
+              (item) =>
+                !currentItems.some((existing) => existing.id === item.id)
+            );
+            return [...currentItems, ...newItems];
+          });
+        }
+
+        // Atualizar paginação com valores seguros
         setPagination({
-          page: 1,
-          totalPages: 1,
-          totalItems: 0,
+          page: meta.page || 1,
+          totalPages: meta.pageCount || 1,
+          totalItems: meta.itemCount || 0,
         });
-        return { data: [], meta: { page: 1, pageCount: 1, itemCount: 0 } };
+
+        return { data: items, meta };
+      } catch (err: any) {
+        console.error("[useItems] Erro ao buscar itens por status:", err);
+        const errorMessage =
+          err.response?.data?.message ||
+          err.message ||
+          "Erro ao buscar itens por status";
+        setError(errorMessage);
+        return null;
+      } finally {
+        setIsLoading(false);
       }
-
-      // Gerenciar paginação
-      if (pageOptions?.page === 1 || !pageOptions?.page) {
-        setItems(items);
-      } else {
-        setItems((prevItems) => {
-          const currentItems = Array.isArray(prevItems) ? prevItems : [];
-          // Evitar duplicatas
-          const newItems = items.filter(
-            (item) => !currentItems.some((existing) => existing.id === item.id)
-          );
-          return [...currentItems, ...newItems];
-        });
-      }
-
-      // Atualizar paginação com valores seguros
-      setPagination({
-        page: meta.page || 1,
-        totalPages: meta.pageCount || 1,
-        totalItems: meta.itemCount || 0,
-      });
-
-      return { data: items, meta };
-    } catch (err: any) {
-      console.error("[useItems] Erro ao buscar itens por status:", err);
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "Erro ao buscar itens por status";
-      setError(errorMessage);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Função para upload de fotos para um item
   const uploadPhotos = useCallback(async (id: string, files: FormData) => {

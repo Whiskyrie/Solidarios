@@ -1,4 +1,3 @@
-// src/modules/items/items.controller.ts
 import {
   Controller,
   Get,
@@ -14,7 +13,11 @@ import {
   Request,
   Query,
   ForbiddenException,
+  UseInterceptors, // Adicionado
+  UploadedFiles, // Adicionado
+  BadRequestException, // Adicionado
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express'; // Adicionado
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -29,11 +32,25 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiConsumes, // Adicionado
+  ApiBody, // Adicionado
 } from '@nestjs/swagger';
 import { PageOptionsDto } from '../../common/pagination/dto/page-options.dto';
 import { PageDto } from '../../common/pagination/dto/page.dto';
 import { Item } from './entities/item.entity';
 import { DonorStatsDto } from './dto/donor-stats.dto';
+
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
 
 @ApiTags('items')
 @Controller('items')
@@ -71,8 +88,11 @@ export class ItemsController {
     return this.itemsService.findAllPaginated(pageOptionsDto);
   }
 
-   @Get('available/all') // ROTA NOVA -> GET /items/available/all
-  @ApiOperation({ summary: 'Listar todos os itens disponíveis para beneficiários (com paginação)' })
+  @Get('available/all') // ROTA NOVA -> GET /items/available/all
+  @ApiOperation({
+    summary:
+      'Listar todos os itens disponíveis para beneficiários (com paginação)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de itens disponíveis retornada com sucesso.',
@@ -84,8 +104,10 @@ export class ItemsController {
     description: 'Opções de paginação',
   })
   // PERMISSÃO CORRIGIDA: Agora Beneficiários (e outros) podem acessar esta rota
-  @Roles(UserRole.BENEFICIARIO, UserRole.ADMIN, UserRole.FUNCIONARIO) 
-  findAvailable(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<Item>> {
+  @Roles(UserRole.BENEFICIARIO, UserRole.ADMIN, UserRole.FUNCIONARIO)
+  findAvailable(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Item>> {
     // Chama um novo método no serviço que você criará no próximo passo
     return this.itemsService.findAvailablePaginated(pageOptionsDto);
   }
@@ -189,5 +211,112 @@ export class ItemsController {
     @Request() req,
   ): Promise<DonorStatsDto> {
     return this.itemsService.getDonorStats(donorId, req.user);
+  }
+
+  @Post(':id/photos')
+  @ApiOperation({ summary: 'Fazer upload de fotos para um item' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do item',
+    type: 'string',
+    format: 'uuid',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Arquivos de imagem para upload',
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Fotos enviadas com sucesso.',
+    type: Item,
+  })
+  @ApiResponse({ status: 400, description: 'Arquivos inválidos.' })
+  @ApiResponse({ status: 404, description: 'Item não encontrado.' })
+  @ApiResponse({ status: 413, description: 'Arquivo muito grande.' })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB por arquivo
+        files: 5, // máximo 5 arquivos
+      },
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(
+            new BadRequestException('Apenas arquivos de imagem são permitidos'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadPhotos(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFiles() files: MulterFile[],
+    @Request() req,
+  ): Promise<Item> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Pelo menos um arquivo deve ser enviado');
+    }
+
+    return this.itemsService.uploadPhotos(id, files, req.user);
+  }
+
+  /**
+   * Remover foto de um item
+   */
+  @Delete(':id/photos')
+  @ApiOperation({ summary: 'Remover foto de um item' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do item',
+    type: 'string',
+    format: 'uuid',
+  })
+  @ApiBody({
+    description: 'URL da foto a ser removida',
+    schema: {
+      type: 'object',
+      properties: {
+        photoUrl: {
+          type: 'string',
+          description: 'URL da foto a ser removida',
+        },
+      },
+      required: ['photoUrl'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foto removida com sucesso.',
+    type: Item,
+  })
+  @ApiResponse({ status: 400, description: 'URL da foto inválida.' })
+  @ApiResponse({ status: 404, description: 'Item ou foto não encontrada.' })
+  @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async removePhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('photoUrl') photoUrl: string,
+    @Request() req,
+  ): Promise<Item> {
+    if (!photoUrl) {
+      throw new BadRequestException('URL da foto é obrigatória');
+    }
+
+    return this.itemsService.removePhoto(id, photoUrl, req.user);
   }
 }

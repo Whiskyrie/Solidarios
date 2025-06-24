@@ -6,12 +6,14 @@ import { Item } from './entities/item.entity';
 import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { LoggingModule } from '../../common/logging/logging.module';
+import { BackBlazeModule } from '../../common/services/backblaze.module'; // Adicionar esta linha
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Item, User]), // Já tem User
+    TypeOrmModule.forFeature([Item, User]),
     forwardRef(() => UsersModule),
     LoggingModule,
+    BackBlazeModule,
   ],
   controllers: [ItemsController],
   providers: [ItemsService],
