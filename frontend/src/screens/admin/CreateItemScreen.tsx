@@ -41,12 +41,11 @@ const CreateItemSchema = Yup.object().shape({
   conservationState: Yup.string().required(
     "Estado de conservação é obrigatório"
   ),
-  size: Yup.string().when("type", {
-    is: (value: ItemType) =>
-      value === ItemType.ROUPA || value === ItemType.CALCADO,
-    then: (schema) =>
-      schema.required("Tamanho é obrigatório para roupas e calçados"),
-    otherwise: (schema) => schema.notRequired(),
+  size: Yup.string().when("type", ([type], schema) => {
+    if (type === ItemType.ROUPA || type === ItemType.CALCADO) {
+      return schema.required("Tamanho é obrigatório para roupas e calçados");
+    }
+    return schema.notRequired();
   }),
   categoryId: Yup.string().required("Categoria é obrigatória"),
 });
@@ -73,7 +72,7 @@ const conservationStateOptions = [
 const CreateItemScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<AdminItemsStackParamList>>();
-  const { createItem, isLoading, error, clearError } = useItems();
+  const { createItem, uploadPhotos, isLoading, error, clearError } = useItems();
   const { fetchCategories } = useCategories();
   const [notification, setNotification] = useState({
     visible: false,
@@ -89,26 +88,51 @@ const CreateItemScreen: React.FC = () => {
   // Função para criar um novo item
   const handleCreateItem = async (values: any) => {
     try {
-      const newItem = await createItem(values);
+      // Separar dados do item e fotos
+      const { photos, ...itemData } = values;
+
+      // Primeiro, criar o item sem fotos
+      const newItem = await createItem(itemData);
+
+      if (newItem && photos && photos.length > 0) {
+        // Em seguida, fazer upload das fotos se existirem
+        const formData = new FormData();
+
+        photos.forEach((photo: any, index: number) => {
+          formData.append("files", {
+            uri: photo.uri,
+            type: photo.type || "image/jpeg",
+            name: photo.name || `photo_${index}.jpg`,
+          } as any);
+        });
+
+        // Fazer upload das fotos usando o hook já instanciado
+        await uploadPhotos(newItem.id, formData);
+      }
 
       if (newItem) {
         setNotification({
           visible: true,
           type: "success",
           message: "Item criado com sucesso!",
-          description: "O item foi adicionado ao sistema.",
+          description:
+            photos && photos.length > 0
+              ? "O item foi adicionado ao sistema com suas fotos."
+              : "O item foi adicionado ao sistema.",
         });
 
         setTimeout(() => {
           navigation.goBack();
         }, 1500);
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Erro ao criar item:", err);
       setNotification({
         visible: true,
         type: "error",
         message: "Erro ao criar item.",
-        description: "Não foi possível criar o item. Tente novamente.",
+        description:
+          err?.message || "Não foi possível criar o item. Tente novamente.",
       });
     }
   };
@@ -157,7 +181,7 @@ const CreateItemScreen: React.FC = () => {
             conservationState: "",
             size: "",
             categoryId: "",
-            photos: [] as Array<{ uri: string; name: string; type: string }>, // Tipando explicitamente
+            photos: [] as Array<{ uri: string; name: string; type: string }>, // Para armazenar localmente
             donorId: "", // Adicionando donorId que parece ser necessário
           }}
           validationSchema={CreateItemSchema}

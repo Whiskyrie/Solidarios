@@ -6,7 +6,7 @@ export class RemovePhotoDto {
   @ApiProperty({
     description: 'URL da foto a ser removida',
     example:
-      'https://f000.backblazeb2.com/file/meu-bucket/items/12345-uuid.jpg',
+      'https://s3.us-west-004.backblazeb2.com/my-bucket/items/my-photo.jpg',
   })
   @IsNotEmpty({ message: 'URL da foto é obrigatória' })
   @IsString({ message: 'URL da foto deve ser uma string' })

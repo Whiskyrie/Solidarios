@@ -17,7 +17,7 @@ import { PageMetaDto } from '../../common/pagination/dto/page-meta.dto';
 import { LoggingService } from '../../common/logging/logging.service';
 import { LogMethod } from '../../common/logging/logger.decorator';
 import { DonorStatsDto } from './dto/donor-stats.dto';
-import { BackBlazeService } from '../../common/services/backblaze.service';
+import { S3Service } from '../../common/services/s3.service';
 
 interface MulterFile {
   fieldname: string;
@@ -40,7 +40,7 @@ export class ItemsService {
     private usersRepository: Repository<User>,
     private usersService: UsersService,
     private readonly logger: LoggingService,
-    private readonly backBlazeService: BackBlazeService,
+    private readonly s3Service: S3Service,
   ) {
     this.logger.setContext('ItemsService');
   }
@@ -480,7 +480,7 @@ export class ItemsService {
       }
 
       const uploadPromises = files.map((file) =>
-        this.backBlazeService.uploadImage(file, true),
+        this.s3Service.uploadImage(file, true),
       );
 
       const uploadResults = await Promise.all(uploadPromises);
@@ -532,7 +532,7 @@ export class ItemsService {
 
       let fileName: string;
       try {
-        fileName = this.backBlazeService.extractFileNameFromUrl(photoUrl);
+        fileName = this.s3Service.extractFileNameFromUrl(photoUrl);
       } catch (error) {
         this.logger.error(
           `Erro ao extrair nome do arquivo da URL: ${error.message}`,
@@ -541,13 +541,11 @@ export class ItemsService {
         throw new BadRequestException('URL da foto inválida');
       }
 
-      if (this.backBlazeService.isBackBlazeUrl(photoUrl)) {
+      if (this.s3Service.isS3Url(photoUrl)) {
         try {
-          await this.backBlazeService.deleteImage(fileName);
+          await this.s3Service.deleteImage(fileName);
         } catch (error) {
-          this.logger.warn(
-            `Erro ao remover foto do BackBlaze: ${error.message}`,
-          );
+          this.logger.warn(`Erro ao remover foto do S3: ${error.message}`);
         }
       }
 
@@ -579,20 +577,18 @@ export class ItemsService {
 
     this.logger.log(`Removendo todas as fotos do item ${item.id}`);
 
-    const backBlazeUrls = item.photos.filter((url) =>
-      this.backBlazeService.isBackBlazeUrl(url),
-    );
+    const s3Urls = item.photos.filter((url) => this.s3Service.isS3Url(url));
 
-    if (backBlazeUrls.length > 0) {
-      const fileNames = backBlazeUrls.map((url) =>
-        this.backBlazeService.extractFileNameFromUrl(url),
+    if (s3Urls.length > 0) {
+      const fileNames = s3Urls.map((url) =>
+        this.s3Service.extractFileNameFromUrl(url),
       );
 
       try {
-        await this.backBlazeService.deleteMultipleImages(fileNames);
+        await this.s3Service.deleteMultipleImages(fileNames);
       } catch (error) {
         this.logger.warn(
-          `Erro ao remover fotos do BackBlaze para item ${item.id}:`,
+          `Erro ao remover fotos do S3 para item ${item.id}:`,
           error,
         );
       }
