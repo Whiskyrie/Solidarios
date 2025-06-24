@@ -1,9 +1,9 @@
 // src/common/services/backblaze.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import B2 from 'backblaze-b2';
 import * as sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
+import B2 from 'backblaze-b2';
 
 export interface UploadResult {
   fileName: string;
@@ -27,7 +27,7 @@ interface MulterFile {
 @Injectable()
 export class BackBlazeService {
   private readonly logger = new Logger(BackBlazeService.name);
-  private b2: B2;
+  private b2: any;
   private bucketId: string;
   private bucketName: string;
   private baseUrl: string;
@@ -149,7 +149,7 @@ export class BackBlazeService {
         fileName,
         data: optimizedBuffer,
         mime: 'image/jpeg',
-        hash: null,
+        hash: undefined,
         info: {
           originalName: file.originalname,
           uploadedAt: new Date().toISOString(),
@@ -176,7 +176,7 @@ export class BackBlazeService {
             fileName: thumbnailFileName,
             data: thumbnailBuffer,
             mime: 'image/jpeg',
-            hash: null,
+            hash: undefined,
             info: {
               originalName: `${file.originalname}_thumbnail`,
               uploadedAt: new Date().toISOString(),
@@ -215,6 +215,7 @@ export class BackBlazeService {
         bucketId: this.bucketId,
         startFileName: fileName,
         maxFileCount: 1,
+        startFileId: '',
       });
 
       if (fileVersions.data.files.length === 0) {
@@ -237,6 +238,7 @@ export class BackBlazeService {
           bucketId: this.bucketId,
           startFileName: thumbnailFileName,
           maxFileCount: 1,
+          startFileId: '',
         });
 
         if (thumbnailVersions.data.files.length > 0) {
