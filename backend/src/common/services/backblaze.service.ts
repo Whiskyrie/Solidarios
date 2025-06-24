@@ -27,7 +27,7 @@ interface MulterFile {
 @Injectable()
 export class BackBlazeService {
   private readonly logger = new Logger(BackBlazeService.name);
-  private b2: any;
+  private b2: B2; // Tipo atualizado para B2
   private bucketId: string;
   private bucketName: string;
   private baseUrl: string;
@@ -55,8 +55,7 @@ export class BackBlazeService {
     ) {
       throw new Error('Missing required BackBlaze configuration');
     }
-
-    this.b2 = new B2({
+    this.b2 = new (B2 as any)({
       applicationKeyId,
       applicationKey,
     });
