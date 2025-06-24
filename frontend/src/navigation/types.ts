@@ -66,11 +66,10 @@ export type AdminUsersStackParamList = {
 
 // Tipos para FuncionarioNavigator - Tabs
 export type FuncionarioTabParamList = {
-  Dashboard: undefined;
+  Dashboard: NavigatorScreenParams<{ DashboardMain: undefined }>;
   Items: NavigatorScreenParams<FuncionarioItemsStackParamList>;
-  Inventory: NavigatorScreenParams<FuncionarioInventoryStackParamList>;
-  Distributions: NavigatorScreenParams<FuncionarioDistributionsStackParamList>;
   Beneficiaries: NavigatorScreenParams<FuncionarioBeneficiariesStackParamList>;
+  Profile: NavigatorScreenParams<FuncionarioProfileStackParamList>;
 };
 
 export type FuncionarioTabScreenProps<T extends keyof FuncionarioTabParamList> =
@@ -98,6 +97,13 @@ export type FuncionarioBeneficiariesStackParamList = {
   BeneficiariesList: undefined;
   BeneficiaryDetail: { id: string };
 };
+
+export type FuncionarioProfileStackParamList = {
+  ProfileMain: undefined;
+  EditProfile?: undefined;
+  Settings?: undefined;
+};
+
 
 // Tipos para DoadorNavigator - Tabs
 export type DoadorTabParamList = {
