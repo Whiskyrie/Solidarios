@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -22,122 +22,129 @@ import {
   EmptyState,
   Loading,
   ErrorState,
-  UserCard,
+  InventoryCard,
   Select,
+  Badge,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
 
 // Hooks
 import { useAuth } from "../../hooks/useAuth";
-import { useUsers } from "../../hooks/useUsers";
+import { useInventory } from "../../hooks/useInventory";
 
 // Tipos e rotas
-import { FuncionarioBeneficiariesStackParamList } from "../../navigation/types";
-import { User, UserRole } from "../../types/users.types";
+import { FuncionarioInventoryStackParamList } from "../../navigation/types";
+import { Inventory } from "../../types/inventory.types";
 
 // Opções de filtro
 const FILTER_OPTIONS = [
   { label: "Todos", value: "all" },
-  { label: "Ativos", value: "active" },
-  { label: "Recentes", value: "recent" },
+  { label: "Estoque Baixo", value: "low" },
+  { label: "Estoque Normal", value: "normal" },
+  { label: "Sem Alerta", value: "noAlert" },
 ];
 
 // Opções de ordenação
 const SORT_OPTIONS = [
-  { label: "Nome A-Z", value: "name_asc" },
-  { label: "Nome Z-A", value: "name_desc" },
-  { label: "Mais recentes", value: "date_desc" },
-  { label: "Mais antigos", value: "date_asc" },
+  { label: "Recentes", value: "date_desc" },
+  { label: "Antigos", value: "date_asc" },
+  { label: "Quantidade ↓", value: "quantity_desc" },
+  { label: "Quantidade ↑", value: "quantity_asc" },
 ];
 
-const BeneficiariesScreen: React.FC = () => {
+const InventoryScreen: React.FC = () => {
   const navigation =
-    useNavigation<StackNavigationProp<FuncionarioBeneficiariesStackParamList>>();
+    useNavigation<StackNavigationProp<FuncionarioInventoryStackParamList>>();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const {
-    users,
+    inventoryItems,
     isLoading,
     error,
-    fetchUsers,
+    fetchInventory,
+    fetchLowStock,
     pagination,
     clearError,
-  } = useUsers();
+  } = useInventory();
 
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("name_asc");
-  const [filteredBeneficiaries, setFilteredBeneficiaries] = useState<User[]>([]);
+  const [sortBy, setSortBy] = useState("date_desc");
+  const [filteredInventory, setFilteredInventory] = useState<Inventory[]>([]);
 
   // Animações
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(30)).current;
 
-  // Aplicar filtros e busca aos beneficiários
+  // Aplicar filtros e busca ao inventário
   useEffect(() => {
-    if (!users) return;
+    if (!inventoryItems) return;
 
-    // Filtrar apenas beneficiários
-    let result = users.filter(user => user.role === UserRole.BENEFICIARIO);
+    let result = [...inventoryItems];
 
     // Aplicar busca
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
-        (user) =>
-          user.name.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query) ||
-          user.phone?.toLowerCase().includes(query)
+        (inv) =>
+          inv.item.description.toLowerCase().includes(query) ||
+          inv.location?.toLowerCase().includes(query) ||
+          inv.item.category?.name.toLowerCase().includes(query)
       );
     }
 
     // Aplicar filtros
-    const now = new Date();
-    const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    if (filter === "recent") {
-      result = result.filter(user => new Date(user.createdAt) > lastMonth);
+    if (filter === "low") {
+      result = result.filter((inv) => inv.quantity <= (inv.alertLevel || 0));
+    } else if (filter === "normal") {
+      result = result.filter((inv) => inv.quantity > (inv.alertLevel || 0));
+    } else if (filter === "noAlert") {
+      result = result.filter((inv) => !inv.alertLevel);
     }
 
     // Aplicar ordenação
     switch (sortBy) {
-      case "name_asc":
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case "name_desc":
-        result.sort((a, b) => b.name.localeCompare(a.name));
-        break;
       case "date_desc":
         result.sort(
           (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
         break;
       case "date_asc":
         result.sort(
           (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
         );
+        break;
+      case "quantity_desc":
+        result.sort((a, b) => b.quantity - a.quantity);
+        break;
+      case "quantity_asc":
+        result.sort((a, b) => a.quantity - b.quantity);
         break;
     }
 
-    setFilteredBeneficiaries(result);
-  }, [users, searchQuery, filter, sortBy]);
+    setFilteredInventory(result);
+  }, [inventoryItems, searchQuery, filter, sortBy]);
 
-  // Carregar beneficiários
-  const loadBeneficiaries = useCallback(
+  // Carregar inventário
+  const loadInventory = useCallback(
     async (page = 1) => {
-      await fetchUsers({ page, take: 20 });
+      if (filter === "low") {
+        await fetchLowStock({ page, take: 20 });
+      } else {
+        await fetchInventory({ page, take: 20 });
+      }
     },
-    [fetchUsers]
+    [filter, fetchInventory, fetchLowStock]
   );
 
   // Carregar ao focar na tela
   useFocusEffect(
     useCallback(() => {
-      loadBeneficiaries();
+      loadInventory();
 
       // Animação de entrada
       Animated.parallel([
@@ -152,20 +159,20 @@ const BeneficiariesScreen: React.FC = () => {
           useNativeDriver: true,
         }),
       ]).start();
-    }, [loadBeneficiaries, fadeAnim, slideAnim])
+    }, [loadInventory, fadeAnim, slideAnim])
   );
 
   // Função para pull-to-refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadBeneficiaries(1);
+    await loadInventory(1);
     setRefreshing(false);
   };
 
   // Função para carregar mais itens
   const handleLoadMore = () => {
     if (pagination && pagination.page < pagination.totalPages) {
-      loadBeneficiaries(pagination.page + 1);
+      loadInventory(pagination.page + 1);
     }
   };
 
@@ -190,25 +197,25 @@ const BeneficiariesScreen: React.FC = () => {
               style={styles.headerTitle}
               color={theme.colors.neutral.white}
             >
-              Beneficiários
+              Inventário
             </Typography>
             <Typography
               variant="bodySecondary"
               color="rgba(255,255,255,0.8)"
               style={styles.headerSubtitle}
             >
-              {filteredBeneficiaries.length} beneficiários encontrados
+              {filteredInventory.length} itens encontrados
             </Typography>
           </View>
 
-          {/* Badge com total de beneficiários */}
+          {/* Badge com total de itens */}
           <View style={styles.headerBadge}>
             <Typography
               variant="h3"
               color={theme.colors.neutral.white}
               style={styles.badgeNumber}
             >
-              {filteredBeneficiaries.length}
+              {pagination?.totalItems || 0}
             </Typography>
             <Typography variant="caption" color="rgba(255,255,255,0.8)">
               Total
@@ -219,36 +226,84 @@ const BeneficiariesScreen: React.FC = () => {
     </>
   );
 
+  // Cards de estatísticas rápidas
+  const QuickStatsCards = () => {
+    const lowStockCount = filteredInventory.filter(
+      (inv) => inv.quantity <= (inv.alertLevel || 0)
+    ).length;
+    const normalStockCount = filteredInventory.length - lowStockCount;
+
+    return (
+      <View style={styles.statsSection}>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <LinearGradient
+              colors={[theme.colors.status.success, "#45B049"]}
+              style={styles.statGradient}
+            >
+              <MaterialIcons name="check-circle" size={24} color="white" />
+              <Typography variant="h3" color="white" style={styles.statNumber}>
+                {normalStockCount}
+              </Typography>
+              <Typography variant="caption" color="white">
+                Estoque Normal
+              </Typography>
+            </LinearGradient>
+          </View>
+
+          <View style={styles.statCard}>
+            <LinearGradient
+              colors={
+                lowStockCount > 0
+                  ? [theme.colors.status.warning, "#FF8C00"]
+                  : [theme.colors.neutral.darkGray, "#666"]
+              }
+              style={styles.statGradient}
+            >
+              <MaterialIcons name="warning" size={24} color="white" />
+              <Typography variant="h3" color="white" style={styles.statNumber}>
+                {lowStockCount}
+              </Typography>
+              <Typography variant="caption" color="white">
+                Estoque Baixo
+              </Typography>
+            </LinearGradient>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   // Empty State personalizado
-  const BeneficiariesEmptyState = () => (
+  const InventoryEmptyState = () => (
     <View style={styles.emptyStateContainer}>
       <View style={styles.emptyStateIconContainer}>
         <MaterialIcons
-          name={searchQuery || filter !== "all" ? "search-off" : "people"}
+          name={searchQuery || filter !== "all" ? "search-off" : "inventory"}
           size={70}
           color={theme.colors.primary.secondary}
         />
       </View>
       <Typography variant="h4" center style={styles.emptyStateTitle}>
         {searchQuery || filter !== "all"
-          ? "Nenhum beneficiário encontrado"
-          : "Nenhum beneficiário cadastrado"}
+          ? "Nenhum item encontrado"
+          : "Inventário vazio"}
       </Typography>
       <Typography variant="bodySecondary" center style={styles.emptyStateDescription}>
         {searchQuery || filter !== "all"
           ? "Tente ajustar sua busca ou filtros"
-          : "Não há beneficiários cadastrados no sistema"}
+          : "Não há itens cadastrados no inventário"}
       </Typography>
     </View>
   );
 
   // Se estiver carregando inicialmente, mostrar loading
-  if (isLoading && !refreshing && !users.length) {
+  if (isLoading && !refreshing && !inventoryItems.length) {
     return (
       <View style={styles.container}>
         <Header />
         <View style={styles.loadingContainer}>
-          <Loading visible={true} message="Carregando beneficiários..." />
+          <Loading visible={true} message="Carregando inventário..." />
         </View>
       </View>
     );
@@ -261,7 +316,7 @@ const BeneficiariesScreen: React.FC = () => {
         <Header />
         <View style={styles.content}>
           <ErrorState
-            title="Erro ao carregar beneficiários"
+            title="Erro ao carregar inventário"
             description={error}
             icon={
               <View style={styles.errorIconContainer}>
@@ -275,7 +330,7 @@ const BeneficiariesScreen: React.FC = () => {
             actionLabel="Tentar novamente"
             onAction={() => {
               clearError();
-              loadBeneficiaries();
+              loadInventory();
             }}
           />
         </View>
@@ -296,11 +351,14 @@ const BeneficiariesScreen: React.FC = () => {
           },
         ]}
       >
+        {/* Cards de estatísticas */}
+        <QuickStatsCards />
+
         {/* Barra de pesquisa */}
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Buscar beneficiários..."
+          placeholder="Buscar no inventário..."
           containerStyle={styles.searchBar}
         />
 
@@ -325,19 +383,20 @@ const BeneficiariesScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Lista de beneficiários */}
+        {/* Lista de inventário */}
         <FlatList
-          data={filteredBeneficiaries}
+          data={filteredInventory}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <UserCard
-              user={item}
+            <InventoryCard
+              inventory={item}
               onPress={() =>
-                navigation.navigate("BeneficiaryDetail", {
+                navigation.navigate("InventoryDetail", {
                   id: item.id,
                 })
               }
-              showRole={false}
+              compact={false}
+              showActions={true}
             />
           )}
           contentContainerStyle={[
@@ -355,7 +414,7 @@ const BeneficiariesScreen: React.FC = () => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<BeneficiariesEmptyState />}
+          ListEmptyComponent={<InventoryEmptyState />}
         />
       </Animated.View>
     </View>
@@ -411,6 +470,37 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: theme.spacing.m,
     paddingTop: theme.spacing.l,
+  },
+
+  // Estatísticas rápidas
+  statsSection: {
+    marginBottom: theme.spacing.l,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  statCard: {
+    flex: 1,
+    marginHorizontal: 4,
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statGradient: {
+    padding: theme.spacing.m,
+    alignItems: "center",
+    minHeight: 100,
+    justifyContent: "space-between",
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginVertical: 4,
   },
 
   // Busca e filtros
@@ -482,4 +572,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BeneficiariesScreen;
+export default InventoryScreen;

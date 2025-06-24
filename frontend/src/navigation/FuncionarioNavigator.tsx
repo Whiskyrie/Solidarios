@@ -2,12 +2,16 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { Platform } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import theme from "../theme";
-import DashboardScreen from "../screens/admin/DashboardScreen";
-import ItemsScreen from "../screens/admin/ItemsScreen";
-import ItemDetailScreen from "../screens/admin/ItemDetailScreen";
-import InventoryScreen from "../screens/admin/InventoryScreen";
+
+// Importar o DashboardScreen da pasta funcionario
+import DashboardScreen from "../screens/funcionario/DashboardScreen";
+import ItemsListScreen from "../screens/funcionario/ItemsListScreen";
+import ItemDetailScreen from "../screens/funcionario/ItemDetailScreen";
+import InventoryScreen from "../screens/funcionario/InventoryScreen";
 import InventoryDetailScreen from "../screens/admin/InventoryDetailScreen";
 import DistributionsScreen from "../screens/admin/DistributionsScreen";
 import DistributionDetailScreen from "../screens/admin/DistributionDetailScreen";
@@ -18,27 +22,36 @@ import BeneficiaryDetailScreen from "../screens/funcionario/BeneficiaryDetailScr
 
 // Implementação real dos ícones usando react-native-vector-icons
 const DashboardIcon = ({ color }: { color: string }) => (
-  <Icon name="speedometer" size={24} color={color} />
+  <Icon name="grid-outline" size={24} color={color} />
 );
 const ItemsIcon = ({ color }: { color: string }) => (
-  <Icon name="list" size={24} color={color} />
+  <Icon name="cube-outline" size={24} color={color} />
 );
 const InventoryIcon = ({ color }: { color: string }) => (
-  <Icon name="cube" size={24} color={color} />
+  <Icon name="library-outline" size={24} color={color} />
 );
 const DistributionsIcon = ({ color }: { color: string }) => (
-  <Icon name="car" size={24} color={color} />
+  <Icon name="car-outline" size={24} color={color} />
 );
 const BeneficiariesIcon = ({ color }: { color: string }) => (
-  <Icon name="people" size={24} color={color} />
+  <Icon name="people-outline" size={24} color={color} />
 );
 
-// Stack Navigators para cada tab
+// Definição dos tipos de navegação
+import {
+  FuncionarioTabParamList,
+  FuncionarioItemsStackParamList,
+  FuncionarioInventoryStackParamList,
+  FuncionarioDistributionsStackParamList,
+  FuncionarioBeneficiariesStackParamList,
+} from "./types";
+
+// Stack Navigators para cada aba
 const DashboardStack = createNativeStackNavigator();
-const ItemsStack = createNativeStackNavigator();
-const InventoryStack = createNativeStackNavigator();
-const DistributionsStack = createNativeStackNavigator();
-const BeneficiariesStack = createNativeStackNavigator();
+const ItemsStack = createNativeStackNavigator<FuncionarioItemsStackParamList>();
+const InventoryStack = createNativeStackNavigator<FuncionarioInventoryStackParamList>();
+const DistributionsStack = createNativeStackNavigator<FuncionarioDistributionsStackParamList>();
+const BeneficiariesStack = createNativeStackNavigator<FuncionarioBeneficiariesStackParamList>();
 
 // Stack Navigator para Dashboard
 const DashboardNavigator = () => {
@@ -53,7 +66,7 @@ const DashboardNavigator = () => {
 const ItemsNavigator = () => {
   return (
     <ItemsStack.Navigator screenOptions={{ headerShown: false }}>
-      <ItemsStack.Screen name="ItemsList" component={ItemsScreen} />
+      <ItemsStack.Screen name="ItemsList" component={ItemsListScreen} />
       <ItemsStack.Screen name="ItemDetail" component={ItemDetailScreen} />
       <ItemsStack.Screen name="CreateItem" component={CreateItemScreen} />
     </ItemsStack.Navigator>
@@ -110,19 +123,42 @@ const BeneficiariesNavigator = () => {
 };
 
 // Tab Navigator principal
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<FuncionarioTabParamList>();
 
 const FuncionarioNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary.secondary,
-        tabBarInactiveTintColor: theme.colors.neutral.darkGray,
+        tabBarInactiveTintColor: theme.colors.neutral.mediumGray,
         tabBarStyle: {
           backgroundColor: theme.colors.neutral.white,
           borderTopWidth: 1,
-          borderTopColor: theme.colors.neutral.mediumGray,
+          borderTopColor: theme.colors.neutral.lightGray,
+          // CORREÇÃO: Usar altura padrão sem adicionar insets extras
+          height: Platform.OS === "ios" ? 80 : 60,
+          // CORREÇÃO: PaddingBottom simples seguindo padrão das outras telas
+          paddingBottom: Platform.OS === "ios" ? insets.bottom : 8,
+          paddingTop: 8,
+          // Adicionar sombra para melhor definição
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "500",
+          // CORREÇÃO: Margem inferior adequada
+          marginBottom: Platform.OS === "ios" ? 0 : 4,
+        },
+        tabBarItemStyle: {
+          // CORREÇÃO: Padding vertical menor para evitar espaçamento excessivo
+          paddingVertical: 2,
         },
       }}
     >
@@ -147,7 +183,7 @@ const FuncionarioNavigator: React.FC = () => {
         component={InventoryNavigator}
         options={{
           tabBarIcon: ({ color }) => <InventoryIcon color={color} />,
-          tabBarLabel: "Estoque",
+          tabBarLabel: "Inventário",
         }}
       />
       <Tab.Screen
