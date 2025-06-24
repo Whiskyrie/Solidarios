@@ -5,6 +5,7 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -21,8 +22,10 @@ import {
   Typography,
   Badge,
   Card,
+  Button,
 } from "../../components/barrelComponents";
 import theme from "../../theme";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 // Hooks
 import { useUsers } from "../../hooks/useUsers";
@@ -30,18 +33,36 @@ import { useUsers } from "../../hooks/useUsers";
 // Tipos e rotas
 import { User, UserRole } from "../../types/users.types";
 import { ADMIN_ROUTES } from "../../navigation/routes";
+import { useAuth } from "../../hooks/useAuth";
 
 const UsersScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<AdminUsersStackParamList>>();
   const { users, isLoading, error, fetchUsers, pagination, clearError } =
     useUsers();
+  const { logout } = useAuth();
 
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+
+  // Função de logout
+  const handleLogout = () => {
+    Alert.alert(
+      "Sair da conta",
+      "Tem certeza que deseja sair da sua conta?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: () => logout(),
+        },
+      ]
+    );
+  };
 
   // Carregar usuários
   const loadUsers = useCallback(
@@ -240,6 +261,24 @@ const UsersScreen: React.FC = () => {
               }
             />
           }
+          ListFooterComponent={
+            /* Botão de logout no final da lista */
+            <View style={styles.logoutContainer}>
+              <Button
+                title="Sair da conta"
+                onPress={handleLogout}
+                variant="secondary"
+                style={styles.logoutButton}
+                leftIcon={
+                  <MaterialIcons
+                    name="logout"
+                    size={20}
+                    color={theme.colors.status.error}
+                  />
+                }
+              />
+            </View>
+          }
         />
 
         {/* Botão flutuante para novo usuário */}
@@ -254,8 +293,10 @@ const UsersScreen: React.FC = () => {
             + Novo Usuário
           </Typography>
         </TouchableOpacity>
+
       </View>
     </View>
+    
   );
 };
 
@@ -285,7 +326,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: theme.spacing.xl + 60, // Espaço extra para o botão flutuante
+    paddingBottom: theme.spacing.s, // Reduzido o padding inferior
   },
   addButton: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -315,6 +356,17 @@ const styles = StyleSheet.create({
   },
   roleBadge: {
     marginTop: theme.spacing.xxs,
+  },
+  logoutContainer: {
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.l,
+    marginTop: theme.spacing.m,
+    marginBottom: theme.spacing.xl, // Espaço para não sobrepor o botão flutuante
+  },
+  logoutButton: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderWidth: 1,
   },
 });
 
