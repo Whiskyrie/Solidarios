@@ -18,6 +18,7 @@ import {
   isTokenExpired,
 } from "../../utils/tokenManager";
 import { refreshTokens as refreshTokensUtil } from "../../utils/tokenUtils";
+import { extractUserFromApiResponse } from "../../utils/profileExtractor";
 
 const validateTokenPayload = (token: string): boolean => {
   if (!token) return false;
@@ -228,7 +229,19 @@ export const getProfile = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await AuthService.getProfile();
-      return response;
+
+      // ✅ EXTRAÇÃO: Extrair User limpo da resposta da API
+      const userData = extractUserFromApiResponse(response);
+
+      if (!userData) {
+        console.error(
+          "[authSlice] Falha ao extrair dados do usuário:",
+          response
+        );
+        return rejectWithValue("Dados do perfil inválidos");
+      }
+
+      return userData; // Retorna User limpo
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || "Erro ao obter perfil"
@@ -595,33 +608,22 @@ const authSlice = createSlice({
       })
 
       .addCase(getProfile.fulfilled, (state, action) => {
-        if (!action.payload) {
-          console.error("[authSlice] Perfil vazio recebido");
+        const userData = action.payload; // Já é User limpo
+
+        if (!userData || !userData.id) {
+          console.error("[authSlice] Dados do usuário inválidos:", userData);
           state.isLoading = false;
           state.error = "Dados do perfil inválidos";
           return;
         }
 
-        if (!action.payload.id) {
-          console.error("[authSlice] Perfil sem ID válido:", action.payload);
-          state.isLoading = false;
-          state.error = "Perfil sem ID válido";
-          return;
-        }
-
+        // Validação de consistência com token (opcional)
         if (state.accessToken) {
           try {
             const tokenPayload = JSON.parse(
               atob(state.accessToken.split(".")[1])
             );
-            if (tokenPayload.sub !== action.payload.id) {
-              console.error(
-                "[authSlice] Inconsistência entre token e perfil:",
-                {
-                  tokenSub: tokenPayload.sub,
-                  profileId: action.payload.id,
-                }
-              );
+            if (tokenPayload.sub !== userData.id) {
               clearAuthenticationState(
                 state,
                 "Inconsistência entre token e perfil"
@@ -629,21 +631,14 @@ const authSlice = createSlice({
               return;
             }
           } catch (error) {
-            console.error(
-              "[authSlice] Erro ao validar consistência token/perfil:",
-              error
-            );
+            console.error("[authSlice] Erro ao validar token:", error);
           }
         }
 
-        state.user = action.payload;
+        // ✅ SUCCESS: Dados já estão limpos
+        state.user = userData;
         state.isLoading = false;
         state.error = null;
-
-        console.log("[authSlice] Perfil validado e carregado:", {
-          userId: action.payload.id,
-          email: action.payload.email,
-        });
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false;
