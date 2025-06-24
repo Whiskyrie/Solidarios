@@ -38,7 +38,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   style,
   required = false,
   maxFiles = 5,
-  accept = "images",
   multiple = true,
 }) => {
   const [uploading, setUploading] = useState(false);
@@ -72,10 +71,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes:
-          accept === "images"
-            ? ImagePicker.MediaTypeOptions.Images
-            : ImagePicker.MediaTypeOptions.All,
+        mediaTypes: "images",
         allowsEditing: false,
         allowsMultipleSelection: multiple,
         quality: 0.8,
@@ -123,7 +119,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: "images",
         allowsEditing: false,
         quality: 0.8,
       });

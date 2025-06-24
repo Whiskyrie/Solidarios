@@ -30,7 +30,6 @@ import {
   Typography,
   TextField,
   Select,
-  Button,
   CategoryPicker,
   NotificationBanner,
 } from "../../components/barrelComponents";
@@ -46,21 +45,16 @@ import { CreateItemDto, ItemType } from "../../types/items.types";
 import { DOADOR_ROUTES } from "../../navigation/routes";
 import { DoadorNewDonationStackParamList } from "../../navigation/types";
 
-// Definindo interface para valores do formulário
+// Interfaces
 interface DonationFormValues {
   type: ItemType;
   description: string;
   conservationState: string;
   size: string;
   categoryId: string;
-  photos: Array<{
-    uri: string;
-    name: string;
-    type: string;
-  }>;
+  photos: Photo[];
 }
 
-// Interface para notificação
 interface NotificationState {
   visible: boolean;
   type: "success" | "error";
@@ -68,32 +62,45 @@ interface NotificationState {
   description?: string;
 }
 
-// Validação do formulário
-const DonationSchema = Yup.object().shape({
-  type: Yup.string()
-    .oneOf(Object.values(ItemType), "Tipo de item inválido")
-    .required("Tipo de item é obrigatório"),
-  description: Yup.string()
-    .min(3, "Descrição deve ter pelo menos 3 caracteres")
-    .max(100, "Descrição deve ter no máximo 100 caracteres")
-    .required("Descrição é obrigatória"),
-  conservationState: Yup.string()
-    .min(3, "Estado de conservação deve ter pelo menos 3 caracteres")
-    .max(50, "Estado de conservação deve ter no máximo 50 caracteres"),
-  size: Yup.string().max(20, "Tamanho deve ter no máximo 20 caracteres"),
-  categoryId: Yup.string().uuid("ID de categoria inválido"),
-  photos: Yup.array()
-    .of(
-      Yup.object().shape({
-        uri: Yup.string().required(),
-        name: Yup.string().required(),
-        type: Yup.string().required(),
-      })
-    )
-    .max(5, "Máximo de 5 fotos permitidas"),
-});
+interface Photo {
+  uri: string;
+  name: string;
+  type: string;
+}
 
-// Opções de tipo de item com ícones
+// Constantes
+const MAX_PHOTOS = 5;
+const MIN_DESCRIPTION_LENGTH = 3;
+const MAX_DESCRIPTION_LENGTH = 100;
+
+// Schema de validação corrigido - removendo validação restritiva das fotos
+const DonationSchema = Yup.object()
+  .shape({
+    type: Yup.string()
+      .oneOf(Object.values(ItemType), "Tipo de item inválido")
+      .required("Tipo de item é obrigatório"),
+    description: Yup.string()
+      .min(
+        MIN_DESCRIPTION_LENGTH,
+        `Descrição deve ter pelo menos ${MIN_DESCRIPTION_LENGTH} caracteres`
+      )
+      .max(
+        MAX_DESCRIPTION_LENGTH,
+        `Descrição deve ter no máximo ${MAX_DESCRIPTION_LENGTH} caracteres`
+      )
+      .required("Descrição é obrigatória"),
+    // Tornar campos opcionais menos restritivos
+    conservationState: Yup.string().optional(),
+    size: Yup.string().optional(),
+    categoryId: Yup.string().optional(),
+    // Remover validação de fotos do schema, validar manualmente
+  })
+  .test("photos-validation", "Pelo menos uma foto é recomendada", function () {
+    // Esta validação é opcional - apenas avisa sobre fotos
+    return true; // Sempre retorna true para não bloquear o envio
+  });
+
+// Opções de configuração
 const TYPE_OPTIONS = [
   { label: "Roupa", value: ItemType.ROUPA, icon: "checkroom" },
   { label: "Calçado", value: ItemType.CALCADO, icon: "sports-tennis" },
@@ -101,7 +108,6 @@ const TYPE_OPTIONS = [
   { label: "Outro", value: ItemType.OUTRO, icon: "category" },
 ];
 
-// Opções de estado de conservação com ícones
 const CONSERVATION_STATE_OPTIONS = [
   { label: "Novo", value: "Novo", icon: "new-releases" },
   { label: "Seminovo", value: "Seminovo", icon: "star-half" },
@@ -117,20 +123,14 @@ const CONSERVATION_STATE_OPTIONS = [
   },
 ];
 
-// Interface para notificação
-interface NotificationState {
-  visible: boolean;
-  type: "success" | "error";
-  message: string;
-  description?: string;
-}
-
-// Interface para foto
-interface Photo {
-  uri: string;
-  name: string;
-  type: string;
-}
+// Configuração do ImagePicker corrigida
+const IMAGE_PICKER_CONFIG: ImagePicker.ImagePickerOptions = {
+  mediaTypes: "images",
+  allowsEditing: true,
+  aspect: [4, 3] as [number, number],
+  quality: 0.8,
+  allowsMultipleSelection: false,
+};
 
 const NewDonationScreen: React.FC = () => {
   const navigation =
@@ -150,12 +150,41 @@ const NewDonationScreen: React.FC = () => {
     message: "",
   });
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [hasGalleryPermission, setHasGalleryPermission] = useState<
+    boolean | null
+  >(null);
 
   // Refs para animações e Formik
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const formikRef = useRef<FormikProps<any>>(null);
+  const formikRef = useRef<FormikProps<DonationFormValues>>(null);
+
+  // Verificar e solicitar permissões
+  useEffect(() => {
+    checkGalleryPermissions();
+  }, []);
+
+  const checkGalleryPermissions = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      setHasGalleryPermission(status === "granted");
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissão necessária",
+          "Precisamos de acesso à sua galeria para adicionar fotos às doações.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Solicitar novamente", onPress: checkGalleryPermissions },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao verificar permissões:", error);
+      setHasGalleryPermission(false);
+    }
+  };
 
   // Animação de entrada
   useEffect(() => {
@@ -171,7 +200,7 @@ const NewDonationScreen: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   // Funções de notificação
   const showNotification = useCallback(
@@ -192,49 +221,117 @@ const NewDonationScreen: React.FC = () => {
     }
   }, [fetchCategories, categories]);
 
-  // Função para escolher foto
-  const pickImage = async () => {
-    if (photos.length >= 5) {
-      Alert.alert("Limite atingido", "Você pode adicionar no máximo 5 fotos.");
+  // Função para escolher foto - CORRIGIDA
+  const pickImage = useCallback(async () => {
+    if (photos.length >= MAX_PHOTOS) {
+      Alert.alert(
+        "Limite atingido",
+        `Você pode adicionar no máximo ${MAX_PHOTOS} fotos.`
+      );
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const newPhoto: Photo = {
-        uri: result.assets[0].uri,
-        name: `photo_${Date.now()}.jpg`,
-        type: "image/jpeg",
-      };
-      setPhotos((prev) => [...prev, newPhoto]);
+    if (hasGalleryPermission === false) {
+      Alert.alert(
+        "Permissão necessária",
+        "Acesso à galeria não foi concedido. Deseja tentar novamente?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Tentar novamente", onPress: checkGalleryPermissions },
+        ]
+      );
+      return;
     }
-  };
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync(
+        IMAGE_PICKER_CONFIG
+      );
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        const newPhoto: Photo = {
+          uri: asset.uri,
+          name: `photo_${Date.now()}.jpg`,
+          type: "image/jpeg",
+        };
+
+        setPhotos((prevPhotos) => [...prevPhotos, newPhoto]);
+
+        // Feedback visual para o usuário
+        showNotification({
+          visible: true,
+          type: "success",
+          message: "Foto adicionada com sucesso!",
+        });
+
+        // Auto-hide notification
+        setTimeout(hideNotification, 2000);
+      }
+    } catch (error) {
+      console.error("Erro ao selecionar imagem:", error);
+      showNotification({
+        visible: true,
+        type: "error",
+        message: "Erro ao selecionar foto",
+        description: "Tente novamente ou escolha outra imagem.",
+      });
+    }
+  }, [photos.length, hasGalleryPermission, showNotification, hideNotification]);
 
   // Função para remover foto
-  const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
-  };
+  const removePhoto = useCallback(
+    (index: number) => {
+      setPhotos((prevPhotos) => prevPhotos.filter((_, i) => i !== index));
+      showNotification({
+        visible: true,
+        type: "success",
+        message: "Foto removida",
+      });
+      setTimeout(hideNotification, 1500);
+    },
+    [showNotification, hideNotification]
+  );
 
   // Calcular progresso do formulário
-  const calculateProgress = (values: any) => {
-    const fields = ["type", "description", "conservationState", "size"];
-    const filledFields = fields.filter(
-      (field) => values[field] && values[field].trim()
-    );
-    const progress =
-      (filledFields.length + (photos.length > 0 ? 1 : 0)) / (fields.length + 1);
-    return progress;
-  };
+  const calculateProgress = useCallback(
+    (values: DonationFormValues) => {
+      const requiredFields = ["type", "description"];
+      const optionalFields = ["conservationState", "size", "categoryId"];
 
-  // Função de submit
+      const filledRequiredFields = requiredFields.filter(
+        (field) =>
+          values[field as keyof DonationFormValues] &&
+          String(values[field as keyof DonationFormValues]).trim()
+      );
+
+      const filledOptionalFields = optionalFields.filter(
+        (field) =>
+          values[field as keyof DonationFormValues] &&
+          String(values[field as keyof DonationFormValues]).trim()
+      );
+
+      const hasPhotos = photos.length > 0;
+
+      // Peso para campos obrigatórios (60%), opcionais (30%) e fotos (10%)
+      const requiredProgress =
+        (filledRequiredFields.length / requiredFields.length) * 0.6;
+      const optionalProgress =
+        (filledOptionalFields.length / optionalFields.length) * 0.3;
+      const photoProgress = hasPhotos ? 0.1 : 0;
+
+      return Math.min(requiredProgress + optionalProgress + photoProgress, 1);
+    },
+    [photos.length]
+  );
+
+  // Função de submit - CORRIGIDA
   const handleSubmit = useCallback(
-    async (values: any) => {
+    async (values: DonationFormValues) => {
+      console.log("🚀 HandleSubmit iniciado");
+      console.log("📝 Valores:", values);
+      console.log("📷 Fotos do state:", photos);
+
       if (!user) {
         showNotification({
           visible: true,
@@ -246,7 +343,18 @@ const NewDonationScreen: React.FC = () => {
       }
 
       try {
-        const itemData = { ...values, donorId: user.id, photos: photos };
+        const itemData: CreateItemDto = {
+          type: values.type,
+          description: values.description.trim(),
+          conservationState: values.conservationState?.trim() || "",
+          size: values.size?.trim() || "",
+          categoryId: values.categoryId || undefined,
+          donorId: user.id,
+          photos: photos.map((photo) => photo.uri), // Usar fotos do state, não do values
+        };
+
+        console.log("📤 Dados para API:", itemData);
+
         const newItem = await createItem(itemData);
 
         if (newItem) {
@@ -254,39 +362,40 @@ const NewDonationScreen: React.FC = () => {
             visible: true,
             type: "success",
             message: "Doação cadastrada com sucesso!",
-            description: "Obrigado pela sua contribuição.",
+            description:
+              "Sua doação foi registrada e estará disponível para interessados.",
           });
 
+          // Reset
+          setPhotos([]);
+
           setTimeout(() => {
-            hideNotification();
-            const rootNavigation = navigation.getParent();
-            if (rootNavigation) {
-              rootNavigation.navigate("MyDonations");
-            }
+            navigation.goBack();
           }, 2000);
         }
-      } catch (err) {
-        console.error("Erro ao criar item:", err);
+      } catch (err: any) {
+        console.error("❌ Erro:", err);
         showNotification({
           visible: true,
           type: "error",
-          message: "Erro ao criar doação",
+          message: "Erro ao cadastrar doação",
           description:
-            "Não foi possível cadastrar sua doação. Tente novamente.",
+            err.response?.data?.message || err.message || "Tente novamente.",
         });
       }
     },
-    [user, createItem, navigation, showNotification, hideNotification, photos]
+    [user, createItem, navigation, showNotification, photos] // Incluir photos nas dependências
   );
 
   // Valores iniciais
   const initialValues = useMemo(
-    () => ({
+    (): DonationFormValues => ({
       type: ItemType.ROUPA,
       description: "",
       conservationState: "",
       size: "",
       categoryId: "",
+      photos: [],
     }),
     []
   );
@@ -354,8 +463,8 @@ const NewDonationScreen: React.FC = () => {
     [navigation, items?.length]
   );
 
-  // Componente de Upload de Fotos com FlatList
-  const PhotoUploadSection = ({ photos, onPickImage, onRemovePhoto }: any) => {
+  // Componente de Upload de Fotos - CORRIGIDO
+  const PhotoUploadSection = useCallback(() => {
     const photoData = [
       { type: "add-button", id: "add-button" },
       ...photos.map((photo: Photo, index: number) => ({
@@ -370,21 +479,35 @@ const NewDonationScreen: React.FC = () => {
       if (item.type === "add-button") {
         return (
           <TouchableOpacity
-            style={styles.addPhotoButton}
-            onPress={onPickImage}
+            style={[
+              styles.addPhotoButton,
+              photos.length >= MAX_PHOTOS && styles.disabledButton,
+            ]}
+            onPress={pickImage}
             activeOpacity={0.7}
+            disabled={photos.length >= MAX_PHOTOS}
           >
             <MaterialIcons
               name="add-a-photo"
               size={32}
-              color={theme.colors.primary.secondary}
+              color={
+                photos.length >= MAX_PHOTOS
+                  ? theme.colors.neutral.darkGray
+                  : theme.colors.primary.secondary
+              }
             />
             <Typography
               variant="caption"
-              color={theme.colors.primary.secondary}
+              color={
+                photos.length >= MAX_PHOTOS
+                  ? theme.colors.neutral.darkGray
+                  : theme.colors.primary.secondary
+              }
               style={styles.addPhotoText}
             >
-              Adicionar Foto
+              {photos.length >= MAX_PHOTOS
+                ? "Limite atingido"
+                : "Adicionar Foto"}
             </Typography>
           </TouchableOpacity>
         );
@@ -392,10 +515,14 @@ const NewDonationScreen: React.FC = () => {
 
       return (
         <View style={styles.photoContainer}>
-          <Image source={{ uri: item.photo.uri }} style={styles.photoPreview} />
+          <Image
+            source={{ uri: item.photo.uri }}
+            style={styles.photoPreview}
+            resizeMode="cover"
+          />
           <TouchableOpacity
             style={styles.removePhotoButton}
-            onPress={() => onRemovePhoto(item.index)}
+            onPress={() => removePhoto(item.index)}
             activeOpacity={0.7}
           >
             <MaterialIcons name="close" size={16} color="white" />
@@ -410,7 +537,8 @@ const NewDonationScreen: React.FC = () => {
           Fotos do Item
         </Typography>
         <Typography variant="bodySecondary" style={styles.sectionSubtitle}>
-          Adicione até 5 fotos para mostrar melhor o item
+          Adicione até {MAX_PHOTOS} fotos para mostrar melhor o item (
+          {photos.length}/{MAX_PHOTOS})
         </Typography>
         <FlatList
           data={photoData}
@@ -422,35 +550,38 @@ const NewDonationScreen: React.FC = () => {
         />
       </View>
     );
-  };
+  }, [photos, pickImage, removePhoto]);
 
   // Componente de Progresso
-  const ProgressIndicator = ({ progress }: { progress: number }) => (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressInfo}>
-        <Typography
-          variant="bodySecondary"
-          color={theme.colors.neutral.darkGray}
-        >
-          Progresso do formulário
-        </Typography>
-        <Typography
-          variant="bodySecondary"
-          color={theme.colors.primary.secondary}
-        >
-          {Math.round(progress * 100)}%
-        </Typography>
+  const ProgressIndicator = useCallback(
+    ({ progress }: { progress: number }) => (
+      <View style={styles.progressContainer}>
+        <View style={styles.progressInfo}>
+          <Typography
+            variant="bodySecondary"
+            color={theme.colors.neutral.darkGray}
+          >
+            Progresso do formulário
+          </Typography>
+          <Typography
+            variant="bodySecondary"
+            color={theme.colors.primary.secondary}
+          >
+            {Math.round(progress * 100)}%
+          </Typography>
+        </View>
+        <View style={styles.progressBar}>
+          <Animated.View
+            style={[styles.progressFill, { width: `${progress * 100}%` }]}
+          />
+        </View>
       </View>
-      <View style={styles.progressBar}>
-        <Animated.View
-          style={[styles.progressFill, { width: `${progress * 100}%` }]}
-        />
-      </View>
-    </View>
+    ),
+    []
   );
+
   // Estrutura de seções do formulário
   const formSections = [
-    { id: "progress", type: "card", icon: "info", title: "Progresso" },
     {
       id: "basic-info",
       type: "card",
@@ -467,178 +598,183 @@ const NewDonationScreen: React.FC = () => {
   ];
 
   // Função para renderizar seções do formulário
-  const renderFormSection = ({ item, formikProps }: any) => {
-    const { values, errors, touched, handleChange, handleBlur, setFieldValue } =
-      formikProps;
+  const renderFormSection = useCallback(
+    ({ item, formikProps }: any) => {
+      const {
+        values,
+        errors,
+        touched,
+        handleChange,
+        handleBlur,
+        setFieldValue,
+      } = formikProps;
 
-    if (item.type === "progress") {
-      return <ProgressIndicator progress={calculateProgress(values)} />;
-    }
-
-    if (item.id === "basic-info") {
-      return (
-        <View style={styles.formCard}>
-          <View style={styles.cardHeader}>
-            <MaterialIcons
-              name={item.icon}
-              size={24}
-              color={theme.colors.primary.secondary}
-            />
-            <Typography variant="h4" style={styles.cardTitle}>
-              {item.title}
-            </Typography>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+      if (item.id === "basic-info") {
+        return (
+          <View style={styles.formCard}>
+            <View style={styles.cardHeader}>
               <MaterialIcons
-                name="category"
-                size={16}
-                color={theme.colors.neutral.darkGray}
-              />{" "}
-              Tipo de Item{" "}
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.status.error}
-              >
-                *
+                name={item.icon}
+                size={24}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography variant="h4" style={styles.cardTitle}>
+                {item.title}
               </Typography>
-            </Typography>
-            <Select
-              options={TYPE_OPTIONS.map((option) => ({
-                label: option.label,
-                value: option.value,
-              }))}
-              selectedValue={values.type}
-              onSelect={(value) => setFieldValue("type", value)}
-              error={touched.type && errors.type ? errors.type : undefined}
-              selectStyle={styles.selectField}
-            />
-          </View>
-          <View style={styles.fieldContainer}>
-            <Typography variant="bodySecondary" style={styles.fieldLabel}>
-              <MaterialIcons
-                name="description"
-                size={16}
-                color={theme.colors.neutral.darkGray}
-              />{" "}
-              Descrição{" "}
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.status.error}
-              >
-                *
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Typography variant="bodySecondary" style={styles.fieldLabel}>
+                <MaterialIcons
+                  name="category"
+                  size={16}
+                  color={theme.colors.neutral.darkGray}
+                />{" "}
+                Tipo de Item{" "}
+                <Typography
+                  variant="bodySecondary"
+                  color={theme.colors.status.error}
+                >
+                  *
+                </Typography>
               </Typography>
-            </Typography>
-            <TextField
-              value={values.description}
-              onChangeText={handleChange("description")}
-              onBlur={handleBlur("description")}
-              error={
-                touched.description && errors.description
-                  ? errors.description
-                  : undefined
-              }
-              placeholder="Descreva o item que está doando"
-              multiline
-              numberOfLines={3}
-              inputContainerStyle={styles.selectField}
-              textAlignVertical="top"
-            />
+              <Select
+                options={TYPE_OPTIONS.map((option) => ({
+                  label: option.label,
+                  value: option.value,
+                }))}
+                selectedValue={values.type}
+                onSelect={(value) => setFieldValue("type", value)}
+                error={touched.type && errors.type ? errors.type : undefined}
+                selectStyle={styles.selectField}
+              />
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Typography variant="bodySecondary" style={styles.fieldLabel}>
+                <MaterialIcons
+                  name="description"
+                  size={16}
+                  color={theme.colors.neutral.darkGray}
+                />{" "}
+                Descrição{" "}
+                <Typography
+                  variant="bodySecondary"
+                  color={theme.colors.status.error}
+                >
+                  *
+                </Typography>
+              </Typography>
+              <TextField
+                value={values.description}
+                onChangeText={handleChange("description")}
+                onBlur={handleBlur("description")}
+                error={
+                  touched.description && errors.description
+                    ? errors.description
+                    : undefined
+                }
+                placeholder="Descreva o item que está doando"
+                multiline
+                numberOfLines={3}
+                inputContainerStyle={styles.selectField}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Typography variant="bodySecondary" style={styles.fieldLabel}>
+                <MaterialIcons
+                  name="grade"
+                  size={16}
+                  color={theme.colors.neutral.darkGray}
+                />{" "}
+                Estado de Conservação
+              </Typography>
+              <Select
+                options={CONSERVATION_STATE_OPTIONS.map((option) => ({
+                  label: option.label,
+                  value: option.value,
+                }))}
+                selectedValue={values.conservationState}
+                onSelect={(value) => setFieldValue("conservationState", value)}
+                error={
+                  touched.conservationState && errors.conservationState
+                    ? errors.conservationState
+                    : undefined
+                }
+                placeholder="Selecione o estado de conservação"
+                selectStyle={styles.selectField}
+              />
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <Typography variant="bodySecondary" style={styles.fieldLabel}>
+                <MaterialIcons
+                  name="straighten"
+                  size={16}
+                  color={theme.colors.neutral.darkGray}
+                />{" "}
+                Tamanho
+              </Typography>
+              <TextField
+                value={values.size}
+                onChangeText={handleChange("size")}
+                onBlur={handleBlur("size")}
+                error={touched.size && errors.size ? errors.size : undefined}
+                placeholder="Ex: PP, P, M, G, GG, 38, 40, etc."
+                inputContainerStyle={styles.selectField}
+              />
+            </View>
           </View>
-          <View style={styles.fieldContainer}>
-            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+        );
+      }
+
+      if (item.id === "category") {
+        return (
+          <View style={styles.formCard}>
+            <View style={styles.cardHeader}>
               <MaterialIcons
-                name="grade"
-                size={16}
-                color={theme.colors.neutral.darkGray}
-              />{" "}
-              Estado de Conservação
-            </Typography>
-            <Select
-              options={CONSERVATION_STATE_OPTIONS.map((option) => ({
-                label: option.label,
-                value: option.value,
-              }))}
-              selectedValue={values.conservationState}
-              onSelect={(value) => setFieldValue("conservationState", value)}
-              error={
-                touched.conservationState && errors.conservationState
-                  ? errors.conservationState
-                  : undefined
-              }
-              placeholder="Selecione o estado de conservação"
-              selectStyle={styles.selectField}
+                name={item.icon}
+                size={24}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography variant="h4" style={styles.cardTitle}>
+                {item.title}
+              </Typography>
+            </View>
+            <CategoryPicker
+              name="categoryId"
+              label=""
+              required={false}
+              multiple={false}
             />
           </View>
-          <View style={styles.fieldContainer}>
-            <Typography variant="bodySecondary" style={styles.fieldLabel}>
+        );
+      }
+
+      if (item.id === "photos") {
+        return (
+          <View style={styles.formCard}>
+            <View style={styles.cardHeader}>
               <MaterialIcons
-                name="straighten"
-                size={16}
-                color={theme.colors.neutral.darkGray}
-              />{" "}
-              Tamanho
-            </Typography>
-            <TextField
-              value={values.size}
-              onChangeText={handleChange("size")}
-              onBlur={handleBlur("size")}
-              error={touched.size && errors.size ? errors.size : undefined}
-              placeholder="Ex: PP, P, M, G, GG, 38, 40, etc."
-              inputContainerStyle={styles.selectField}
-            />
+                name={item.icon}
+                size={24}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography variant="h4" style={styles.cardTitle}>
+                {item.title}
+              </Typography>
+            </View>
+            <PhotoUploadSection />
           </View>
-        </View>
-      );
-    }
+        );
+      }
 
-    if (item.id === "category") {
-      return (
-        <View style={styles.formCard}>
-          <View style={styles.cardHeader}>
-            <MaterialIcons
-              name={item.icon}
-              size={24}
-              color={theme.colors.primary.secondary}
-            />
-            <Typography variant="h4" style={styles.cardTitle}>
-              {item.title}
-            </Typography>
-          </View>
-          <CategoryPicker
-            name="categoryId"
-            label=""
-            required={false}
-            multiple={false}
-          />
-        </View>
-      );
-    }
-
-    if (item.id === "photos") {
-      return (
-        <View style={styles.formCard}>
-          <View style={styles.cardHeader}>
-            <MaterialIcons
-              name={item.icon}
-              size={24}
-              color={theme.colors.primary.secondary}
-            />
-            <Typography variant="h4" style={styles.cardTitle}>
-              {item.title}
-            </Typography>
-          </View>
-          <PhotoUploadSection
-            photos={photos}
-            onPickImage={pickImage}
-            onRemovePhoto={removePhoto}
-          />
-        </View>
-      );
-    }
-
-    return null;
-  };
+      return null;
+    },
+    [PhotoUploadSection]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -647,6 +783,7 @@ const NewDonationScreen: React.FC = () => {
       keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
     >
       <Header />
+
       <NotificationBanner
         visible={notification.visible}
         type={notification.type}
@@ -654,6 +791,7 @@ const NewDonationScreen: React.FC = () => {
         description={notification.description}
         onClose={hideNotification}
       />
+
       <NotificationBanner
         visible={!!error}
         type="error"
@@ -661,6 +799,7 @@ const NewDonationScreen: React.FC = () => {
         description={error || "Ocorreu um erro. Tente novamente."}
         onClose={clearError}
       />
+
       <Animated.View
         style={[
           styles.content,
@@ -668,37 +807,56 @@ const NewDonationScreen: React.FC = () => {
         ]}
       >
         <Formik
-          ref={formikRef}
+          innerRef={formikRef} // Use innerRef ao invés de ref
           initialValues={initialValues}
           validationSchema={DonationSchema}
           onSubmit={handleSubmit}
+          validateOnChange={true}
+          validateOnBlur={true}
         >
-          {(formikProps) => (
-            <>
+          {({
+            values,
+            errors,
+            touched,
+            handleChange,
+            handleBlur,
+            setFieldValue,
+            isValid,
+            isSubmitting,
+            handleSubmit: formikHandleSubmit,
+          }) => (
+            <View style={styles.container}>
               <View style={styles.fixedProgressContainer}>
-                <ProgressIndicator
-                  progress={calculateProgress(formikProps.values)}
-                />
+                <ProgressIndicator progress={calculateProgress(values)} />
               </View>
+
               <FlatList
-                data={formSections.filter(
-                  (section) => section.type !== "progress"
-                )}
+                data={formSections}
                 renderItem={({ item }) =>
-                  renderFormSection({ item, formikProps })
+                  renderFormSection({
+                    item,
+                    formikProps: {
+                      values,
+                      errors,
+                      touched,
+                      handleChange,
+                      handleBlur,
+                      setFieldValue,
+                      isValid,
+                      isSubmitting,
+                    },
+                  })
                 }
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               />
+
               <View style={styles.bottomActions}>
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    style={[
-                      styles.cancelButton,
-                      { backgroundColor: theme.colors.neutral.lightGray },
-                    ]}
+                    style={styles.cancelButton}
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                   >
@@ -709,42 +867,43 @@ const NewDonationScreen: React.FC = () => {
                       Cancelar
                     </Typography>
                   </TouchableOpacity>
+
                   <TouchableOpacity
                     style={styles.submitButtonContainer}
-                    onPress={() => formikRef.current?.handleSubmit()}
+                    onPress={() => {
+                      console.log("🔘 Botão de submit clicado!");
+                      console.log("📝 Valores atuais:", values);
+                      console.log("❌ Erros:", errors);
+                      console.log("✅ IsValid:", isValid);
+                      console.log("📷 Fotos:", photos);
+
+                      // Verificar se há fotos (se necessário)
+                      if (photos.length === 0) {
+                        Alert.alert(
+                          "Atenção",
+                          "Você deseja continuar sem fotos? Adicionar fotos ajuda outros usuários a conhecer melhor o item.",
+                          [
+                            { text: "Adicionar fotos", style: "cancel" },
+                            {
+                              text: "Continuar sem fotos",
+                              onPress: () => formikHandleSubmit(),
+                            },
+                          ]
+                        );
+                      } else {
+                        formikHandleSubmit();
+                      }
+                    }}
                     activeOpacity={0.8}
+                    disabled={isLoading || !isValid}
                   >
-                    <LinearGradient
-                      colors={["#173F5F", "#006E58"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.submitButton}
-                    >
-                      {isLoading ? (
-                        <MaterialIcons
-                          name="hourglass-empty"
-                          size={20}
-                          color="white"
-                        />
-                      ) : (
-                        <MaterialIcons
-                          name="volunteer-activism"
-                          size={20}
-                          color="white"
-                        />
-                      )}
-                      <Typography
-                        variant="body"
-                        color={theme.colors.neutral.white}
-                        style={styles.submitButtonText}
-                      >
-                        {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
-                      </Typography>
-                    </LinearGradient>
+                    <Typography variant="button" color="white">
+                      {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
+                    </Typography>
                   </TouchableOpacity>
                 </View>
               </View>
-            </>
+            </View>
           )}
         </Formik>
       </Animated.View>
@@ -752,9 +911,12 @@ const NewDonationScreen: React.FC = () => {
   );
 };
 
-// Estilos
+// Estilos atualizados
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.neutral.lightGray },
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.neutral.lightGray,
+  },
   headerGradient: {
     paddingTop:
       Platform.OS === "ios" ? 45 : 25 + (StatusBar.currentHeight ?? 0),
@@ -780,9 +942,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.m,
     marginTop: 40,
   },
-  titleSection: { flex: 1 },
-  headerTitle: { fontWeight: "bold", fontSize: 24, marginBottom: 4 },
-  headerSubtitle: { fontSize: 14 },
+  titleSection: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontWeight: "bold",
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+  },
   donationCounter: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -793,8 +963,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
     minWidth: 80,
   },
-  counterNumber: { fontWeight: "bold", fontSize: 18, marginVertical: 2 },
-  content: { flex: 1 },
+  counterNumber: {
+    fontWeight: "bold",
+    fontSize: 18,
+    marginVertical: 2,
+  },
+  content: {
+    flex: 1,
+  },
   fixedProgressContainer: {
     backgroundColor: theme.colors.neutral.white,
     paddingHorizontal: theme.spacing.m,
@@ -822,30 +998,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: theme.spacing.m,
   },
-  cardTitle: { marginLeft: theme.spacing.s, fontWeight: "600" },
-  fieldContainer: { marginBottom: theme.spacing.m },
+  cardTitle: {
+    marginLeft: theme.spacing.s,
+    fontWeight: "600",
+  },
+  fieldContainer: {
+    marginBottom: theme.spacing.m,
+  },
   fieldLabel: {
     marginBottom: theme.spacing.xs,
     fontWeight: "500",
     flexDirection: "row",
     alignItems: "center",
-  },
-  textField: {
-    backgroundColor: theme.colors.neutral.lightGray,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral.mediumGray,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-  },
-  textAreaField: {
-    backgroundColor: theme.colors.neutral.lightGray,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.neutral.mediumGray,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    textAlignVertical: "top",
   },
   selectField: {
     backgroundColor: theme.colors.neutral.lightGray,
@@ -853,13 +1017,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
   },
-  photoSection: { marginTop: theme.spacing.s },
-  sectionTitle: { marginBottom: theme.spacing.xs, fontWeight: "600" },
+  photoSection: {
+    marginTop: theme.spacing.s,
+  },
+  sectionTitle: {
+    marginBottom: theme.spacing.xs,
+    fontWeight: "600",
+  },
   sectionSubtitle: {
     marginBottom: theme.spacing.m,
     color: theme.colors.neutral.darkGray,
   },
-  photoListContent: { paddingHorizontal: theme.spacing.xs },
+  photoListContent: {
+    paddingHorizontal: theme.spacing.xs,
+  },
   addPhotoButton: {
     width: 100,
     height: 100,
@@ -871,12 +1042,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   addPhotoText: {
     marginTop: theme.spacing.xs,
     textAlign: "center",
     fontSize: 12,
   },
-  photoContainer: { position: "relative", marginLeft: theme.spacing.s },
+  photoContainer: {
+    position: "relative",
+    marginLeft: theme.spacing.s,
+  },
   photoPreview: {
     width: 100,
     height: 100,
@@ -896,7 +1073,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginBottom: theme.spacing.m,
-    width: "94%", // Ajustado para manter largura similar ao header
+    width: "94%",
     alignSelf: "center",
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
@@ -907,7 +1084,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   progressBar: {
-    height: 3, // Altura reduzida
+    height: 3,
     backgroundColor: theme.colors.neutral.mediumGray,
     borderRadius: 2,
     overflow: "hidden",
@@ -946,13 +1123,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.neutral.mediumGray,
     backgroundColor: theme.colors.neutral.lightGray,
-    ...theme.shadows.small, // Adicionando sombra
+    ...theme.shadows.small,
   },
   submitButtonContainer: {
     flex: 2,
     borderRadius: 12,
     overflow: "hidden",
-    ...theme.shadows.small, // Adicionando sombra
+    ...theme.shadows.small,
   },
   submitButton: {
     flexDirection: "row",
@@ -961,7 +1138,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: theme.spacing.xs,
   },
-  submitButtonText: { fontWeight: "600" },
+  submitButtonText: {
+    fontWeight: "600",
+  },
 });
 
 export default NewDonationScreen;
