@@ -36,11 +36,12 @@ import theme from "../../theme";
 // Hooks
 import { useAuth } from "../../hooks/useAuth";
 import { useDistributions } from "../../hooks/useDistributions";
+import { useCategories } from "../../hooks/useCategories";
 
 // Tipos e rotas
 import { Distribution } from "../../types/distributions.types";
 import { BENEFICIARIO_ROUTES } from "../../navigation/routes";
-import { ItemStatus } from "../../types/items.types";
+import { ItemStatus, ItemType } from "../../types/items.types";
 
 // Filtros de status dos recebimentos
 const STATUS_FILTERS = [
@@ -48,6 +49,15 @@ const STATUS_FILTERS = [
   { label: "Recentes", value: "recent", icon: "schedule" },
   { label: "Pendentes", value: "pending", icon: "hourglass-empty" },
   { label: "Recebidos", value: "completed", icon: "check-circle" },
+];
+
+// Filtros de tipo de item
+const TYPE_FILTERS = [
+  { label: "Todos os tipos", value: "all", icon: "category" },
+  { label: "Roupas", value: ItemType.ROUPA, icon: "checkroom" },
+  { label: "Calçados", value: ItemType.CALCADO, icon: "directions_walk" },
+  { label: "Utensílios", value: ItemType.UTENSILIO, icon: "kitchen" },
+  { label: "Outros", value: "outros", icon: "more_horiz" },
 ];
 
 const MyReceiptsScreen: React.FC = () => {
@@ -62,11 +72,13 @@ const MyReceiptsScreen: React.FC = () => {
     pagination,
     clearError,
   } = useDistributions();
+  const { categories } = useCategories();
 
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [filteredDistributions, setFilteredDistributions] = useState<Distribution[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -113,85 +125,7 @@ const MyReceiptsScreen: React.FC = () => {
     return result;
   }, [distributions, validateDistributionsArray]);
 
-  const filteredDistributions = useMemo(() => {
-    console.log("[MyReceiptsScreen] Aplicando filtros...");
-
-    let result = [...validatedDistributions];
-
-    // Aplicar filtro de status
-    if (activeFilter !== "all") {
-      const now = new Date();
-      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      switch (activeFilter) {
-        case "recent":
-          result = result.filter((distribution) => {
-            const distDate = new Date(distribution.date);
-            return distDate >= lastWeek;
-          });
-          break;
-        case "pending":
-          result = result.filter((distribution) => {
-            const distDate = new Date(distribution.date);
-            return (
-              distDate >= lastMonth &&
-              !distribution.observations?.includes("concluído")
-            );
-          });
-          break;
-        case "completed":
-          result = result.filter((distribution) => {
-            return (
-              distribution.observations?.includes("concluído") ||
-              distribution.items?.some(
-                (item) => item.status === ItemStatus.DISTRIBUIDO
-              )
-            );
-          });
-          break;
-      }
-    }
-
-    // Aplicar busca
-    if (searchQuery && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-
-      try {
-        result = result.filter((distribution) => {
-          if (!distribution || typeof distribution !== "object") {
-            return false;
-          }
-
-          const hasMatchingItems =
-            distribution.items && Array.isArray(distribution.items)
-              ? distribution.items.some((item: any) =>
-                  item?.description?.toLowerCase().includes(query)
-                )
-              : false;
-
-          const hasMatchingObservations =
-            distribution.observations?.toLowerCase().includes(query) || false;
-
-          const hasMatchingId =
-            distribution.id?.toLowerCase().includes(query) || false;
-
-          return hasMatchingItems || hasMatchingObservations || hasMatchingId;
-        });
-      } catch (error) {
-        console.error("[MyReceiptsScreen] Erro durante filtragem:", error);
-        return [];
-      }
-    }
-
-    console.log(
-      "[MyReceiptsScreen] Filtragem concluída:",
-      result.length,
-      "itens"
-    );
-    return result;
-  }, [validatedDistributions, searchQuery, activeFilter]);
-
+  // Carregar recebimentos do usuário
   const loadReceipts = useCallback(
     async (page = 1) => {
       if (user?.id) {
@@ -234,20 +168,91 @@ const MyReceiptsScreen: React.FC = () => {
     }, [loadReceipts, fadeAnim, slideAnim])
   );
 
-  const handleRefresh = useCallback(async () => {
-    console.log("[MyReceiptsScreen] Executando refresh");
+  // Filtragem de recebimentos - COPIADO DO MyDonationsScreen
+  useEffect(() => {
+    if (!validatedDistributions || !Array.isArray(validatedDistributions)) {
+      setFilteredDistributions([]);
+      return;
+    }
+
+    let result = [...validatedDistributions];
+
+    // Aplicar filtro de status
+    if (activeFilter !== "all") {
+      const now = new Date();
+      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      switch (activeFilter) {
+        case "recent":
+          result = result.filter((distribution) => {
+            const distDate = new Date(distribution.date);
+            return distDate >= lastWeek;
+          });
+          break;
+        case "pending":
+          result = result.filter((distribution) => {
+            const distDate = new Date(distribution.date);
+            return (
+              distDate >= lastMonth &&
+              !distribution.observations?.includes("concluído")
+            );
+          });
+          break;
+        case "completed":
+          result = result.filter((distribution) => {
+            return (
+              distribution.observations?.includes("concluído") ||
+              distribution.items?.some(
+                (item) => item.status === ItemStatus.DISTRIBUIDO
+              )
+            );
+          });
+          break;
+      }
+    }
+
+    // Aplicar busca
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((distribution) => {
+        if (!distribution || typeof distribution !== "object") {
+          return false;
+        }
+
+        const hasMatchingItems =
+          distribution.items && Array.isArray(distribution.items)
+            ? distribution.items.some((item: any) =>
+                item?.description?.toLowerCase().includes(query) ||
+                item?.category?.name?.toLowerCase().includes(query) ||
+                item?.conservationState?.toLowerCase().includes(query) ||
+                item?.size?.toLowerCase().includes(query)
+              )
+            : false;
+
+        const hasMatchingObservations =
+          distribution.observations?.toLowerCase().includes(query) || false;
+
+        const hasMatchingId =
+          distribution.id?.toLowerCase().includes(query) || false;
+
+        return hasMatchingItems || hasMatchingObservations || hasMatchingId;
+      });
+    }
+
+    setFilteredDistributions(result);
+  }, [validatedDistributions, activeFilter, searchQuery]);
+
+  // Função para pull-to-refresh
+  const handleRefresh = async () => {
     setRefreshing(true);
     clearError();
-    try {
-      await loadReceipts(1);
-    } catch (error) {
-      console.error("[MyReceiptsScreen] Erro no refresh:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadReceipts, clearError]);
+    await loadReceipts(1);
+    setRefreshing(false);
+  };
 
-  const handleLoadMore = useCallback(async () => {
+  // Função para carregar mais itens
+  const handleLoadMore = async () => {
     if (isLoadingMore || isLoading || refreshing) return;
 
     if (pagination && pagination.page < pagination.totalPages) {
@@ -258,7 +263,7 @@ const MyReceiptsScreen: React.FC = () => {
         setIsLoadingMore(false);
       }
     }
-  }, [pagination, isLoading, loadReceipts, isLoadingMore, refreshing]);
+  };
 
   const handleErrorRetry = useCallback(() => {
     clearError();
@@ -270,6 +275,7 @@ const MyReceiptsScreen: React.FC = () => {
     navigation.navigate(BENEFICIARIO_ROUTES.AVAILABLE_ITEMS);
   }, [navigation]);
 
+  // Toggle dropdown de filtros - COPIADO DO MyDonationsScreen
   const toggleFilterDropdown = () => {
     const toValue = showFilterDropdown ? 0 : 1;
     Animated.timing(filterRotation, {
@@ -347,121 +353,139 @@ const MyReceiptsScreen: React.FC = () => {
     </View>
   );
 
-  // Header Component
+  // Componente de cabeçalho - ADAPTADO DO MyDonationsScreen
   const Header = () => (
-    <LinearGradient
-      colors={["#173F5F", "#006E58"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.headerGradient}
-    >
-      {/* Seção de boas-vindas */}
-      <View style={styles.welcomeSection}>
-        <View>
-          <Typography
-            variant="h2"
-            style={styles.welcomeText}
-            color={theme.colors.neutral.white}
-          >
-            Meus Recebimentos
-          </Typography>
-          <Typography
-            variant="bodySecondary"
-            color="rgba(255,255,255,0.8)"
-            style={styles.greetingText}
-          >
-            Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
-          </Typography>
-        </View>
-
-        {/* Contador de recebimentos */}
-        <View style={styles.receiptCounter}>
-          <Typography
-            variant="h2"
-            color={theme.colors.neutral.white}
-            style={styles.counterNumber}
-          >
-            {validatedDistributions?.length || 0}
-          </Typography>
-          <Typography variant="caption" color="rgba(255,255,255,0.8)">
-            recebimentos
-          </Typography>
-        </View>
-      </View>
-
-      {/* Seção integrada de busca e filtros */}
-      <View style={styles.searchFilterSection}>
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <MaterialIcons
-              name="search"
-              size={20}
-              color="rgba(255,255,255,0.6)"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Buscar recebimentos..."
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              style={styles.searchInput}
-              selectionColor="rgba(255,255,255,0.8)"
-              underlineColorAndroid="transparent"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={toggleFilterDropdown}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="filter-list"
-              size={20}
-              color={theme.colors.neutral.white}
-            />
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: filterRotation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0deg", "180deg"],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <MaterialIcons
-                name="expand-more"
-                size={16}
-                color={theme.colors.neutral.white}
-              />
-            </Animated.View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Indicador de filtro ativo */}
-        {activeFilter !== "all" && (
-          <View style={styles.activeFilterIndicator}>
-            <MaterialIcons
-              name={
-                STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
-                "filter-list"
-              }
-              size={14}
-              color={theme.colors.primary.secondary}
-            />
+    <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#173F5F"
+        translucent
+      />
+      <LinearGradient
+        colors={["#173F5F", "#006E58"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        {/* Seção de boas-vindas */}
+        <View style={styles.welcomeSection}>
+          <View>
             <Typography
-              variant="caption"
-              color={theme.colors.primary.secondary}
-              style={styles.activeFilterText}
+              variant="h2"
+              style={styles.welcomeText}
+              color={theme.colors.neutral.white}
             >
-              {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label ||
-                "Filtro ativo"}
+              Meus Recebimentos
+            </Typography>
+            <Typography
+              variant="bodySecondary"
+              color="rgba(255,255,255,0.8)"
+              style={styles.greetingText}
+            >
+              Olá, {user?.name?.split(" ")[0] || "Beneficiário"}
             </Typography>
           </View>
-        )}
+
+          {/* Contador de recebimentos */}
+          <View style={styles.receiptCounter}>
+            <Typography
+              variant="h2"
+              color={theme.colors.neutral.white}
+              style={styles.counterNumber}
+            >
+              {filteredDistributions?.length || 0}
+            </Typography>
+            <Typography variant="caption" color="rgba(255,255,255,0.8)">
+              {filteredDistributions?.length === 1 ? "recebimento" : "recebimentos"}
+            </Typography>
+          </View>
+        </View>
+
+        {/* Seção integrada de busca e filtros */}
+        <View style={styles.searchFilterSection}>
+          <View style={styles.searchContainer}>
+            {/* SearchBar customizado para melhor controle de cores */}
+            <View style={styles.searchBar}>
+              <MaterialIcons
+                name="search"
+                size={20}
+                color="rgba(255,255,255,0.6)"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar recebimentos..."
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                style={styles.searchInput}
+                selectionColor="rgba(255,255,255,0.8)"
+                underlineColorAndroid="transparent"
+              />
+            </View>
+
+            {/* Botão de filtro compacto */}
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={toggleFilterDropdown}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name="filter-list"
+                size={20}
+                color={theme.colors.neutral.white}
+              />
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: filterRotation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["0deg", "180deg"],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <MaterialIcons
+                  name="expand-more"
+                  size={16}
+                  color={theme.colors.neutral.white}
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Indicador de filtro ativo */}
+          {activeFilter !== "all" && (
+            <View style={styles.activeFilterIndicator}>
+              <MaterialIcons
+                name={
+                  STATUS_FILTERS.find((f) => f.value === activeFilter)?.icon ||
+                  "filter-list"
+                }
+                size={14}
+                color={theme.colors.primary.secondary}
+              />
+              <Typography
+                variant="caption"
+                color={theme.colors.primary.secondary}
+                style={styles.activeFilterText}
+              >
+                {STATUS_FILTERS.find((f) => f.value === activeFilter)?.label}
+              </Typography>
+              <TouchableOpacity
+                onPress={() => setActiveFilter("all")}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons
+                  name="close"
+                  size={14}
+                  color={theme.colors.primary.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         {/* Dropdown de filtros */}
         {showFilterDropdown && (
@@ -471,18 +495,12 @@ const MyReceiptsScreen: React.FC = () => {
                 key={filter.value}
                 style={[
                   styles.filterOption,
-                  activeFilter === filter.value && styles.filterOptionActive,
+                  activeFilter === filter.value && styles.activeFilterOption,
                 ]}
                 onPress={() => {
                   setActiveFilter(filter.value);
                   setShowFilterDropdown(false);
-                  Animated.timing(filterRotation, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                  }).start();
                 }}
-                activeOpacity={0.7}
               >
                 <MaterialIcons
                   name={filter.icon}
@@ -508,120 +526,110 @@ const MyReceiptsScreen: React.FC = () => {
             ))}
           </Animated.View>
         )}
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+    </>
   );
 
+  // Estado de carregamento inicial
+  if (isLoading && !dataLoaded && !refreshing) {
+    return (
+      <View style={styles.container}>
+        <Header />
+        <View style={styles.loadingContainer}>
+          <Loading visible={true} message="Buscando seus recebimentos..." />
+        </View>
+      </View>
+    );
+  }
+
+  // Estado de erro
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Header />
+        <View style={styles.content}>
+          <ErrorState
+            title="Erro ao carregar recebimentos"
+            description={error}
+            icon={
+              <View style={styles.errorIconContainer}>
+                <MaterialIcons
+                  name="error-outline"
+                  size={70}
+                  color={theme.colors.status.error}
+                />
+              </View>
+            }
+            actionLabel="Tentar novamente"
+            onAction={() => {
+              clearError();
+              loadReceipts(1);
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // UI principal
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#173F5F"
-        translucent
-      />
-      
       <Header />
-      
+
       <View style={styles.content}>
-        <Animated.View
-          style={[
-            styles.animatedContent,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
+        <FlatList
+          data={filteredDistributions}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={[
+            styles.listContent,
+            filteredDistributions.length === 0 && styles.emptyListContent,
           ]}
-        >
-          {/* Loading inicial */}
-          {isLoading && !dataLoaded && !refreshing && (
-            <View style={styles.loadingContainer}>
-              <Loading visible={true} message="Buscando seus recebimentos..." />
-            </View>
-          )}
-
-          {/* Erro */}
-          {error && (
-            <ErrorState
-              title="Erro ao carregar recebimentos"
-              description={error}
-              icon={
-                <View style={styles.errorIconContainer}>
-                  <MaterialIcons
-                    name="error-outline"
-                    size={70}
-                    color={theme.colors.status.error}
-                  />
-                </View>
-              }
-              actionLabel="Tentar novamente"
-              onAction={handleErrorRetry}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary.secondary]}
+              tintColor={theme.colors.primary.secondary}
             />
-          )}
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <Loading visible size="small" message="Carregando mais..." />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            dataLoaded && filteredDistributions.length === 0 ? <NoReceiptsView /> : null
+          }
+          showsVerticalScrollIndicator={false}
+        />
 
-          {/* Conteúdo principal */}
-          {!isLoading && !error && (
-            <>
-              {dataLoaded && filteredDistributions.length === 0 ? (
-                <ScrollView 
-                  style={styles.scrollContainer}
-                  contentContainerStyle={styles.scrollContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <NoReceiptsView />
-                </ScrollView>
-              ) : (
-                <FlatList
-                  data={filteredDistributions}
-                  keyExtractor={keyExtractor}
-                  renderItem={renderItem}
-                  contentContainerStyle={styles.listContent}
-                  style={styles.flatList}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={handleRefresh}
-                      colors={[theme.colors.primary.secondary]}
-                      tintColor={theme.colors.primary.secondary}
-                    />
-                  }
-                  onEndReached={handleLoadMore}
-                  onEndReachedThreshold={0.5}
-                  ListFooterComponent={
-                    isLoadingMore ? (
-                      <View style={styles.loadingMoreContainer}>
-                        <Loading visible size="small" message="Carregando mais..." />
-                      </View>
-                    ) : null
-                  }
-                  showsVerticalScrollIndicator={false}
-                />
-              )}
-            </>
-          )}
-
-          {/* Botão flutuante */}
-          <TouchableOpacity
-            style={styles.floatingButtonContainer}
-            onPress={navigateToAvailableItems}
-            activeOpacity={0.8}
+        {/* Botão flutuante para itens disponíveis */}
+        <TouchableOpacity
+          style={styles.floatingButtonContainer}
+          onPress={navigateToAvailableItems}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={["#173F5F", "#006E58"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.floatingButton}
           >
-            <LinearGradient
-              colors={["#173F5F", "#006E58"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.floatingButton}
+            <MaterialIcons name="search" size={20} color="#fff" />
+            <Typography
+              variant="bodySecondary"
+              color={theme.colors.neutral.white}
+              style={styles.buttonText}
             >
-              <MaterialIcons name="search" size={20} color="#fff" />
-              <Typography
-                variant="bodySecondary"
-                color={theme.colors.neutral.white}
-                style={styles.buttonText}
-              >
-                Ver Disponíveis
-              </Typography>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
+              Ver Disponíveis
+            </Typography>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -658,8 +666,8 @@ const styles = StyleSheet.create({
   receiptCounter: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: theme.spacing.xxs,
-    paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
@@ -714,44 +722,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: theme.colors.neutral.white,
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: 8,
-    marginTop: theme.spacing.s,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: theme.spacing.xs,
     alignSelf: "flex-start",
     gap: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.colors.primary.secondary,
   },
   activeFilterText: {
-    fontSize: 12,
+    marginLeft: 2,
+    marginRight: 4,
     fontWeight: "600",
   },
   filterDropdown: {
-    position: "absolute",
-    top: 70,
-    right: 0,
     backgroundColor: theme.colors.neutral.white,
+    marginHorizontal: theme.spacing.m,
+    marginTop: theme.spacing.xs,
     borderRadius: 12,
-    paddingVertical: theme.spacing.s,
-    minWidth: 150,
-    maxWidth: 200,
-    ...theme.shadows.medium,
-    zIndex: 1000,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
+    borderColor: theme.colors.neutral.mediumGray,
+    ...theme.shadows.medium,
   },
   filterOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
     gap: theme.spacing.xs,
-    minHeight: 44,
+    backgroundColor: theme.colors.neutral.white,
   },
-  filterOptionActive: {
+  activeFilterOption: {
     backgroundColor: `${theme.colors.primary.secondary}15`,
   },
   filterOptionText: {
@@ -762,24 +764,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.neutral.lightGray,
   },
-  animatedContent: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingVertical: theme.spacing.m,
-  },
-  flatList: {
-    flex: 1,
-  },
   listContent: {
     flexGrow: 1,
     paddingTop: theme.spacing.s,
     paddingHorizontal: theme.spacing.s,
     paddingBottom: theme.spacing.xl + 60,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    minHeight: 500,
+    paddingTop: 100,
+    justifyContent: "center",
   },
   cardContainer: {
     marginBottom: theme.spacing.s,
