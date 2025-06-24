@@ -1,6 +1,6 @@
 // src/common/utils/image-validator.util.ts
 import { BadRequestException } from '@nestjs/common';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 export class ImageValidatorUtil {
   private static readonly ALLOWED_FORMATS = ['jpeg', 'png', 'webp', 'gif'];
