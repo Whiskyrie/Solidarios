@@ -5,10 +5,10 @@ import {
   IsString,
   IsUUID,
   IsArray,
-  IsUrl,
 } from 'class-validator';
 import { ItemType, ItemStatus } from '../entities/item.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsPhotoUrl } from '../../../common/validators/photo-url.validator';
 
 export class CreateItemDto {
   @ApiProperty({ enum: ItemType, description: 'Tipo do item' })
@@ -52,11 +52,14 @@ export class CreateItemDto {
   @ApiPropertyOptional({
     type: [String],
     example: ['http://example.com/foto1.jpg', 'http://example.com/foto2.jpg'],
-    description: 'URLs das fotos do item',
+    description: 'URLs das fotos do item ou paths locais',
   })
   @IsOptional()
-  @IsArray({ message: 'As fotos devem ser um array de strings (URLs)' })
-  @IsUrl({}, { each: true, message: 'Cada foto deve ser uma URL válida' })
+  @IsArray({ message: 'As fotos devem ser um array de strings' })
+  @IsPhotoUrl({
+    each: true,
+    message: 'Cada foto deve ser uma URL válida ou path local',
+  })
   photos?: string[];
 
   @ApiProperty({
