@@ -1,9 +1,10 @@
 // src/common/services/backblaze.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
-import B2 from 'backblaze-b2';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const B2 = require('backblaze-b2');
 
 export interface UploadResult {
   fileName: string;
@@ -27,7 +28,7 @@ interface MulterFile {
 @Injectable()
 export class BackBlazeService {
   private readonly logger = new Logger(BackBlazeService.name);
-  private b2: B2; // Tipo atualizado para B2
+  private b2: any;
   private bucketId: string;
   private bucketName: string;
   private baseUrl: string;
@@ -55,7 +56,9 @@ export class BackBlazeService {
     ) {
       throw new Error('Missing required BackBlaze configuration');
     }
-    this.b2 = new (B2 as any)({
+
+    // SOLUÇÃO 1: Uso direto do require
+    this.b2 = new B2({
       applicationKeyId,
       applicationKey,
     });
