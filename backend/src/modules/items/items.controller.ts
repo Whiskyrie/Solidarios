@@ -40,6 +40,18 @@ import { PageDto } from '../../common/pagination/dto/page.dto';
 import { Item } from './entities/item.entity';
 import { DonorStatsDto } from './dto/donor-stats.dto';
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 @ApiTags('items')
 @Controller('items')
 @UseGuards(JwtAuthGuard, RolesGuard) // Proteger todas as rotas e verificar roles
@@ -253,7 +265,7 @@ export class ItemsController {
   )
   async uploadPhotos(
     @Param('id', ParseUUIDPipe) id: string,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles() files: MulterFile[],
     @Request() req,
   ): Promise<Item> {
     if (!files || files.length === 0) {

@@ -10,6 +10,18 @@ import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 @Injectable()
 export class UploadLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(UploadLoggingInterceptor.name);
@@ -25,7 +37,7 @@ export class UploadLoggingInterceptor implements NestInterceptor {
         `Upload iniciado - Usuário: ${userId}, Item: ${itemId}, Arquivos: ${files.length}`,
       );
 
-      files.forEach((file: Express.Multer.File, index: number) => {
+      files.forEach((file: MulterFile, index: number) => {
         this.logger.debug(
           `Arquivo ${index + 1}: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`,
         );

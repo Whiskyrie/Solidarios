@@ -12,6 +12,18 @@ export interface UploadResult {
   thumbnailUrl?: string;
 }
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 @Injectable()
 export class BackBlazeService {
   private readonly logger = new Logger(BackBlazeService.name);
@@ -117,7 +129,7 @@ export class BackBlazeService {
    * Faz upload de uma imagem para BackBlaze B2
    */
   async uploadImage(
-    file: Express.Multer.File,
+    file: MulterFile,
     generateThumbnail = true,
   ): Promise<UploadResult> {
     await this.initializeB2();

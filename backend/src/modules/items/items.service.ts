@@ -19,6 +19,18 @@ import { LogMethod } from '../../common/logging/logger.decorator';
 import { DonorStatsDto } from './dto/donor-stats.dto';
 import { BackBlazeService } from '../../common/services/backblaze.service';
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 @Injectable()
 export class ItemsService {
   constructor(
@@ -442,7 +454,7 @@ export class ItemsService {
   @LogMethod()
   async uploadPhotos(
     itemId: string,
-    files: Express.Multer.File[],
+    files: MulterFile[],
     currentUser: User,
   ): Promise<Item> {
     this.logger.log(

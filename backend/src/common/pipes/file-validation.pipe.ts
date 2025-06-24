@@ -6,6 +6,18 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 @Injectable()
 export class FileValidationPipe implements PipeTransform {
   private readonly allowedMimeTypes = [
@@ -25,10 +37,7 @@ export class FileValidationPipe implements PipeTransform {
     '.gif',
   ];
 
-  transform(
-    files: Express.Multer.File[],
-    _metadata: ArgumentMetadata,
-  ): Express.Multer.File[] {
+  transform(files: MulterFile[], _metadata: ArgumentMetadata): MulterFile[] {
     if (!files || files.length === 0) {
       throw new BadRequestException('Pelo menos um arquivo deve ser enviado');
     }
@@ -44,7 +53,7 @@ export class FileValidationPipe implements PipeTransform {
     return files;
   }
 
-  private validateFile(file: Express.Multer.File, index: number): void {
+  private validateFile(file: MulterFile, index: number): void {
     this.validateFileName(file.originalname, index);
     this.validateMimeType(file.mimetype, file.originalname);
     this.validateFileSize(file.size, file.originalname);
