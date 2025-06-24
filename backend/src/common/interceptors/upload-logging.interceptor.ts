@@ -55,8 +55,10 @@ export class UploadLoggingInterceptor implements NestInterceptor {
       }),
       catchError((error) => {
         const duration = Date.now() - startTime;
+        const errorMessage =
+          error instanceof Error ? error.message : 'Erro desconhecido';
         this.logger.error(
-          `Upload falhou - Usuário: ${userId}, Item: ${itemId}, Duração: ${duration}ms, Erro: ${error.message}`,
+          `Upload falhou - Usuário: ${userId}, Item: ${itemId}, Duração: ${duration}ms, Erro: ${errorMessage}`,
         );
         return throwError(() => error);
       }),

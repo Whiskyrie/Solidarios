@@ -93,27 +93,27 @@ export const useCategories = () => {
       globalLoadingPromise = (async () => {
         try {
           const response = await CategoriesService.getAll(pageOptions);
-          
+
           let categoriesData: Category[] = [];
-          
+
           // Handle different response formats
           if (Array.isArray(response)) {
             categoriesData = response;
-          } else if (response && typeof response === 'object') {
+          } else if (response && typeof response === "object") {
             if (Array.isArray(response.data)) {
               categoriesData = response.data;
             }
           }
-          
+
           // Validate each category object
           const validCategories = categoriesData.filter(
-            (cat) => cat && typeof cat === 'object' && cat.id && cat.name
+            (cat) => cat && typeof cat === "object" && cat.id && cat.name
           );
-          
+
           if (isMountedRef.current) {
             setCategories(validCategories);
             setError(null);
-            
+
             // Set basic pagination if available
             if (response && response.meta) {
               setPagination({
@@ -133,13 +133,14 @@ export const useCategories = () => {
           return { data: validCategories, meta: response?.meta };
         } catch (err) {
           console.error("[useCategories] Erro ao buscar categorias:", err);
-          const errorMessage = (err instanceof Error && err.message) ? err.message : "Erro ao buscar categorias";
-          
+          const errorMessage =
+            err instanceof Error ? err.message : "Erro ao buscar categorias";
+
           if (isMountedRef.current) {
             setError(errorMessage);
             setCategories([]); // Ensure categories is always an array
           }
-          
+
           throw new Error(errorMessage);
         } finally {
           globalLoadingPromise = null;
@@ -163,80 +164,96 @@ export const useCategories = () => {
     }
   }, [isCacheValid]);
 
-  const fetchCategoryById = useCallback(async (id: string) => {
-    const cachedCategory = categories.find((cat) => cat.id === id);
-    if (cachedCategory) {
-      setCategory(cachedCategory);
-      return cachedCategory;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await CategoriesService.getById(id);
-      if (isMountedRef.current) setCategory(data);
-      return data;
-    } catch (err: any) {
-      if (isMountedRef.current) setError(err.message || "Erro ao buscar categoria");
-      return null;
-    } finally {
-      if (isMountedRef.current) setIsLoading(false);
-    }
-  }, [categories]);
-
-  const createCategory = useCallback(async (categoryData: CreateCategoryDto) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await CategoriesService.create(categoryData);
-      if (isMountedRef.current) {
-        setCategory(data);
-        updateCategoriesState([...categories, data]);
+  const fetchCategoryById = useCallback(
+    async (id: string) => {
+      const cachedCategory = categories.find((cat) => cat.id === id);
+      if (cachedCategory) {
+        setCategory(cachedCategory);
+        return cachedCategory;
       }
-      return data;
-    } catch (err: any) {
-      if (isMountedRef.current) setError(err.message || "Erro ao criar categoria");
-      return null;
-    } finally {
-      if (isMountedRef.current) setIsLoading(false);
-    }
-  }, [categories, updateCategoriesState]);
-
-  const updateCategory = useCallback(async (id: string, categoryData: UpdateCategoryDto) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await CategoriesService.update(id, categoryData);
-      if (isMountedRef.current) {
-        setCategory(data);
-        const updated = categories.map((cat) => (cat.id === id ? data : cat));
-        updateCategoriesState(updated);
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await CategoriesService.getById(id);
+        if (isMountedRef.current) setCategory(data);
+        return data;
+      } catch (err: any) {
+        if (isMountedRef.current)
+          setError(err.message || "Erro ao buscar categoria");
+        return null;
+      } finally {
+        if (isMountedRef.current) setIsLoading(false);
       }
-      return data;
-    } catch (err: any) {
-      if (isMountedRef.current) setError(err.message || "Erro ao atualizar categoria");
-      return null;
-    } finally {
-      if (isMountedRef.current) setIsLoading(false);
-    }
-  }, [categories, updateCategoriesState]);
+    },
+    [categories]
+  );
 
-  const removeCategory = useCallback(async (id: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await CategoriesService.remove(id);
-      if (isMountedRef.current) {
-        const filtered = categories.filter((cat) => cat.id !== id);
-        updateCategoriesState(filtered);
+  const createCategory = useCallback(
+    async (categoryData: CreateCategoryDto) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await CategoriesService.create(categoryData);
+        if (isMountedRef.current) {
+          setCategory(data);
+          updateCategoriesState([...categories, data]);
+        }
+        return data;
+      } catch (err: any) {
+        if (isMountedRef.current)
+          setError(err.message || "Erro ao criar categoria");
+        return null;
+      } finally {
+        if (isMountedRef.current) setIsLoading(false);
       }
-      return true;
-    } catch (err: any) {
-      if (isMountedRef.current) setError(err.message || "Erro ao remover categoria");
-      return false;
-    } finally {
-      if (isMountedRef.current) setIsLoading(false);
-    }
-  }, [categories, updateCategoriesState]);
+    },
+    [categories, updateCategoriesState]
+  );
+
+  const updateCategory = useCallback(
+    async (id: string, categoryData: UpdateCategoryDto) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await CategoriesService.update(id, categoryData);
+        if (isMountedRef.current) {
+          setCategory(data);
+          const updated = categories.map((cat) => (cat.id === id ? data : cat));
+          updateCategoriesState(updated);
+        }
+        return data;
+      } catch (err: any) {
+        if (isMountedRef.current)
+          setError(err.message || "Erro ao atualizar categoria");
+        return null;
+      } finally {
+        if (isMountedRef.current) setIsLoading(false);
+      }
+    },
+    [categories, updateCategoriesState]
+  );
+
+  const removeCategory = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        await CategoriesService.remove(id);
+        if (isMountedRef.current) {
+          const filtered = categories.filter((cat) => cat.id !== id);
+          updateCategoriesState(filtered);
+        }
+        return true;
+      } catch (err: any) {
+        if (isMountedRef.current)
+          setError(err.message || "Erro ao remover categoria");
+        return false;
+      } finally {
+        if (isMountedRef.current) setIsLoading(false);
+      }
+    },
+    [categories, updateCategoriesState]
+  );
 
   const refreshCategories = useCallback(async () => {
     console.log("[useCategories] Forçando atualização do cache");
