@@ -270,7 +270,6 @@ const MyReceiptsScreen: React.FC = () => {
     navigation.navigate(BENEFICIARIO_ROUTES.AVAILABLE_ITEMS);
   }, [navigation]);
 
-  // Toggle dropdown de filtros
   const toggleFilterDropdown = () => {
     const toValue = showFilterDropdown ? 0 : 1;
     Animated.timing(filterRotation, {
@@ -513,7 +512,6 @@ const MyReceiptsScreen: React.FC = () => {
     </LinearGradient>
   );
 
-  // ESTRUTURA SIMPLIFICADA SEGUINDO PADRÃO EXATO DO MyDonationsScreen
   return (
     <View style={styles.container}>
       <StatusBar
@@ -645,43 +643,34 @@ const styles = StyleSheet.create({
   welcomeSection: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start", // Mudado de "center" para "flex-start"
+    alignItems: "center",
     paddingHorizontal: theme.spacing.m,
     marginBottom: theme.spacing.m,
-    minHeight: 60, // Altura mínima para garantir espaçamento
   },
   welcomeText: {
     fontWeight: "bold",
     fontSize: 24,
-    marginBottom: 4, // Aumentado de 2 para 4
-    lineHeight: 28, // Melhor altura de linha
+    marginBottom: 2,
   },
   greetingText: {
     fontSize: 14,
-    lineHeight: 18, // Melhor altura de linha
-    marginTop: 2, // Pequeno espaço adicional
   },
   receiptCounter: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s, // Aumentado de xs para s
+    paddingHorizontal: theme.spacing.xxs,
+    paddingVertical: theme.spacing.s,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
-    minWidth: 80, // Largura mínima para evitar contador muito pequeno
-    alignSelf: "flex-start", // Alinha no topo, não centralizado verticalmente
-    marginTop: 4, // Pequeno espaço do topo para criar respiração visual
   },
   counterNumber: {
     fontWeight: "bold",
     fontSize: 20,
     lineHeight: 24,
-    marginBottom: 2, // Pequeno espaço entre número e texto
   },
   searchFilterSection: {
     paddingHorizontal: theme.spacing.m,
-    paddingTop: theme.spacing.xs, // Adicionar pequeno espaço superior
   },
   searchContainer: {
     flexDirection: "row",
@@ -693,12 +682,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 12,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
-    minHeight: 44, // Altura mínima para melhor touch target
+    borderRadius: 12,
+    paddingHorizontal: theme.spacing.s,
+    height: 44,
   },
   searchIcon: {
     marginRight: theme.spacing.xs,
@@ -706,34 +694,31 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: theme.colors.neutral.white,
-    fontSize: 16,
-    paddingVertical: theme.spacing.xs,
-    lineHeight: 20, // Melhor altura de linha
+    fontSize: 14,
+    fontFamily: "System",
+    padding: 0,
   },
   filterButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.xs + 2,
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: theme.spacing.s,
+    height: 44,
+    borderRadius: 12,
     gap: 4,
-    minHeight: 44, // Altura mínima consistente com searchBar
-    minWidth: 44, // Largura mínima para melhor touch target
   },
   activeFilterIndicator: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: theme.colors.neutral.white,
     paddingHorizontal: theme.spacing.s,
     paddingVertical: theme.spacing.xs,
     borderRadius: 8,
-    marginTop: theme.spacing.s, // Aumentado de xs para s
+    marginTop: theme.spacing.s,
     alignSelf: "flex-start",
     gap: 4,
-    // Adicionar sombra sutil para destacar
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -743,20 +728,18 @@ const styles = StyleSheet.create({
   activeFilterText: {
     fontSize: 12,
     fontWeight: "600",
-    lineHeight: 16, // Melhor altura de linha
   },
   filterDropdown: {
     position: "absolute",
-    top: 70, // Aumentado de 60 para 70 para melhor espaçamento
+    top: 70,
     right: 0,
     backgroundColor: theme.colors.neutral.white,
     borderRadius: 12,
-    paddingVertical: theme.spacing.s, // Aumentado de xs para s
+    paddingVertical: theme.spacing.s,
     minWidth: 150,
-    maxWidth: 200, // Largura máxima para evitar dropdown muito largo
+    maxWidth: 200,
     ...theme.shadows.medium,
     zIndex: 1000,
-    // Adicionar border sutil
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
   },
@@ -764,9 +747,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.s, // Aumentado de xs para s
+    paddingVertical: theme.spacing.s,
     gap: theme.spacing.xs,
-    minHeight: 44, // Altura mínima para melhor touch target
+    minHeight: 44,
   },
   filterOptionActive: {
     backgroundColor: `${theme.colors.primary.secondary}15`,
@@ -774,7 +757,6 @@ const styles = StyleSheet.create({
   filterOptionText: {
     flex: 1,
     color: theme.colors.neutral.black,
-    lineHeight: 18, // Melhor altura de linha
   },
   content: {
     flex: 1,
@@ -797,7 +779,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: theme.spacing.s,
     paddingHorizontal: theme.spacing.s,
-    paddingBottom: theme.spacing.xl + 80,
+    paddingBottom: theme.spacing.xl + 60,
   },
   cardContainer: {
     marginBottom: theme.spacing.s,
