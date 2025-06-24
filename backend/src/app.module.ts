@@ -19,7 +19,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { DistributionsModule } from './modules/distributions/distributions.module';
 
 // Guards e Providers
-import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -38,7 +38,13 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { TypeOrmLoggerService } from './common/logging/typeorm-logger';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 
-import * as cookieParser from 'cookie-parser';
+// Interceptadores de sanitização
+import {
+  SanitizeInputInterceptor,
+  SanitizeOutputInterceptor,
+} from './common/interceptors/sanitize.interceptor';
+
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
 @Module({
@@ -129,6 +135,15 @@ import helmet from 'helmet';
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
+    },
+    // Interceptadores de sanitização globais
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SanitizeInputInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SanitizeOutputInterceptor,
     },
   ],
 })
