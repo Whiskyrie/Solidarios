@@ -47,6 +47,24 @@ export class BackBlazeService {
       'BACKBLAZE_APPLICATION_KEY',
     );
 
+    // Logs de debug para verificar configurações
+    this.logger.debug('🔧 BackBlaze Configurações:');
+    this.logger.debug(
+      `   - Bucket ID: ${this.bucketId ? '✅ Configurado' : '❌ Não configurado'}`,
+    );
+    this.logger.debug(
+      `   - Bucket Name: ${this.bucketName ? '✅ Configurado' : '❌ Não configurado'}`,
+    );
+    this.logger.debug(
+      `   - Base URL: ${this.baseUrl ? '✅ Configurado' : '❌ Não configurado'}`,
+    );
+    this.logger.debug(
+      `   - Application Key ID: ${applicationKeyId ? '✅ Configurado' : '❌ Não configurado'}`,
+    );
+    this.logger.debug(
+      `   - Application Key: ${applicationKey ? '✅ Configurado' : '❌ Não configurado'}`,
+    );
+
     if (
       !this.bucketId ||
       !this.bucketName ||
@@ -54,6 +72,22 @@ export class BackBlazeService {
       !applicationKeyId ||
       !applicationKey
     ) {
+      this.logger.error('❌ Configurações BackBlaze incompletas:');
+      this.logger.error(
+        `   - BACKBLAZE_BUCKET_ID: ${this.bucketId || 'undefined'}`,
+      );
+      this.logger.error(
+        `   - BACKBLAZE_BUCKET_NAME: ${this.bucketName || 'undefined'}`,
+      );
+      this.logger.error(
+        `   - BACKBLAZE_BASE_URL: ${this.baseUrl || 'undefined'}`,
+      );
+      this.logger.error(
+        `   - BACKBLAZE_APPLICATION_KEY_ID: ${applicationKeyId || 'undefined'}`,
+      );
+      this.logger.error(
+        `   - BACKBLAZE_APPLICATION_KEY: ${applicationKey || 'undefined'}`,
+      );
       throw new Error('Missing required BackBlaze configuration');
     }
 
@@ -62,6 +96,8 @@ export class BackBlazeService {
       applicationKeyId,
       applicationKey,
     });
+
+    this.logger.log('✅ BackBlaze B2 configurado com sucesso');
   }
 
   /**
@@ -134,17 +170,31 @@ export class BackBlazeService {
     file: MulterFile,
     generateThumbnail = true,
   ): Promise<UploadResult> {
+    this.logger.log(`🚀 Iniciando upload de imagem: ${file.originalname}`);
+    this.logger.debug(
+      `📊 Tamanho do arquivo: ${(file.size / 1024 / 1024).toFixed(2)}MB`,
+    );
+    this.logger.debug(`📎 Tipo MIME: ${file.mimetype}`);
+
     await this.initializeB2();
 
     try {
       const fileName = this.generateFileName(file.originalname);
+      this.logger.debug(`📂 Nome do arquivo gerado: ${fileName}`);
+
       const optimizedBuffer = await this.optimizeImage(file.buffer);
+      this.logger.debug(
+        `🔧 Imagem otimizada: ${(optimizedBuffer.length / 1024 / 1024).toFixed(2)}MB`,
+      );
 
       // Upload da imagem principal
+      this.logger.debug('🔗 Obtendo URL de upload...');
       const uploadUrl = await this.b2.getUploadUrl({
         bucketId: this.bucketId,
       });
+      this.logger.debug('✅ URL de upload obtida');
 
+      this.logger.debug('📤 Fazendo upload do arquivo...');
       const uploadResponse = await this.b2.uploadFile({
         uploadUrl: uploadUrl.data.uploadUrl,
         uploadAuthToken: uploadUrl.data.authorizationToken,
@@ -157,8 +207,10 @@ export class BackBlazeService {
           uploadedAt: new Date().toISOString(),
         },
       });
+      this.logger.debug('✅ Upload principal concluído');
 
       const publicUrl = `${this.baseUrl}/file/${this.bucketName}/${fileName}`;
+      this.logger.debug(`🌐 URL pública: ${publicUrl}`);
 
       let thumbnailUrl: string | undefined;
 

@@ -7,12 +7,15 @@
  * @param dateString String de data ou objeto Date
  * @returns Data formatada
  */
-export const formatDate = (dateString: string | Date): string => {
+export const formatDate = (
+  dateString: string | Date | undefined | null
+): string => {
   try {
+    if (!dateString) return "-";
     const date =
       typeof dateString === "string" ? new Date(dateString) : dateString;
-
-    return date.toLocaleDateString("pt-BR", {
+    if (!date || isNaN((date as Date).getTime())) return "-";
+    return (date as Date).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
