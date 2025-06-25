@@ -513,7 +513,33 @@ export class ItemsService {
       const uploadPromises = files.map(async (file, index) => {
         try {
           this.logger.debug(
-            `Uploading arquivo ${index + 1}/${files.length}: ${file.originalname}`,
+            `📋 Processando arquivo ${index + 1}/${files.length}:`,
+          );
+          this.logger.debug(`   Nome: ${file.originalname}`);
+          this.logger.debug(`   MIME: ${file.mimetype}`);
+          this.logger.debug(`   Tamanho: ${file.size} bytes`);
+          this.logger.debug(
+            `   Buffer length: ${file.buffer?.length || 0} bytes`,
+          );
+          this.logger.debug(`   Encoding: ${file.encoding}`);
+
+          // Validação adicional antes do upload
+          if (!file.buffer) {
+            throw new Error(
+              `Arquivo ${file.originalname} não possui buffer válido`,
+            );
+          }
+
+          if (file.buffer.length === 0) {
+            throw new Error(`Arquivo ${file.originalname} possui buffer vazio`);
+          }
+
+          if (file.size === 0) {
+            throw new Error(`Arquivo ${file.originalname} possui tamanho zero`);
+          }
+
+          this.logger.debug(
+            `🚀 Iniciando upload do arquivo ${index + 1}/${files.length}: ${file.originalname}`,
           );
           const result = await this.s3Service.uploadImage(file, true);
           this.logger.debug(`✅ Upload concluído para: ${file.originalname}`);

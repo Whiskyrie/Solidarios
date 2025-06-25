@@ -13,7 +13,7 @@ import {
   S3Client,
   DeleteObjectCommand,
   HeadBucketCommand,
-  ListObjectsV2Command,
+  PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import sharp from 'sharp';
@@ -199,7 +199,15 @@ export class S3Service {
    */
   private async optimizeImage(buffer: Buffer): Promise<Buffer> {
     try {
-      return await sharp(buffer)
+      this.logger.debug(`🔄 Iniciando otimização da imagem...`);
+      this.logger.debug(`   Buffer original: ${buffer.length} bytes`);
+
+      // Verificar se o buffer de entrada é válido
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Buffer de entrada inválido ou vazio');
+      }
+
+      const optimizedBuffer = await sharp(buffer)
         .resize(1200, 1200, {
           fit: 'inside',
           withoutEnlargement: true,
@@ -209,8 +217,29 @@ export class S3Service {
           progressive: true,
         })
         .toBuffer();
+
+      this.logger.debug(`   Buffer otimizado: ${optimizedBuffer.length} bytes`);
+
+      // Verificar se a otimização foi bem-sucedida
+      if (!optimizedBuffer || optimizedBuffer.length === 0) {
+        this.logger.warn(
+          '⚠️ Otimização resultou em buffer vazio, usando original',
+        );
+        return buffer;
+      }
+
+      return optimizedBuffer;
     } catch (error) {
-      this.logger.warn('Erro ao otimizar imagem, usando original:', error);
+      this.logger.warn(
+        '⚠️ Erro ao otimizar imagem, usando original:',
+        error.message,
+      );
+
+      // Verificar se o buffer original ainda é válido antes de retornar
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Buffer original também está inválido');
+      }
+
       return buffer;
     }
   }
@@ -241,50 +270,143 @@ export class S3Service {
     await this.initializeS3();
 
     try {
-      // Validações básicas
-      if (!file || !file.buffer) {
-        throw new Error('Arquivo inválido ou vazio');
+      // Validações básicas mais rigorosas
+      if (!file) {
+        throw new Error('Arquivo não fornecido');
       }
 
-      if (!file.mimetype.startsWith('image/')) {
-        throw new Error(`Tipo de arquivo não suportado: ${file.mimetype}`);
+      if (!file.buffer) {
+        throw new Error('Buffer do arquivo está vazio ou não existe');
       }
+
+      if (file.buffer.length === 0) {
+        throw new Error('Arquivo está vazio (0 bytes)');
+      }
+
+      if (file.size === 0) {
+        throw new Error('Tamanho do arquivo é 0 bytes');
+      }
+
+      if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+        throw new Error(
+          `Tipo de arquivo não suportado: ${file.mimetype || 'desconhecido'}`,
+        );
+      }
+
+      // Log detalhado do arquivo recebido
+      this.logger.debug(`📋 Detalhes do arquivo recebido:`);
+      this.logger.debug(`   Nome original: ${file.originalname}`);
+      this.logger.debug(`   MIME type: ${file.mimetype}`);
+      this.logger.debug(
+        `   Tamanho: ${file.size} bytes (${(file.size / 1024).toFixed(2)} KB)`,
+      );
+      this.logger.debug(`   Buffer length: ${file.buffer.length} bytes`);
+      this.logger.debug(`   Encoding: ${file.encoding}`);
 
       const fileName = this.generateFileName(file.originalname);
       this.logger.debug(`📂 Nome do arquivo gerado: ${fileName}`);
 
       const optimizedBuffer = await this.optimizeImage(file.buffer);
       this.logger.debug(
-        `🔧 Imagem otimizada: ${(optimizedBuffer.length / 1024 / 1024).toFixed(2)}MB`,
+        `🔧 Imagem otimizada: ${(optimizedBuffer.length / 1024 / 1024).toFixed(2)}MB (${optimizedBuffer.length} bytes)`,
+      );
+
+      // Validar se o buffer otimizado ainda é válido
+      if (!optimizedBuffer || optimizedBuffer.length === 0) {
+        throw new Error(
+          'Erro na otimização da imagem: buffer resultante está vazio',
+        );
+      }
+
+      // Verificar tamanho mínimo para Backblaze B2 (deve ser maior que 0)
+      if (optimizedBuffer.length < 1) {
+        throw new Error('Arquivo muito pequeno para upload no Backblaze B2');
+      }
+
+      // Para arquivos muito pequenos, usar upload simples ao invés de multipart
+      const useSimpleUpload = optimizedBuffer.length < 1024 * 1024; // 1MB
+
+      this.logger.debug(
+        `📊 Estratégia de upload: ${useSimpleUpload ? 'Simples' : 'Multipart'}`,
       );
 
       // Upload da imagem principal
-      const upload = new Upload({
-        client: this.s3Client,
-        params: {
-          Bucket: this.bucketName,
-          Key: fileName,
-          Body: optimizedBuffer,
-          ContentType: 'image/jpeg',
-          // Remover ACL para compatibilidade com Backblaze B2
-          // ACL: 'public-read',
-          Metadata: {
-            originalName: file.originalname,
-            uploadedAt: new Date().toISOString(),
-          },
-          // Desabilitar checksums explicitamente
-          ChecksumAlgorithm: undefined,
+      const uploadParams = {
+        Bucket: this.bucketName,
+        Key: fileName,
+        Body: optimizedBuffer,
+        ContentType: 'image/jpeg',
+        // Remover ACL para compatibilidade com Backblaze B2
+        // ACL: 'public-read',
+        Metadata: {
+          originalName: file.originalname,
+          uploadedAt: new Date().toISOString(),
         },
-        // Configurações otimizadas para Backblaze B2
-        partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
-        queueSize: 1,
-        // Desabilitar checksums que causam problemas no B2
-        leavePartsOnError: false,
-      });
+        // Desabilitar checksums explicitamente
+        ChecksumAlgorithm: undefined,
+      };
+
+      let upload: Upload;
+
+      if (useSimpleUpload) {
+        this.logger.debug('🚀 Usando upload simples para arquivo pequeno...');
+        // Para arquivos pequenos, usar configurações mais simples
+        upload = new Upload({
+          client: this.s3Client,
+          params: uploadParams,
+          // Forçar upload simples para arquivos pequenos
+          partSize: optimizedBuffer.length,
+          queueSize: 1,
+          leavePartsOnError: false,
+        });
+      } else {
+        this.logger.debug('🚀 Usando upload multipart para arquivo maior...');
+        // Para arquivos maiores, usar configurações normais
+        upload = new Upload({
+          client: this.s3Client,
+          params: uploadParams,
+          // Configurações otimizadas para Backblaze B2
+          partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
+          queueSize: 1,
+          // Desabilitar checksums que causam problemas no B2
+          leavePartsOnError: false,
+        });
+      }
 
       this.logger.debug('🚀 Iniciando upload principal...');
-      await upload.done();
-      this.logger.debug('✅ Upload principal concluído');
+
+      try {
+        if (useSimpleUpload) {
+          // Para arquivos pequenos, usar PutObjectCommand diretamente
+          this.logger.debug('📤 Executando upload simples...');
+          await this.s3Client.send(new PutObjectCommand(uploadParams));
+        } else {
+          // Para arquivos maiores, usar Upload com multipart
+          this.logger.debug('📤 Executando upload multipart...');
+          await upload.done();
+        }
+        this.logger.debug('✅ Upload principal concluído');
+      } catch (uploadError) {
+        this.logger.error('❌ Erro específico no upload:', {
+          message: uploadError.message,
+          code: uploadError.code,
+          name: uploadError.name,
+          statusCode: uploadError.$metadata?.httpStatusCode,
+          requestId: uploadError.$metadata?.requestId,
+        });
+
+        // Tratar erro específico "request body was too small"
+        if (
+          uploadError.message &&
+          uploadError.message.includes('request body was too small')
+        ) {
+          throw new Error(
+            'Arquivo muito pequeno ou corrompido para upload. Verifique se a imagem está válida.',
+          );
+        }
+
+        throw uploadError;
+      }
 
       const publicUrl = `${this.baseUrl}/${fileName}`;
 
@@ -296,29 +418,26 @@ export class S3Service {
           const thumbnailBuffer = await this.createThumbnail(file.buffer);
           const thumbnailFileName = fileName.replace('.', '_thumb.');
 
-          const thumbnailUpload = new Upload({
-            client: this.s3Client,
-            params: {
-              Bucket: this.bucketName,
-              Key: thumbnailFileName,
-              Body: thumbnailBuffer,
-              ContentType: 'image/jpeg',
-              // Remover ACL para compatibilidade com Backblaze B2
-              // ACL: 'public-read',
-              Metadata: {
-                originalName: `${file.originalname}_thumbnail`,
-                uploadedAt: new Date().toISOString(),
-              },
-              // Desabilitar checksums explicitamente
-              ChecksumAlgorithm: undefined,
+          const thumbnailParams = {
+            Bucket: this.bucketName,
+            Key: thumbnailFileName,
+            Body: thumbnailBuffer,
+            ContentType: 'image/jpeg',
+            // Remover ACL para compatibilidade com Backblaze B2
+            // ACL: 'public-read',
+            Metadata: {
+              originalName: `${file.originalname}_thumbnail`,
+              uploadedAt: new Date().toISOString(),
             },
-            partSize: 1024 * 1024 * 5, // 5MB para thumbnails
-            queueSize: 1,
-            leavePartsOnError: false,
-          });
+            // Desabilitar checksums explicitamente
+            ChecksumAlgorithm: undefined,
+          };
 
           this.logger.debug('🚀 Iniciando upload do thumbnail...');
-          await thumbnailUpload.done();
+
+          // Thumbnails são sempre pequenos, usar upload simples
+          await this.s3Client.send(new PutObjectCommand(thumbnailParams));
+
           this.logger.debug('✅ Upload do thumbnail concluído');
           thumbnailUrl = `${this.baseUrl}/${thumbnailFileName}`;
         } catch (error) {

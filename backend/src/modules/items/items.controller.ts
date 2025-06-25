@@ -18,6 +18,7 @@ import {
   BadRequestException, // Adicionado
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express'; // Adicionado
+import * as multer from 'multer'; // Adicionado para configuração de storage
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -268,6 +269,7 @@ export class ItemsController {
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR)
   @UseInterceptors(
     FilesInterceptor('files', 5, {
+      storage: multer.memoryStorage(), // Garantir que use storage em memória
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB por arquivo
         files: 5, // máximo 5 arquivos
@@ -301,7 +303,37 @@ export class ItemsController {
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+          bufferLength: file.buffer?.length || 0,
+          hasBuffer: !!file.buffer,
         });
+
+        // Validação adicional dos arquivos recebidos
+        if (!file.buffer) {
+          console.error(
+            `❌ [ItemsController] Arquivo ${file.originalname} não possui buffer`,
+          );
+          throw new BadRequestException(
+            `Arquivo ${file.originalname} está corrompido - sem buffer`,
+          );
+        }
+
+        if (file.buffer.length === 0) {
+          console.error(
+            `❌ [ItemsController] Arquivo ${file.originalname} possui buffer vazio`,
+          );
+          throw new BadRequestException(
+            `Arquivo ${file.originalname} está vazio`,
+          );
+        }
+
+        if (file.size === 0) {
+          console.error(
+            `❌ [ItemsController] Arquivo ${file.originalname} tem tamanho zero`,
+          );
+          throw new BadRequestException(
+            `Arquivo ${file.originalname} tem tamanho zero`,
+          );
+        }
       });
     }
 
