@@ -91,6 +91,10 @@ export class S3Service {
         requestTimeout: 300000, // 5 minutos
         connectionTimeout: 30000, // 30 segundos
       },
+      // Configurações adicionais para melhor compatibilidade com B2
+      bucketEndpoint: false,
+      useAccelerateEndpoint: false,
+      useDualstackEndpoint: false,
     });
 
     // Adicionar middleware para remover headers problemáticos do Backblaze B2
@@ -104,6 +108,15 @@ export class S3Service {
           delete args.request.headers['x-amz-checksum-sha256'];
           delete args.request.headers['x-amz-sdk-checksum-algorithm'];
           delete args.request.headers['x-amz-content-sha256'];
+          // Remover headers adicionais que podem causar problemas
+          delete args.request.headers['expect'];
+          delete args.request.headers['x-amz-decoded-content-length'];
+
+          // Garantir que Content-Length seja definido corretamente
+          if (args.request.body && args.request.body.length) {
+            args.request.headers['content-length'] =
+              args.request.body.length.toString();
+          }
         }
         return next(args);
       },
@@ -399,9 +412,82 @@ export class S3Service {
           uploadError.message &&
           uploadError.message.includes('request body was too small')
         ) {
-          throw new Error(
-            'Arquivo muito pequeno ou corrompido para upload. Verifique se a imagem está válida.',
+          this.logger.warn(
+            '⚠️ Erro "request body was too small" detectado - tentando estratégias alternativas',
           );
+
+          // Estratégia 1: Tentar sem metadata e headers extras
+          try {
+            this.logger.debug('🔄 Tentativa 1: Upload simples sem metadata...');
+            const simpleParams = {
+              Bucket: this.bucketName,
+              Key: fileName,
+              Body: optimizedBuffer,
+              ContentType: 'image/jpeg',
+            };
+
+            await this.s3Client.send(new PutObjectCommand(simpleParams));
+            this.logger.debug('✅ Upload simples sem metadata bem-sucedido');
+          } catch (retryError1) {
+            this.logger.warn('❌ Tentativa 1 falhou:', retryError1.message);
+
+            // Estratégia 2: Tentar com buffer original (sem otimização)
+            if (file.buffer && file.buffer.length > 0) {
+              try {
+                this.logger.debug(
+                  '🔄 Tentativa 2: Upload com buffer original...',
+                );
+                const originalParams = {
+                  Bucket: this.bucketName,
+                  Key: fileName,
+                  Body: file.buffer,
+                  ContentType: file.mimetype,
+                };
+
+                await this.s3Client.send(new PutObjectCommand(originalParams));
+                this.logger.debug('✅ Upload com buffer original bem-sucedido');
+              } catch (retryError2) {
+                this.logger.warn('❌ Tentativa 2 falhou:', retryError2.message);
+
+                // Estratégia 3: Aumentar o buffer artificialmente se muito pequeno
+                try {
+                  this.logger.debug(
+                    '🔄 Tentativa 3: Verificando tamanho mínimo...',
+                  );
+
+                  let bufferToUpload = optimizedBuffer;
+
+                  // Se o buffer é muito pequeno, pode ser um problema específico do B2
+                  if (optimizedBuffer.length < 1024) {
+                    this.logger.warn(
+                      '⚠️ Buffer muito pequeno detectado, usando buffer original',
+                    );
+                    bufferToUpload = file.buffer;
+                  }
+
+                  const finalParams = {
+                    Bucket: this.bucketName,
+                    Key: fileName,
+                    Body: bufferToUpload,
+                    ContentType: file.mimetype,
+                  };
+
+                  await this.s3Client.send(new PutObjectCommand(finalParams));
+                  this.logger.debug('✅ Upload final bem-sucedido');
+                } catch (retryError3) {
+                  this.logger.error('❌ Todas as tentativas falharam');
+                  throw new Error(
+                    `Erro persistente no upload após múltiplas tentativas: ${uploadError.message}. ` +
+                      `Último erro: ${retryError3.message}`,
+                  );
+                }
+              }
+            } else {
+              throw new Error(
+                'Buffer original também inválido. Arquivo pode estar corrompido.',
+              );
+            }
+          }
         } else {
           throw uploadError;
         }
@@ -612,6 +698,42 @@ export class S3Service {
         error,
       );
       return false;
+    }
+  }
+
+  /**
+   * Método de teste para upload com debugging detalhado
+   */
+  async testUpload(buffer: Buffer, fileName: string): Promise<void> {
+    await this.initializeS3();
+
+    this.logger.debug('🧪 Iniciando teste de upload detalhado');
+    this.logger.debug(`   Buffer size: ${buffer.length} bytes`);
+    this.logger.debug(`   File name: ${fileName}`);
+
+    const testParams = {
+      Bucket: this.bucketName,
+      Key: `test/${fileName}`,
+      Body: buffer,
+      ContentType: 'image/jpeg',
+    };
+
+    try {
+      this.logger.debug('🧪 Testando upload simples...');
+      await this.s3Client.send(new PutObjectCommand(testParams));
+      this.logger.debug('✅ Teste de upload bem-sucedido');
+
+      // Limpar arquivo de teste
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucketName,
+          Key: `test/${fileName}`,
+        }),
+      );
+      this.logger.debug('🗑️ Arquivo de teste removido');
+    } catch (error) {
+      this.logger.error('❌ Teste de upload falhou:', error);
+      throw error;
     }
   }
 }
