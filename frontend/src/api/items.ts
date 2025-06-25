@@ -43,6 +43,12 @@ const ItemsService = {
    * @returns Item criado
    */
   create: async (itemData: CreateItemDto): Promise<Item> => {
+    console.log(
+      "🚀 [ItemsService] Enviando para API:",
+      JSON.stringify(itemData, null, 2)
+    );
+    console.log("🔍 [ItemsService] Campos em itemData:", Object.keys(itemData));
+
     const response = await api.post<any>("/items", itemData);
     console.log("🔍 [ItemsService] Resposta completa da API:", response.data);
 

@@ -66,7 +66,27 @@ export class ItemsController {
   @ApiResponse({ status: 403, description: 'Acesso negado.' })
   @ApiResponse({ status: 404, description: 'Doador não encontrado.' })
   @Roles(UserRole.ADMIN, UserRole.FUNCIONARIO, UserRole.DOADOR) // Admin, Funcionário ou o próprio Doador podem criar
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+      errorHttpStatusCode: 400,
+      exceptionFactory: (errors) => {
+        const errorMessages = errors.map((error) => ({
+          field: error.property,
+          value: error.value,
+          constraints: error.constraints,
+        }));
+        return new BadRequestException({
+          message: 'Dados de entrada inválidos para criação de item',
+          errors: errorMessages,
+          statusCode: 400,
+        });
+      },
+    }),
+  )
   create(@Body() createItemDto: CreateItemDto, @Request() req) {
     return this.itemsService.create(createItemDto, req.user); // Passa o usuário logado
   }

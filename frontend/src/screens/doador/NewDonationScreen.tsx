@@ -136,7 +136,7 @@ const NewDonationScreen: React.FC = () => {
     useNavigation<StackNavigationProp<DoadorNewDonationStackParamList>>();
   const { user } = useAuth();
   const {
-    createItem,
+    createItem: _createItem,
     createItemWithPhotos,
     isLoading,
     error,
@@ -146,7 +146,7 @@ const NewDonationScreen: React.FC = () => {
   const {
     fetchCategories,
     categories,
-    isLoading: categoriesLoading,
+    isLoading: _categoriesLoading,
   } = useCategories();
 
   // Estados
@@ -335,8 +335,13 @@ const NewDonationScreen: React.FC = () => {
   const handleSubmit = useCallback(
     async (values: DonationFormValues) => {
       console.log("🚀 HandleSubmit iniciado");
-      console.log("📝 Valores:", values);
+      console.log(
+        "📝 Valores completos do Formik:",
+        JSON.stringify(values, null, 2)
+      );
       console.log("📷 Fotos do state:", photos);
+      console.log("🔍 Campos em values:", Object.keys(values));
+      console.log("🔍 Valor de values.photos:", values.photos);
 
       if (!user) {
         showNotification({
@@ -349,17 +354,24 @@ const NewDonationScreen: React.FC = () => {
       }
 
       try {
+        // Garantir que photos não seja incluído no CreateItemDto
+        const { photos: _, ...cleanValues } = values;
+
         const itemData: CreateItemDto = {
-          type: values.type,
-          description: values.description.trim(),
-          conservationState: values.conservationState?.trim() || "",
-          size: values.size?.trim() || "",
-          categoryId: values.categoryId || undefined,
+          type: cleanValues.type,
+          description: cleanValues.description.trim(),
+          conservationState: cleanValues.conservationState?.trim() || "",
+          size: cleanValues.size?.trim() || "",
+          categoryId: cleanValues.categoryId || undefined,
           donorId: user.id,
-          // Remover photos daqui - será tratado separadamente
+          // photos será tratado separadamente via FormData
         };
 
-        console.log("📤 Dados para API:", itemData);
+        console.log(
+          "📤 Dados para API (sem photos):",
+          JSON.stringify(itemData, null, 2)
+        );
+        console.log("📷 Fotos separadas:", photos);
 
         // Preparar FormData para fotos se houver
         let photosFormData: FormData | undefined;
@@ -914,7 +926,7 @@ const NewDonationScreen: React.FC = () => {
                   <TouchableOpacity
                     style={[
                       styles.submitButtonContainer,
-                      (!isValid || isLoading) && styles.disabledSubmitButton
+                      (!isValid || isLoading) && styles.disabledSubmitButton,
                     ]}
                     onPress={() => {
                       console.log("🔘 Botão de submit clicado!");
@@ -946,7 +958,10 @@ const NewDonationScreen: React.FC = () => {
                     <LinearGradient
                       colors={
                         isLoading || !isValid
-                          ? [theme.colors.neutral.mediumGray, theme.colors.neutral.darkGray]
+                          ? [
+                              theme.colors.neutral.mediumGray,
+                              theme.colors.neutral.darkGray,
+                            ]
                           : ["#173F5F", "#006E58"]
                       }
                       start={{ x: 0, y: 0 }}
@@ -955,20 +970,28 @@ const NewDonationScreen: React.FC = () => {
                     >
                       {isLoading ? (
                         <View style={styles.loadingContainer}>
-                          <MaterialIcons 
-                            name="refresh" 
-                            size={20} 
-                            color="white" 
+                          <MaterialIcons
+                            name="refresh"
+                            size={20}
+                            color="white"
                             style={{ marginRight: theme.spacing.xs }}
                           />
-                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                          <Typography
+                            variant="button"
+                            color="white"
+                            style={styles.submitButtonText}
+                          >
                             Cadastrando...
                           </Typography>
                         </View>
                       ) : (
                         <>
                           <MaterialIcons name="add" size={20} color="white" />
-                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                          <Typography
+                            variant="button"
+                            color="white"
+                            style={styles.submitButtonText}
+                          >
                             Cadastrar Doação
                           </Typography>
                         </>

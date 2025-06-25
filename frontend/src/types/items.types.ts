@@ -72,7 +72,7 @@ export interface CreateItemDto {
   conservationState?: string;
   size?: string;
   status?: ItemStatus;
-  photos?: string[];
+  // photos são tratadas separadamente via FormData
   donorId: string;
   categoryId?: string;
 }

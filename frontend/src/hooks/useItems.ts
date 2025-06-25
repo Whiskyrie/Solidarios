@@ -228,10 +228,19 @@ export const useItems = () => {
       setError(null);
 
       try {
-        console.log("🚀 [useItems] Criando item:", itemData);
+        console.log(
+          "🚀 [useItems] Criando item:",
+          JSON.stringify(itemData, null, 2)
+        );
+        console.log("🔍 [useItems] Campos em itemData:", Object.keys(itemData));
 
-        // ❌ Garantir que photos não seja enviado na criação
-        const { _photos, ...safeItemData } = itemData as any;
+        // ✅ Garantir que photos não seja enviado na criação
+        const { photos: _photos, ...safeItemData } = itemData as any;
+
+        console.log(
+          "📤 [useItems] Dados limpos para API:",
+          JSON.stringify(safeItemData, null, 2)
+        );
 
         const newItem = await ItemsService.create(safeItemData);
 
