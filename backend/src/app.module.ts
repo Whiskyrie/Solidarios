@@ -82,7 +82,7 @@ import helmet from 'helmet';
 
         // Adicionar o logger personalizado à configuração
         const baseConfig = {
-          logging: configService.get<boolean>('DB_LOGGING', true),
+          logging: configService.get<boolean>('DB_LOGGING', false),
           logger: typeOrmLogger,
         };
 

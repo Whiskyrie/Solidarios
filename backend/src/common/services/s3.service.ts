@@ -68,7 +68,7 @@ export class S3Service {
       forcePathStyle: true, // Necessário para Backblaze B2
     });
 
-    this.logger.log('✅ BackBlaze B2 configurado com sucesso');
+    this.logger.log('BackBlaze B2 configurado com sucesso');
   }
 
   /**
