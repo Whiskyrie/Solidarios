@@ -13,6 +13,7 @@ import ItemsListScreen from "../screens/funcionario/ItemsListScreen";
 import ItemDetailScreen from "../screens/funcionario/ItemDetailScreen";
 import InventoryScreen from "../screens/funcionario/InventoryScreen";
 import InventoryDetailScreen from "../screens/admin/InventoryDetailScreen";
+import ProfileScreen from "../screens/funcionario/ProfileScreen";
 import DistributionsScreen from "../screens/admin/DistributionsScreen";
 import DistributionDetailScreen from "../screens/admin/DistributionDetailScreen";
 import CreateItemScreen from "../screens/admin/CreateItemScreen";
@@ -36,6 +37,10 @@ const DistributionsIcon = ({ color }: { color: string }) => (
 const BeneficiariesIcon = ({ color }: { color: string }) => (
   <Icon name="people-outline" size={24} color={color} />
 );
+// CORREÇÃO: Adicionar ícone específico para Profile
+const ProfileIcon = ({ color }: { color: string }) => (
+  <Icon name="person-outline" size={24} color={color} />
+);
 
 // Definição dos tipos de navegação
 import {
@@ -44,6 +49,7 @@ import {
   FuncionarioInventoryStackParamList,
   FuncionarioDistributionsStackParamList,
   FuncionarioBeneficiariesStackParamList,
+  FuncionarioProfileStackParamList,
 } from "./types";
 
 // Stack Navigators para cada aba
@@ -52,6 +58,8 @@ const ItemsStack = createNativeStackNavigator<FuncionarioItemsStackParamList>();
 const InventoryStack = createNativeStackNavigator<FuncionarioInventoryStackParamList>();
 const DistributionsStack = createNativeStackNavigator<FuncionarioDistributionsStackParamList>();
 const BeneficiariesStack = createNativeStackNavigator<FuncionarioBeneficiariesStackParamList>();
+// CORREÇÃO: Adicionar Stack para Profile
+const ProfileStack = createNativeStackNavigator<FuncionarioProfileStackParamList>();
 
 // Stack Navigator para Dashboard
 const DashboardNavigator = () => {
@@ -73,39 +81,6 @@ const ItemsNavigator = () => {
   );
 };
 
-// Stack Navigator para Inventário
-const InventoryNavigator = () => {
-  return (
-    <InventoryStack.Navigator screenOptions={{ headerShown: false }}>
-      <InventoryStack.Screen name="InventoryList" component={InventoryScreen} />
-      <InventoryStack.Screen
-        name="InventoryDetail"
-        component={InventoryDetailScreen}
-      />
-    </InventoryStack.Navigator>
-  );
-};
-
-// Stack Navigator para Distribuições
-const DistributionsNavigator = () => {
-  return (
-    <DistributionsStack.Navigator screenOptions={{ headerShown: false }}>
-      <DistributionsStack.Screen
-        name="DistributionsList"
-        component={DistributionsScreen}
-      />
-      <DistributionsStack.Screen
-        name="DistributionDetail"
-        component={DistributionDetailScreen}
-      />
-      <DistributionsStack.Screen
-        name="CreateDistribution"
-        component={CreateDistributionScreen}
-      />
-    </DistributionsStack.Navigator>
-  );
-};
-
 // Stack Navigator para Beneficiários
 const BeneficiariesNavigator = () => {
   return (
@@ -119,6 +94,15 @@ const BeneficiariesNavigator = () => {
         component={BeneficiaryDetailScreen}
       />
     </BeneficiariesStack.Navigator>
+  );
+};
+
+// CORREÇÃO: Stack Navigator para Profile
+const ProfileNavigator = () => {
+  return (
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
+    </ProfileStack.Navigator>
   );
 };
 
@@ -138,12 +122,9 @@ const FuncionarioNavigator: React.FC = () => {
           backgroundColor: theme.colors.neutral.white,
           borderTopWidth: 1,
           borderTopColor: theme.colors.neutral.lightGray,
-          // CORREÇÃO: Usar altura padrão sem adicionar insets extras
           height: Platform.OS === "ios" ? 80 : 60,
-          // CORREÇÃO: PaddingBottom simples seguindo padrão das outras telas
           paddingBottom: Platform.OS === "ios" ? insets.bottom : 8,
           paddingTop: 8,
-          // Adicionar sombra para melhor definição
           elevation: 8,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: -2 },
@@ -153,11 +134,9 @@ const FuncionarioNavigator: React.FC = () => {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "500",
-          // CORREÇÃO: Margem inferior adequada
           marginBottom: Platform.OS === "ios" ? 0 : 4,
         },
         tabBarItemStyle: {
-          // CORREÇÃO: Padding vertical menor para evitar espaçamento excessivo
           paddingVertical: 2,
         },
       }}
@@ -179,27 +158,20 @@ const FuncionarioNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Inventory"
-        component={InventoryNavigator}
-        options={{
-          tabBarIcon: ({ color }) => <InventoryIcon color={color} />,
-          tabBarLabel: "Inventário",
-        }}
-      />
-      <Tab.Screen
-        name="Distributions"
-        component={DistributionsNavigator}
-        options={{
-          tabBarIcon: ({ color }) => <DistributionsIcon color={color} />,
-          tabBarLabel: "Distribuições",
-        }}
-      />
-      <Tab.Screen
         name="Beneficiaries"
         component={BeneficiariesNavigator}
         options={{
           tabBarIcon: ({ color }) => <BeneficiariesIcon color={color} />,
           tabBarLabel: "Beneficiários",
+        }}
+      />
+      {/* CORREÇÃO: Configuração correta da tab Profile */}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileNavigator}
+        options={{
+          tabBarIcon: ({ color }) => <ProfileIcon color={color} />,
+          tabBarLabel: "Perfil",
         }}
       />
     </Tab.Navigator>

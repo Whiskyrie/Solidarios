@@ -7,6 +7,32 @@ import { Item, CreateItemDto, UpdateItemDto } from "../types/items.types";
 import { PageOptionsDto } from "../types/common.types";
 import { extractItemsData, extractItemsMeta } from "../utils/typeGuards";
 
+// Enum para tipos de erro específicos
+enum ItemsError {
+  NETWORK_ERROR = "network_error",
+  VALIDATION_ERROR = "validation_error",
+  PERMISSION_ERROR = "permission_error",
+  NOT_FOUND_ERROR = "not_found_error",
+  PHOTO_UPLOAD_ERROR = "photo_upload_error",
+}
+
+// Interface para resultado de criação de item
+interface CreateItemResult {
+  success: boolean;
+  item?: Item;
+  error?: string;
+  errorType?: ItemsError;
+}
+
+// Interface para resultado de upload de fotos
+interface PhotoUploadResult {
+  success: boolean;
+  item?: Item;
+  uploadedCount?: number;
+  failedCount?: number;
+  error?: string;
+}
+
 // Hook para gerenciamento de itens
 export const useItems = () => {
   // Estados locais
@@ -23,6 +49,35 @@ export const useItems = () => {
     totalPages: 1,
     totalItems: 0,
   });
+
+  // ✅ Função auxiliar para mapear erros
+  const mapErrorToType = (error: any): ItemsError => {
+    if (error.response?.status === 400) return ItemsError.VALIDATION_ERROR;
+    if (error.response?.status === 403) return ItemsError.PERMISSION_ERROR;
+    if (error.response?.status === 404) return ItemsError.NOT_FOUND_ERROR;
+    if (error.code === "NETWORK_ERROR") return ItemsError.NETWORK_ERROR;
+    return ItemsError.NETWORK_ERROR;
+  };
+
+  // ✅ Função auxiliar para gerar mensagens de erro amigáveis
+  const getErrorMessage = (error: any, context: string): string => {
+    const errorType = mapErrorToType(error);
+
+    switch (errorType) {
+      case ItemsError.VALIDATION_ERROR:
+        return error.response?.data?.message || "Dados inválidos fornecidos";
+      case ItemsError.PERMISSION_ERROR:
+        return "Você não tem permissão para esta ação";
+      case ItemsError.NOT_FOUND_ERROR:
+        return "Item não encontrado";
+      case ItemsError.NETWORK_ERROR:
+        return "Erro de conexão. Verifique sua internet";
+      case ItemsError.PHOTO_UPLOAD_ERROR:
+        return "Erro ao fazer upload das fotos";
+      default:
+        return `Erro ao ${context}`;
+    }
+  };
 
   // Função para limpar erros
   const clearError = useCallback(() => {
@@ -166,29 +221,68 @@ export const useItems = () => {
     }
   }, []);
 
-  // Função para criar um novo item
-  const createItem = useCallback(async (itemData: CreateItemDto) => {
-    setIsLoading(true);
-    setError(null);
+  // ✅ Função melhorada para criar item (SEM fotos)
+  const createItem = useCallback(
+    async (itemData: CreateItemDto): Promise<CreateItemResult> => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      console.log("Hook useItems - dados recebidos:", itemData);
-      const data = await ItemsService.create(itemData);
-      console.log("Hook useItems - resposta da API:", data);
+      try {
+        console.log("🚀 [useItems] Criando item:", itemData);
 
-      setItem(data);
-      setItems((prev) => [...prev, data]);
-      return data;
-    } catch (err: any) {
-      console.error("Hook useItems - erro:", err);
-      const errorMessage =
-        err.response?.data?.message || err.message || "Erro ao criar item";
-      setError(errorMessage);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        // ❌ Garantir que photos não seja enviado na criação
+        const { _photos, ...safeItemData } = itemData as any;
+
+        const newItem = await ItemsService.create(safeItemData);
+
+        console.log("✅ [useItems] Item criado com sucesso:", newItem);
+        console.log("📄 Item ID:", newItem?.id);
+        console.log("📄 Item completo:", JSON.stringify(newItem, null, 2));
+
+        // Validação melhorada: verificar se temos um objeto item válido
+        if (!newItem || typeof newItem !== "object") {
+          console.error("❌ Resposta inválida da API:", newItem);
+          throw new Error("Resposta inválida da API ao criar item");
+        }
+
+        if (!newItem.id) {
+          console.error(
+            "❌ Item criado sem ID válido. Objeto completo:",
+            newItem
+          );
+          console.error("❌ Tipo do newItem:", typeof newItem);
+          console.error("❌ Keys do newItem:", Object.keys(newItem));
+          throw new Error(
+            `Item criado mas ID não retornado pela API. ID recebido: ${newItem.id}`
+          );
+        }
+
+        setItem(newItem);
+        setItems((prev) => [...prev, newItem]);
+
+        return {
+          success: true,
+          item: newItem,
+        };
+      } catch (err: any) {
+        console.error("❌ [useItems] Erro ao criar item:", err);
+
+        const errorMessage = getErrorMessage(err, "criar item");
+        const errorType = mapErrorToType(err);
+
+        setError(errorMessage);
+
+        return {
+          success: false,
+          error: errorMessage,
+          errorType,
+        };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   // Função para atualizar um item existente
   const updateItem = useCallback(
@@ -420,43 +514,104 @@ export const useItems = () => {
     []
   );
 
-  // Função para upload de fotos para um item
-  const uploadPhotos = useCallback(async (id: string, files: FormData) => {
-    setIsLoading(true);
-    setError(null);
+  // ✅ Função melhorada para upload de fotos
+  const uploadPhotos = useCallback(
+    async (itemId: string, formData: FormData): Promise<PhotoUploadResult> => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const data = await ItemsService.uploadPhotos(id, files);
-      setItem(data);
-      // Atualizar a lista de itens se necessário
-      setItems((prev) => prev.map((i) => (i.id === id ? data : i)));
-      return data;
-    } catch (err: any) {
-      setError(err.message || "Erro ao fazer upload de fotos");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        console.log(
+          "📤 [useItems] Iniciando upload de fotos para item:",
+          itemId
+        );
 
-  // Função para remover foto de um item
-  const removePhoto = useCallback(async (id: string, photoUrl: string) => {
-    setIsLoading(true);
-    setError(null);
+        if (!itemId || itemId === "undefined") {
+          throw new Error("ID do item é inválido ou undefined");
+        }
 
-    try {
-      const data = await ItemsService.removePhoto(id, photoUrl);
-      setItem(data);
-      // Atualizar a lista de itens se necessário
-      setItems((prev) => prev.map((i) => (i.id === id ? data : i)));
-      return data;
-    } catch (err: any) {
-      setError(err.message || "Erro ao remover foto");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        const updatedItem = await ItemsService.uploadPhotos(itemId, formData);
+
+        console.log("✅ [useItems] Upload de fotos concluído");
+
+        setItem(updatedItem);
+        setItems((prev) =>
+          prev.map((i) => (i.id === itemId ? updatedItem : i))
+        );
+
+        // Contar fotos uploadadas
+        const uploadedCount = updatedItem.photos?.length || 0;
+
+        return {
+          success: true,
+          item: updatedItem,
+          uploadedCount,
+          failedCount: 0,
+        };
+      } catch (err: any) {
+        console.error("❌ [useItems] Erro no upload de fotos:", err);
+
+        const errorMessage = getErrorMessage(err, "fazer upload das fotos");
+        setError(errorMessage);
+
+        return {
+          success: false,
+          error: errorMessage,
+          uploadedCount: 0,
+          failedCount: 1,
+        };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  // ✅ Função combinada: criar item + upload de fotos
+  const createItemWithPhotos = useCallback(
+    async (
+      itemData: CreateItemDto,
+      photosFormData?: FormData
+    ): Promise<{
+      itemResult: CreateItemResult;
+      photoResult?: PhotoUploadResult;
+    }> => {
+      // 1. Criar item primeiro (sem fotos)
+      const itemResult = await createItem(itemData);
+
+      if (!itemResult.success || !itemResult.item) {
+        return { itemResult };
+      }
+
+      // Validar se o item foi criado com ID válido
+      if (!itemResult.item.id) {
+        console.error("❌ Item criado sem ID válido:", itemResult.item);
+        return {
+          itemResult: {
+            success: false,
+            error: "Item criado mas sem ID válido",
+            errorType: ItemsError.VALIDATION_ERROR,
+          },
+        };
+      }
+
+      // 2. Se há fotos, fazer upload
+      if (photosFormData) {
+        console.log(
+          "📤 Iniciando upload de fotos para item:",
+          itemResult.item.id
+        );
+        const photoResult = await uploadPhotos(
+          itemResult.item.id,
+          photosFormData
+        );
+        return { itemResult, photoResult };
+      }
+
+      return { itemResult };
+    },
+    [createItem, uploadPhotos]
+  );
 
   // Retornar as funções e estado
   return {
@@ -467,11 +622,15 @@ export const useItems = () => {
     error,
     pagination,
 
-    // Ações
+    // ✅ Ações melhoradas
+    createItem, // Criar item SEM fotos
+    uploadPhotos, // Upload de fotos separadamente
+    createItemWithPhotos, // Função combinada conveniente
+
+    // Ações existentes
     fetchItems,
-    fetchAvailableItems, // NOVA FUNÇÃO ADICIONADA
+    fetchAvailableItems,
     fetchItemById,
-    createItem,
     updateItem,
     removeItem,
     fetchItemsByDonor,
@@ -479,9 +638,11 @@ export const useItems = () => {
     fetchItemsByStatus,
     fetchDonorStats,
     requestItem,
-    uploadPhotos,
-    removePhoto,
     clearError,
+
+    // ✅ Utilitários para debugging
+    mapErrorToType,
+    getErrorMessage,
   };
 };
 

@@ -41,7 +41,7 @@ const ItemsListScreen: React.FC = () => {
   // Estados locais
   const [refreshing, setRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // Mudança aqui
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ItemStatus | "all">("all");
   const [filteredItems, setFilteredItems] = useState<Item[]>([]);
@@ -66,10 +66,10 @@ const ItemsListScreen: React.FC = () => {
       if (user) {
         try {
           await fetchItems({ page, take: 20 });
-          setDataLoaded(true);
         } catch (error) {
           console.error("Erro ao carregar itens:", error);
-          setDataLoaded(true);
+        } finally {
+          setInitialLoading(false); // Sempre marcar como carregado
         }
       }
     },
@@ -79,6 +79,11 @@ const ItemsListScreen: React.FC = () => {
   // Efeito de animação ao focar na tela
   useFocusEffect(
     useCallback(() => {
+      // Só mostrar loading inicial se for a primeira vez
+      if (initialLoading) {
+        setInitialLoading(true);
+      }
+      
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -93,7 +98,7 @@ const ItemsListScreen: React.FC = () => {
       ]).start();
 
       loadItems(1);
-    }, [loadItems, fadeAnim, slideAnim])
+    }, [loadItems, fadeAnim, slideAnim, initialLoading])
   );
 
   // Filtragem de itens
@@ -318,7 +323,7 @@ const ItemsListScreen: React.FC = () => {
   );
 
   // Estado de carregamento inicial
-  if (isLoading && !dataLoaded && !refreshing) {
+  if (initialLoading && isLoading && !refreshing) {
     return (
       <View style={styles.container}>
         <Header />
@@ -330,7 +335,7 @@ const ItemsListScreen: React.FC = () => {
   }
 
   // Estado de erro
-  if (error) {
+  if (error && !initialLoading) {
     return (
       <View style={styles.container}>
         <Header />
@@ -350,6 +355,7 @@ const ItemsListScreen: React.FC = () => {
             actionLabel="Tentar novamente"
             onAction={() => {
               clearError();
+              setInitialLoading(true);
               loadItems(1);
             }}
           />
@@ -420,7 +426,7 @@ const ItemsListScreen: React.FC = () => {
             ) : null
           }
           ListEmptyComponent={
-            dataLoaded && filteredItems.length === 0 ? <NoItemsView /> : null
+            !initialLoading && filteredItems.length === 0 ? <NoItemsView /> : null
           }
           showsVerticalScrollIndicator={false}
         />

@@ -67,6 +67,8 @@ export class S3Service {
       },
       forcePathStyle: true, // Necessário para Backblaze B2
     });
+
+    this.logger.log('✅ BackBlaze B2 configurado com sucesso');
   }
 
   /**
@@ -146,7 +148,12 @@ export class S3Service {
 
     try {
       const fileName = this.generateFileName(file.originalname);
+      this.logger.debug(`📂 Nome do arquivo gerado: ${fileName}`);
+
       const optimizedBuffer = await this.optimizeImage(file.buffer);
+      this.logger.debug(
+        `🔧 Imagem otimizada: ${(optimizedBuffer.length / 1024 / 1024).toFixed(2)}MB`,
+      );
 
       // Upload da imagem principal
       const upload = new Upload({
@@ -163,6 +170,7 @@ export class S3Service {
           },
         },
       });
+      this.logger.debug('✅ Upload principal concluído');
 
       await upload.done();
       const publicUrl = `${this.baseUrl}/${fileName}`;

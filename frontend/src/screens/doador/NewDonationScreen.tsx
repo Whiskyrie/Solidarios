@@ -42,7 +42,6 @@ import { useCategories } from "../../hooks/useCategories";
 
 // Tipos e rotas
 import { CreateItemDto, ItemType } from "../../types/items.types";
-import { DOADOR_ROUTES } from "../../navigation/routes";
 import { DoadorNewDonationStackParamList } from "../../navigation/types";
 
 // Interfaces
@@ -136,7 +135,14 @@ const NewDonationScreen: React.FC = () => {
   const navigation =
     useNavigation<StackNavigationProp<DoadorNewDonationStackParamList>>();
   const { user } = useAuth();
-  const { createItem, isLoading, error, clearError, items } = useItems();
+  const {
+    createItem,
+    createItemWithPhotos,
+    isLoading,
+    error,
+    clearError,
+    items,
+  } = useItems();
   const {
     fetchCategories,
     categories,
@@ -350,20 +356,55 @@ const NewDonationScreen: React.FC = () => {
           size: values.size?.trim() || "",
           categoryId: values.categoryId || undefined,
           donorId: user.id,
-          photos: photos.map((photo) => photo.uri), // Usar fotos do state, não do values
+          // Remover photos daqui - será tratado separadamente
         };
 
         console.log("📤 Dados para API:", itemData);
 
-        const newItem = await createItem(itemData);
+        // Preparar FormData para fotos se houver
+        let photosFormData: FormData | undefined;
+        if (photos.length > 0) {
+          photosFormData = new FormData();
+          photos.forEach((photo, index) => {
+            console.log(`📷 Adicionando foto ${index + 1}:`, {
+              uri: photo.uri,
+              type: photo.type,
+              name: photo.name,
+            });
+            photosFormData!.append("files", {
+              uri: photo.uri,
+              type: photo.type,
+              name: photo.name,
+            } as any);
+          });
+          console.log("📤 FormData preparado com", photos.length, "fotos");
+        }
 
-        if (newItem) {
+        // Usar a função combinada do hook
+        const result = await createItemWithPhotos(itemData, photosFormData);
+
+        if (result.itemResult.success) {
+          let successMessage = "Doação cadastrada com sucesso!";
+          let successDescription =
+            "Sua doação foi registrada e estará disponível para interessados.";
+
+          // Verificar se houve problemas com fotos
+          if (photosFormData && result.photoResult) {
+            if (!result.photoResult.success) {
+              successMessage =
+                "Doação cadastrada, mas houve problemas com as fotos";
+              successDescription =
+                "O item foi criado mas algumas fotos não foram enviadas. Você pode tentar novamente.";
+            } else if (result.photoResult.uploadedCount) {
+              successDescription += ` ${result.photoResult.uploadedCount} foto(s) enviada(s) com sucesso.`;
+            }
+          }
+
           showNotification({
             visible: true,
             type: "success",
-            message: "Doação cadastrada com sucesso!",
-            description:
-              "Sua doação foi registrada e estará disponível para interessados.",
+            message: successMessage,
+            description: successDescription,
           });
 
           // Reset
@@ -372,6 +413,8 @@ const NewDonationScreen: React.FC = () => {
           setTimeout(() => {
             navigation.goBack();
           }, 2000);
+        } else {
+          throw new Error(result.itemResult.error || "Erro ao criar item");
         }
       } catch (err: any) {
         console.error("❌ Erro:", err);
@@ -384,7 +427,7 @@ const NewDonationScreen: React.FC = () => {
         });
       }
     },
-    [user, createItem, navigation, showNotification, photos] // Incluir photos nas dependências
+    [user, createItemWithPhotos, navigation, showNotification, photos]
   );
 
   // Valores iniciais
@@ -869,7 +912,10 @@ const NewDonationScreen: React.FC = () => {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.submitButtonContainer}
+                    style={[
+                      styles.submitButtonContainer,
+                      (!isValid || isLoading) && styles.disabledSubmitButton
+                    ]}
                     onPress={() => {
                       console.log("🔘 Botão de submit clicado!");
                       console.log("📝 Valores atuais:", values);
@@ -897,9 +943,37 @@ const NewDonationScreen: React.FC = () => {
                     activeOpacity={0.8}
                     disabled={isLoading || !isValid}
                   >
-                    <Typography variant="button" color="white">
-                      {isLoading ? "Cadastrando..." : "Cadastrar Doação"}
-                    </Typography>
+                    <LinearGradient
+                      colors={
+                        isLoading || !isValid
+                          ? [theme.colors.neutral.mediumGray, theme.colors.neutral.darkGray]
+                          : ["#173F5F", "#006E58"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.submitButton}
+                    >
+                      {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                          <MaterialIcons 
+                            name="refresh" 
+                            size={20} 
+                            color="white" 
+                            style={{ marginRight: theme.spacing.xs }}
+                          />
+                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                            Cadastrando...
+                          </Typography>
+                        </View>
+                      ) : (
+                        <>
+                          <MaterialIcons name="add" size={20} color="white" />
+                          <Typography variant="button" color="white" style={styles.submitButtonText}>
+                            Cadastrar Doação
+                          </Typography>
+                        </>
+                      )}
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1137,9 +1211,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing.xs,
+    minHeight: 48,
   },
   submitButtonText: {
     fontWeight: "600",
+    fontSize: 16,
+  },
+  disabledSubmitButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

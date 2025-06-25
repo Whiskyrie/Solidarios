@@ -70,6 +70,7 @@ const BeneficiariesScreen: React.FC = () => {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name_asc");
   const [filteredBeneficiaries, setFilteredBeneficiaries] = useState<User[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true); // Mudança aqui
 
   // Animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -129,7 +130,13 @@ const BeneficiariesScreen: React.FC = () => {
   // Carregar beneficiários
   const loadBeneficiaries = useCallback(
     async (page = 1) => {
-      await fetchUsers({ page, take: 20 });
+      try {
+        await fetchUsers({ page, take: 20 });
+      } catch (error) {
+        console.error("Erro ao carregar beneficiários:", error);
+      } finally {
+        setInitialLoading(false); // Sempre marcar como carregado
+      }
     },
     [fetchUsers]
   );
@@ -137,6 +144,11 @@ const BeneficiariesScreen: React.FC = () => {
   // Carregar ao focar na tela
   useFocusEffect(
     useCallback(() => {
+      // Só mostrar loading inicial se for a primeira vez
+      if (initialLoading) {
+        setInitialLoading(true);
+      }
+      
       loadBeneficiaries();
 
       // Animação de entrada
@@ -152,7 +164,7 @@ const BeneficiariesScreen: React.FC = () => {
           useNativeDriver: true,
         }),
       ]).start();
-    }, [loadBeneficiaries, fadeAnim, slideAnim])
+    }, [loadBeneficiaries, fadeAnim, slideAnim, initialLoading])
   );
 
   // Função para pull-to-refresh
@@ -243,7 +255,7 @@ const BeneficiariesScreen: React.FC = () => {
   );
 
   // Se estiver carregando inicialmente, mostrar loading
-  if (isLoading && !refreshing && !users.length) {
+  if (initialLoading && isLoading && !refreshing) {
     return (
       <View style={styles.container}>
         <Header />
@@ -255,7 +267,7 @@ const BeneficiariesScreen: React.FC = () => {
   }
 
   // Se houver erro, mostrar tela de erro
-  if (error) {
+  if (error && !initialLoading) {
     return (
       <View style={styles.container}>
         <Header />
@@ -275,6 +287,7 @@ const BeneficiariesScreen: React.FC = () => {
             actionLabel="Tentar novamente"
             onAction={() => {
               clearError();
+              setInitialLoading(true);
               loadBeneficiaries();
             }}
           />
@@ -355,7 +368,7 @@ const BeneficiariesScreen: React.FC = () => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<BeneficiariesEmptyState />}
+          ListEmptyComponent={!initialLoading ? <BeneficiariesEmptyState /> : null}
         />
       </Animated.View>
     </View>

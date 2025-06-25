@@ -152,14 +152,6 @@ const AdminNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Inventory"
-        component={InventoryNavigator}
-        options={{
-          tabBarIcon: ({ color }) => <InventoryIcon color={color} />,
-          tabBarLabel: "Estoque",
-        }}
-      />
-      <Tab.Screen
         name="Distributions"
         component={DistributionsNavigator}
         options={{

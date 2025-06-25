@@ -456,9 +456,7 @@ const DashboardScreen: React.FC = () => {
           rightHeaderContent={
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate("Distributions", {
-                  screen: "DistributionsList",
-                })
+                navigation.navigate("DistributionsList")
               }
             >
               <Typography
@@ -477,9 +475,8 @@ const DashboardScreen: React.FC = () => {
                   <DistributionCard
                     distribution={distribution}
                     onPress={() => {
-                      navigation.navigate("Distributions", {
-                        screen: "DistributionDetail",
-                        params: { id: distribution.id },
+                      navigation.navigate("DistributionDetail", {
+                        id: distribution.id,
                       });
                     }}
                     compact
@@ -497,9 +494,7 @@ const DashboardScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => {
-                navigation.navigate("Distributions", {
-                  screen: "CreateDistribution",
-                });
+                navigation.navigate("CreateDistribution");
               }}
             >
               <LinearGradient
@@ -517,6 +512,66 @@ const DashboardScreen: React.FC = () => {
           </View>
         </Card>
 
+        {/* Opções de Acesso Rápido */}
+        <Card
+          title="Acesso Rápido"
+          style={styles.card}
+        >
+          <View style={styles.quickAccessContainer}>
+            {/* Opção Inventário */}
+            <TouchableOpacity
+              style={styles.quickAccessOption}
+              onPress={() =>
+                navigation.navigate("InventoryList")
+              }
+            >
+              <View style={styles.quickAccessIcon}>
+                <LinearGradient
+                  colors={[theme.colors.primary.secondary, "#4ECDC4"]}
+                  style={styles.quickAccessGradient}
+                >
+                  <MaterialIcons name="inventory" size={24} color="white" />
+                </LinearGradient>
+              </View>
+              <Typography variant="body" style={styles.quickAccessText}>
+                Inventário
+              </Typography>
+              <MaterialIcons 
+                name="arrow-forward-ios" 
+                size={16} 
+                color={theme.colors.neutral.mediumGray} 
+              />
+            </TouchableOpacity>
+
+            <View style={styles.quickAccessSeparator} />
+
+            {/* Opção Distribuições */}
+            <TouchableOpacity
+              style={styles.quickAccessOption}
+              onPress={() =>
+                navigation.navigate("DistributionsList")
+              }
+            >
+              <View style={styles.quickAccessIcon}>
+                <LinearGradient
+                  colors={[theme.colors.primary.main, "#2E8B9A"]}
+                  style={styles.quickAccessGradient}
+                >
+                  <MaterialIcons name="local-shipping" size={24} color="white" />
+                </LinearGradient>
+              </View>
+              <Typography variant="body" style={styles.quickAccessText}>
+                Distribuições
+              </Typography>
+              <MaterialIcons 
+                name="arrow-forward-ios" 
+                size={16} 
+                color={theme.colors.neutral.mediumGray} 
+              />
+            </TouchableOpacity>
+          </View>
+        </Card>
+
         {/* Itens com estoque baixo */}
         <Card
           title="Alertas de Estoque"
@@ -524,7 +579,7 @@ const DashboardScreen: React.FC = () => {
           rightHeaderContent={
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate("Inventory", { screen: "InventoryList" })
+                navigation.navigate("InventoryList")
               }
             >
               <Typography
@@ -543,9 +598,8 @@ const DashboardScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.lowStockItem}
                     onPress={() => {
-                      navigation.navigate("Inventory", {
-                        screen: "InventoryDetail",
-                        params: { id: inv.id },
+                      navigation.navigate("InventoryDetail", {
+                        id: inv.id,
                       });
                     }}
                   >
@@ -812,6 +866,106 @@ statCard: {
     textAlign: "center",
     color: theme.colors.neutral.mediumGray,
     lineHeight: 20,
+  },
+
+  // Novos estilos para os cards de ação rápida
+  quickActionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.m,
+    backgroundColor: theme.colors.neutral.white,
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.neutral.lightGray,
+  },
+  quickActionIcon: {
+    marginRight: theme.spacing.m,
+  },
+  quickActionGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  quickActionContent: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    marginBottom: 4,
+    color: theme.colors.neutral.darkGray,
+  },
+  quickActionDescription: {
+    marginBottom: theme.spacing.s,
+    color: theme.colors.neutral.mediumGray,
+    lineHeight: 18,
+  },
+  quickActionStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  quickActionStat: {
+    alignItems: "center",
+  },
+  quickActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${theme.colors.primary.secondary}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: theme.spacing.s,
+  },
+  createDistributionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.primary.secondary,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.small,
+    gap: 4,
+  },
+
+  // Novos estilos para acesso rápido
+  quickAccessContainer: {
+    padding: theme.spacing.xs,
+  },
+  quickAccessOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: theme.spacing.m,
+    paddingHorizontal: theme.spacing.s,
+  },
+  quickAccessIcon: {
+    marginRight: theme.spacing.m,
+  },
+  quickAccessGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  quickAccessText: {
+    flex: 1,
+    color: theme.colors.neutral.darkGray,
+    fontWeight: "500",
+  },
+  quickAccessSeparator: {
+    height: 1,
+    backgroundColor: theme.colors.neutral.lightGray,
+    marginHorizontal: theme.spacing.s,
   },
 });
 
