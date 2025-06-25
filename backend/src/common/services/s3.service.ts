@@ -324,7 +324,8 @@ export class S3Service {
       }
 
       // Para arquivos muito pequenos, usar upload simples ao invés de multipart
-      const useSimpleUpload = optimizedBuffer.length < 1024 * 1024; // 1MB
+      // Backblaze B2 exige mínimo de 5MB para multipart, então usar 5MB como limite
+      const useSimpleUpload = optimizedBuffer.length < 1024 * 1024 * 5; // 5MB
 
       this.logger.debug(
         `📊 Estratégia de upload: ${useSimpleUpload ? 'Simples' : 'Multipart'}`,
@@ -346,43 +347,27 @@ export class S3Service {
         ChecksumAlgorithm: undefined,
       };
 
-      let upload: Upload;
-
-      if (useSimpleUpload) {
-        this.logger.debug('🚀 Usando upload simples para arquivo pequeno...');
-        // Para arquivos pequenos, usar configurações mais simples
-        upload = new Upload({
-          client: this.s3Client,
-          params: uploadParams,
-          // Forçar upload simples para arquivos pequenos
-          partSize: optimizedBuffer.length,
-          queueSize: 1,
-          leavePartsOnError: false,
-        });
-      } else {
-        this.logger.debug('🚀 Usando upload multipart para arquivo maior...');
-        // Para arquivos maiores, usar configurações normais
-        upload = new Upload({
-          client: this.s3Client,
-          params: uploadParams,
-          // Configurações otimizadas para Backblaze B2
-          partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
-          queueSize: 1,
-          // Desabilitar checksums que causam problemas no B2
-          leavePartsOnError: false,
-        });
-      }
-
       this.logger.debug('🚀 Iniciando upload principal...');
 
       try {
         if (useSimpleUpload) {
           // Para arquivos pequenos, usar PutObjectCommand diretamente
-          this.logger.debug('📤 Executando upload simples...');
+          this.logger.debug(
+            '📤 Executando upload simples com PutObjectCommand...',
+          );
           await this.s3Client.send(new PutObjectCommand(uploadParams));
         } else {
           // Para arquivos maiores, usar Upload com multipart
-          this.logger.debug('📤 Executando upload multipart...');
+          this.logger.debug('� Executando upload multipart...');
+          const upload = new Upload({
+            client: this.s3Client,
+            params: uploadParams,
+            // Configurações otimizadas para Backblaze B2
+            partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
+            queueSize: 1,
+            // Desabilitar checksums que causam problemas no B2
+            leavePartsOnError: false,
+          });
           await upload.done();
         }
         this.logger.debug('✅ Upload principal concluído');
@@ -395,17 +380,31 @@ export class S3Service {
           requestId: uploadError.$metadata?.requestId,
         });
 
-        // Tratar erro específico "request body was too small"
+        // Tratar erro específico "EntityTooSmall"
         if (
+          uploadError.message &&
+          uploadError.message.includes('EntityTooSmall')
+        ) {
+          this.logger.warn(
+            '⚠️ Erro EntityTooSmall detectado - forçando upload simples',
+          );
+          // Tentar novamente com PutObjectCommand forçado
+          try {
+            await this.s3Client.send(new PutObjectCommand(uploadParams));
+            this.logger.debug('✅ Upload simples forçado bem-sucedido');
+          } catch (retryError) {
+            throw new Error(`Erro no upload após retry: ${retryError.message}`);
+          }
+        } else if (
           uploadError.message &&
           uploadError.message.includes('request body was too small')
         ) {
           throw new Error(
             'Arquivo muito pequeno ou corrompido para upload. Verifique se a imagem está válida.',
           );
+        } else {
+          throw uploadError;
         }
-
-        throw uploadError;
       }
 
       const publicUrl = `${this.baseUrl}/${fileName}`;
