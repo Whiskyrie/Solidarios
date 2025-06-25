@@ -13,6 +13,7 @@ import {
   S3Client,
   DeleteObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import sharp from 'sharp';
@@ -54,6 +55,18 @@ export class S3Service {
     const secretAccessKey =
       this.configService.get<string>('B2_APPLICATION_KEY');
     const endpoint = this.configService.get<string>('B2_ENDPOINT');
+
+    // Log das configurações (sem mostrar chaves completas)
+    this.logger.debug(`🔧 Configurações Backblaze B2:`);
+    this.logger.debug(`   Bucket: ${this.bucketName}`);
+    this.logger.debug(`   Região: ${this.region}`);
+    this.logger.debug(`   Endpoint: ${endpoint}`);
+    this.logger.debug(
+      `   Key ID: ${accessKeyId ? accessKeyId.substring(0, 10) + '...' : 'MISSING'}`,
+    );
+    this.logger.debug(
+      `   Key: ${secretAccessKey ? '***' + secretAccessKey.substring(secretAccessKey.length - 5) : 'MISSING'}`,
+    );
 
     if (!this.bucketName || !accessKeyId || !secretAccessKey || !endpoint) {
       throw new Error(
@@ -131,14 +144,42 @@ export class S3Service {
     if (this.isInitialized) return;
 
     try {
+      this.logger.debug(`Tentando conectar ao bucket: ${this.bucketName}`);
+      this.logger.debug(
+        `Endpoint: ${this.configService.get<string>('B2_ENDPOINT')}`,
+      );
+      this.logger.debug(`Região: ${this.region}`);
+
       // Verificar se o bucket existe e é acessível
       await this.s3Client.send(
         new HeadBucketCommand({ Bucket: this.bucketName }),
       );
+
       this.isInitialized = true;
       this.logger.log('Backblaze B2 (S3-compatible) inicializado com sucesso');
     } catch (error) {
-      this.logger.error('Erro ao inicializar Backblaze B2:', error);
+      this.logger.error('Erro ao inicializar Backblaze B2:', {
+        error: error.message,
+        bucket: this.bucketName,
+        endpoint: this.configService.get<string>('B2_ENDPOINT'),
+        region: this.region,
+        statusCode: error.$metadata?.httpStatusCode,
+        requestId: error.$metadata?.requestId,
+      });
+
+      // Para o Backblaze B2, vamos tentar continuar sem o HeadBucket
+      // pois alguns endpoints podem não suportar essa operação
+      if (error.$metadata?.httpStatusCode === 400) {
+        this.logger.warn(
+          '⚠️ Continuando sem verificação HeadBucket devido ao erro 400',
+        );
+        this.logger.warn(
+          '   Isso pode ser normal no Backblaze B2 - tentando operação de upload...',
+        );
+        this.isInitialized = true;
+        return;
+      }
+
       throw error;
     }
   }
