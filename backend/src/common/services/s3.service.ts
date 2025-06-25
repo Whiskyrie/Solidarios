@@ -1,5 +1,12 @@
 // src/common/services/s3.service.ts
 // Serviço para Backblaze B2 usando API S3-compatible
+//
+// CORREÇÕES APLICADAS PARA BACKBLAZE B2:
+// 1. Removido ACL public-read (não suportado pelo B2)
+// 2. Adicionado middleware para remover headers de checksum incompatíveis
+// 3. Configurados timeouts apropriados para uploads maiores
+// 4. Reduzido tamanho das partes do upload multipart para melhor compatibilidade
+//
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -66,7 +73,31 @@ export class S3Service {
         secretAccessKey,
       },
       forcePathStyle: true, // Necessário para Backblaze B2
+      // Configurações específicas para Backblaze B2
+      requestHandler: {
+        requestTimeout: 300000, // 5 minutos
+        connectionTimeout: 30000, // 30 segundos
+      },
     });
+
+    // Adicionar middleware para remover headers problemáticos do Backblaze B2
+    this.s3Client.middlewareStack.add(
+      (next) => async (args: any) => {
+        if (args.request && args.request.headers) {
+          // Remover headers que causam problemas no Backblaze B2
+          delete args.request.headers['x-amz-checksum-crc32'];
+          delete args.request.headers['x-amz-checksum-crc32c'];
+          delete args.request.headers['x-amz-checksum-sha1'];
+          delete args.request.headers['x-amz-checksum-sha256'];
+        }
+        return next(args);
+      },
+      {
+        step: 'finalizeRequest',
+        name: 'removeB2IncompatibleHeaders',
+        priority: 'high',
+      },
+    );
 
     this.logger.log('BackBlaze B2 configurado com sucesso');
   }
@@ -172,15 +203,18 @@ export class S3Service {
           Key: fileName,
           Body: optimizedBuffer,
           ContentType: 'image/jpeg',
-          ACL: 'public-read',
+          // Remover ACL para compatibilidade com Backblaze B2
+          // ACL: 'public-read',
           Metadata: {
             originalName: file.originalname,
             uploadedAt: new Date().toISOString(),
           },
         },
-        // Configurações para melhor tratamento de erros
-        partSize: 1024 * 1024 * 10, // 10MB
+        // Configurações otimizadas para Backblaze B2
+        partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
         queueSize: 1,
+        // Desabilitar checksums que causam problemas no B2
+        leavePartsOnError: false,
       });
 
       this.logger.debug('🚀 Iniciando upload principal...');
@@ -204,7 +238,8 @@ export class S3Service {
               Key: thumbnailFileName,
               Body: thumbnailBuffer,
               ContentType: 'image/jpeg',
-              ACL: 'public-read',
+              // Remover ACL para compatibilidade com Backblaze B2
+              // ACL: 'public-read',
               Metadata: {
                 originalName: `${file.originalname}_thumbnail`,
                 uploadedAt: new Date().toISOString(),
@@ -212,6 +247,7 @@ export class S3Service {
             },
             partSize: 1024 * 1024 * 5, // 5MB para thumbnails
             queueSize: 1,
+            leavePartsOnError: false,
           });
 
           this.logger.debug('🚀 Iniciando upload do thumbnail...');
@@ -372,6 +408,25 @@ export class S3Service {
     } catch (error) {
       this.logger.error('Erro ao obter informações do bucket:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Método de teste simples para verificar conectividade com B2
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.initializeS3();
+      this.logger.log(
+        '✅ Teste de conectividade com Backblaze B2 bem-sucedido',
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(
+        '❌ Falha no teste de conectividade com Backblaze B2:',
+        error,
+      );
+      return false;
     }
   }
 }
