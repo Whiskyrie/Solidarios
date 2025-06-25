@@ -535,8 +535,14 @@ export const useItems = () => {
           itemId
         );
 
-        if (!itemId || itemId === "undefined") {
+        // Validação mais robusta do itemId
+        if (!itemId || itemId === "undefined" || itemId === "null") {
           throw new Error("ID do item é inválido ou undefined");
+        }
+
+        // Validação do FormData
+        if (!formData) {
+          throw new Error("FormData não fornecido para upload");
         }
 
         const updatedItem = await ItemsService.uploadPhotos(itemId, formData);
@@ -560,7 +566,39 @@ export const useItems = () => {
       } catch (err: any) {
         console.error("❌ [useItems] Erro no upload de fotos:", err);
 
-        const errorMessage = getErrorMessage(err, "fazer upload das fotos");
+        let errorMessage = "Erro ao fazer upload das fotos";
+
+        // Tratar erro 500 específico
+        if (err.response?.status === 500) {
+          errorMessage =
+            "Erro interno do servidor. Possíveis causas: arquivo corrompido, problemas de conectividade ou configuração do servidor. Tente novamente com outra imagem.";
+        } else if (err.response?.status === 413) {
+          errorMessage =
+            "Imagens muito grandes. Reduza o tamanho das fotos e tente novamente.";
+        } else if (err.response?.status === 400) {
+          errorMessage =
+            err.response?.data?.message || "Dados inválidos no upload de fotos";
+        } else if (err.response?.status === 404) {
+          errorMessage =
+            "Item não encontrado. Verifique se o item ainda existe.";
+        } else if (err.response?.status === 403) {
+          errorMessage =
+            "Você não tem permissão para fazer upload de fotos para este item.";
+        } else if (
+          err.message?.includes("timeout") ||
+          err.code === "ETIMEDOUT"
+        ) {
+          errorMessage =
+            "Timeout no upload. Verifique sua conexão e tente novamente.";
+        } else if (
+          err.message?.includes("Network Error") ||
+          err.code === "NETWORK_ERROR"
+        ) {
+          errorMessage = "Erro de conexão. Verifique sua internet";
+        } else {
+          errorMessage = getErrorMessage(err, "fazer upload das fotos");
+        }
+
         setError(errorMessage);
 
         return {

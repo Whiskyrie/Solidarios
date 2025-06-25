@@ -45,7 +45,10 @@ export class Item {
   @Column({ nullable: true })
   size: string; // Tamanho (quando aplicável)
 
-  @CreateDateColumn()
+  @CreateDateColumn({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   receivedDate: Date; // Data de recebimento
 
   @Column({

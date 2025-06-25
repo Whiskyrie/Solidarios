@@ -21,6 +21,12 @@ export const formatDate = (
       dateString !== null &&
       !(dateString instanceof Date)
     ) {
+      // Se for um objeto vazio {}, retornar "-" em vez de data atual
+      if (Object.keys(dateString).length === 0) {
+        console.warn("[formatDate] Objeto vazio recebido:", dateString);
+        return "-";
+      }
+
       console.warn("[formatDate] Objeto inválido recebido:", dateString);
       return "Data inválida";
     }
@@ -57,16 +63,49 @@ export const formatDate = (
  * @param dateString String de data ou objeto Date
  * @returns Data e hora formatadas
  */
-export const formatDateTime = (dateString: string | Date): string => {
+export const formatDateTime = (
+  dateString: string | Date | undefined | null | any
+): string => {
   try {
+    console.log("[formatDateTime] Input:", {
+      dateString,
+      type: typeof dateString,
+    });
+
+    if (!dateString) return "-";
+
+    // Verificar se é um objeto vazio (comum quando há problemas de serialização)
+    if (
+      typeof dateString === "object" &&
+      dateString !== null &&
+      !(dateString instanceof Date)
+    ) {
+      // Se for um objeto vazio {}, retornar "-" em vez de data/hora atual
+      if (Object.keys(dateString).length === 0) {
+        console.warn("[formatDateTime] Objeto vazio recebido:", dateString);
+        return "-";
+      }
+
+      console.warn("[formatDateTime] Objeto inválido recebido:", dateString);
+      return "Data/hora inválida";
+    }
+
     const date =
       typeof dateString === "string" ? new Date(dateString) : dateString;
 
-    return `${date.toLocaleDateString("pt-BR", {
+    if (!date || isNaN((date as Date).getTime())) {
+      console.warn("[formatDateTime] Data inválida:", {
+        dateString,
+        parsedDate: date,
+      });
+      return "-";
+    }
+
+    return `${(date as Date).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-    })} ${date.toLocaleTimeString("pt-BR", {
+    })} ${(date as Date).toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
     })}`;

@@ -147,6 +147,15 @@ export class S3Service {
     await this.initializeS3();
 
     try {
+      // Validações básicas
+      if (!file || !file.buffer) {
+        throw new Error('Arquivo inválido ou vazio');
+      }
+
+      if (!file.mimetype.startsWith('image/')) {
+        throw new Error(`Tipo de arquivo não suportado: ${file.mimetype}`);
+      }
+
       const fileName = this.generateFileName(file.originalname);
       this.logger.debug(`📂 Nome do arquivo gerado: ${fileName}`);
 
@@ -169,10 +178,15 @@ export class S3Service {
             uploadedAt: new Date().toISOString(),
           },
         },
+        // Configurações para melhor tratamento de erros
+        partSize: 1024 * 1024 * 10, // 10MB
+        queueSize: 1,
       });
+
+      this.logger.debug('🚀 Iniciando upload principal...');
+      await upload.done();
       this.logger.debug('✅ Upload principal concluído');
 
-      await upload.done();
       const publicUrl = `${this.baseUrl}/${fileName}`;
 
       let thumbnailUrl: string | undefined;
@@ -196,12 +210,20 @@ export class S3Service {
                 uploadedAt: new Date().toISOString(),
               },
             },
+            partSize: 1024 * 1024 * 5, // 5MB para thumbnails
+            queueSize: 1,
           });
 
+          this.logger.debug('🚀 Iniciando upload do thumbnail...');
           await thumbnailUpload.done();
+          this.logger.debug('✅ Upload do thumbnail concluído');
           thumbnailUrl = `${this.baseUrl}/${thumbnailFileName}`;
         } catch (error) {
-          this.logger.warn('Erro ao criar thumbnail:', error);
+          this.logger.warn(
+            'Erro ao criar thumbnail (continuando sem thumbnail):',
+            error,
+          );
+          // Não falhar o upload principal por causa do thumbnail
         }
       }
 
@@ -214,8 +236,41 @@ export class S3Service {
         thumbnailUrl,
       };
     } catch (error) {
-      this.logger.error('Erro ao fazer upload da imagem:', error);
-      throw error;
+      this.logger.error('Erro ao fazer upload da imagem:', {
+        error: error.message,
+        stack: error.stack,
+        fileName: file?.originalname,
+        fileSize: file?.size,
+        mimeType: file?.mimetype,
+      });
+
+      // Melhor tratamento de erros específicos
+      if (error.name === 'TimeoutError' || error.code === 'ETIMEDOUT') {
+        throw new Error('Timeout no upload da imagem. Tente novamente.');
+      }
+
+      if (error.code === 'NetworkingError' || error.code === 'ENOTFOUND') {
+        throw new Error(
+          'Erro de conectividade. Verifique sua conexão com a internet.',
+        );
+      }
+
+      if (error.code === 'AccessDenied') {
+        throw new Error(
+          'Acesso negado ao serviço de armazenamento. Verifique as credenciais.',
+        );
+      }
+
+      if (error.code === 'NoSuchBucket') {
+        throw new Error(
+          'Bucket de armazenamento não encontrado. Verifique a configuração.',
+        );
+      }
+
+      // Para outros erros, manter a mensagem original mas de forma mais amigável
+      throw new Error(
+        `Erro no upload da imagem: ${error.message || 'Erro desconhecido'}`,
+      );
     }
   }
 

@@ -462,6 +462,33 @@ export class ItemsService {
     );
 
     try {
+      // Validações básicas
+      if (!files || files.length === 0) {
+        throw new BadRequestException('Pelo menos um arquivo deve ser enviado');
+      }
+
+      // Validar cada arquivo
+      files.forEach((file, index) => {
+        if (!file.buffer || file.buffer.length === 0) {
+          throw new BadRequestException(
+            `Arquivo ${index + 1} está vazio ou corrompido`,
+          );
+        }
+
+        if (!file.mimetype.startsWith('image/')) {
+          throw new BadRequestException(
+            `Arquivo ${index + 1} (${file.originalname}) não é uma imagem válida`,
+          );
+        }
+
+        // Validar tamanho (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          throw new BadRequestException(
+            `Arquivo ${index + 1} (${file.originalname}) excede o tamanho máximo de 10MB`,
+          );
+        }
+      });
+
       const item = await this.findOne(itemId);
       if (!item) {
         throw new NotFoundException('Item não encontrado');
@@ -479,9 +506,28 @@ export class ItemsService {
         );
       }
 
-      const uploadPromises = files.map((file) =>
-        this.s3Service.uploadImage(file, true),
+      this.logger.log(
+        `Iniciando upload de ${files.length} arquivo(s) para o S3`,
       );
+
+      const uploadPromises = files.map(async (file, index) => {
+        try {
+          this.logger.debug(
+            `Uploading arquivo ${index + 1}/${files.length}: ${file.originalname}`,
+          );
+          const result = await this.s3Service.uploadImage(file, true);
+          this.logger.debug(`✅ Upload concluído para: ${file.originalname}`);
+          return result;
+        } catch (error) {
+          this.logger.error(
+            `❌ Erro no upload do arquivo ${file.originalname}:`,
+            error,
+          );
+          throw new Error(
+            `Erro no upload de ${file.originalname}: ${error.message}`,
+          );
+        }
+      });
 
       const uploadResults = await Promise.all(uploadPromises);
       const newPhotoUrls = uploadResults.map((result) => result.publicUrl);
@@ -500,7 +546,7 @@ export class ItemsService {
       return updatedItem;
     } catch (error) {
       this.logger.error(
-        `Erro ao fazer upload de fotos para item ${itemId}:`,
+        `Erro ao fazer upload de fotos para item ${itemId}: ${error.message}`,
         error.stack,
       );
       throw error;
@@ -617,5 +663,26 @@ export class ItemsService {
     }
 
     throw new ForbiddenException('Você não tem permissão para esta ação');
+  }
+
+  /**
+   * Método de diagnóstico para verificar o status do S3
+   */
+  async checkS3Status(): Promise<any> {
+    try {
+      const bucketInfo = await this.s3Service.getBucketInfo();
+      return {
+        s3Connected: true,
+        bucketAccessible: true,
+        bucketInfo,
+      };
+    } catch (error) {
+      this.logger.error('Erro ao verificar status do S3:', error);
+      return {
+        s3Connected: false,
+        bucketAccessible: false,
+        error: error.message,
+      };
+    }
   }
 }

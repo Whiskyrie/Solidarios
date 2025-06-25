@@ -288,11 +288,41 @@ export class ItemsController {
     @UploadedFiles() files: MulterFile[],
     @Request() req,
   ): Promise<Item> {
+    console.log(
+      `📤 [ItemsController] Upload de fotos iniciado para item: ${id}`,
+    );
+    console.log(
+      `📤 [ItemsController] Número de arquivos recebidos: ${files?.length || 0}`,
+    );
+
+    if (files && files.length > 0) {
+      files.forEach((file, index) => {
+        console.log(`📤 [ItemsController] Arquivo ${index + 1}:`, {
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        });
+      });
+    }
+
     if (!files || files.length === 0) {
+      console.error('❌ [ItemsController] Nenhum arquivo recebido');
       throw new BadRequestException('Pelo menos um arquivo deve ser enviado');
     }
 
-    return this.itemsService.uploadPhotos(id, files, req.user);
+    try {
+      const result = await this.itemsService.uploadPhotos(id, files, req.user);
+      console.log(
+        `✅ [ItemsController] Upload concluído com sucesso para item: ${id}`,
+      );
+      return result;
+    } catch (error) {
+      console.error(
+        `❌ [ItemsController] Erro no upload para item ${id}:`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -338,5 +368,30 @@ export class ItemsController {
     }
 
     return this.itemsService.removePhoto(id, photoUrl, req.user);
+  }
+
+  // Endpoint de diagnóstico para testar uploads
+  @Get('diagnostic/s3-status')
+  @ApiOperation({ summary: 'Verificar status do serviço S3' })
+  @ApiResponse({
+    status: 200,
+    description: 'Status do S3 retornado com sucesso.',
+  })
+  @Roles(UserRole.ADMIN)
+  async checkS3Status() {
+    try {
+      const s3Status = await this.itemsService.checkS3Status();
+      return {
+        status: 'OK',
+        message: 'Verificação de S3 concluída',
+        details: s3Status,
+      };
+    } catch (error) {
+      return {
+        status: 'ERROR',
+        message: 'Problema detectado no serviço S3',
+        error: error.message,
+      };
+    }
   }
 }

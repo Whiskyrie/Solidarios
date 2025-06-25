@@ -187,32 +187,78 @@ const ItemsService = {
    * @returns Item atualizado com URLs das fotos
    */
   uploadPhotos: async (id: string, files: FormData): Promise<Item> => {
-    const response = await api.post<any>(`/items/${id}/photos`, files, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    console.log("🔍 [ItemsService] Upload resposta:", response.data);
+    try {
+      console.log("🔍 [ItemsService] Iniciando upload para item:", id);
 
-    // Backend retorna envelope: { data: Item, statusCode, message, timestamp }
-    let item = response.data;
+      const response = await api.post<any>(`/items/${id}/photos`, files, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 30000, // 30 segundos de timeout
+      });
 
-    // Se a resposta tem um campo 'data', extrair o item de lá
-    if (
-      response.data &&
-      typeof response.data === "object" &&
-      response.data.data
-    ) {
-      item = response.data.data;
+      console.log("🔍 [ItemsService] Upload resposta:", response.data);
+
+      // Backend retorna envelope: { data: Item, statusCode, message, timestamp }
+      let item = response.data;
+
+      // Se a resposta tem um campo 'data', extrair o item de lá
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        response.data.data
+      ) {
+        item = response.data.data;
+      }
+
+      console.log("🔍 [ItemsService] Item com fotos:", item);
+
+      if (!item || !item.id) {
+        throw new Error("Upload concluído mas resposta da API é inválida");
+      }
+
+      return item;
+    } catch (error: any) {
+      console.error("❌ [ItemsService] Erro no upload de fotos:", error);
+
+      // Melhor tratamento de erros
+      if (error.response) {
+        // Erro HTTP
+        const status = error.response.status;
+        const message = error.response.data?.message || error.message;
+
+        switch (status) {
+          case 400:
+            throw new Error(`Erro de validação: ${message}`);
+          case 403:
+            throw new Error(
+              "Você não tem permissão para fazer upload de fotos neste item"
+            );
+          case 404:
+            throw new Error("Item não encontrado");
+          case 413:
+            throw new Error(
+              "Imagens muito grandes. Reduza o tamanho e tente novamente"
+            );
+          case 500:
+            throw new Error(
+              "Erro interno do servidor. Verifique se as imagens são válidas e tente novamente"
+            );
+          default:
+            throw new Error(`Erro ${status}: ${message}`);
+        }
+      } else if (error.code === "ECONNABORTED") {
+        throw new Error(
+          "Timeout no upload. Verifique sua conexão e tente novamente"
+        );
+      } else if (error.message === "Network Error") {
+        throw new Error("Erro de conexão. Verifique sua internet");
+      } else {
+        throw new Error(
+          error.message || "Erro desconhecido no upload de fotos"
+        );
+      }
     }
-
-    console.log("🔍 [ItemsService] Item com fotos:", item);
-
-    if (!item || !item.id) {
-      throw new Error("Upload concluído mas resposta da API é inválida");
-    }
-
-    return item;
   },
 
   /**
