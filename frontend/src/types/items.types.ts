@@ -105,9 +105,9 @@ export interface DonorStatsDto {
     type: string;
     count: number;
   }>;
-  lastDonationDate?: Date;
+  lastDonationDate?: string;
   averageDonationInterval?: number;
-  lastUpdated: Date;
+  lastUpdated: string;
 }
 
 export type ItemsPage = PageDto<Item>;

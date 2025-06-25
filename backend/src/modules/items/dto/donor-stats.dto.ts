@@ -35,11 +35,11 @@ export class DonorStatsDto {
   }>;
 
   @ApiProperty({ description: 'Data da última doação' })
-  lastDonationDate?: Date;
+  lastDonationDate?: string;
 
   @ApiProperty({ description: 'Média de tempo entre doações (em dias)' })
   averageDonationInterval?: number;
 
   @ApiProperty({ description: 'Data da última atualização das estatísticas' })
-  lastUpdated: Date;
+  lastUpdated: string;
 }

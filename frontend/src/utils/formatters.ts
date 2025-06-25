@@ -31,6 +31,15 @@ export const formatDate = (
       return "Data inválida";
     }
 
+    // Se a string já está no formato YYYY-MM-DD, formatar diretamente
+    if (
+      typeof dateString === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(dateString)
+    ) {
+      const [year, month, day] = dateString.split("-");
+      return `${day}/${month}/${year}`;
+    }
+
     const date =
       typeof dateString === "string" ? new Date(dateString) : dateString;
 

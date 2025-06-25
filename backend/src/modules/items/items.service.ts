@@ -427,7 +427,7 @@ export class ItemsService {
         donationsByType,
         lastDonationDate,
         averageDonationInterval,
-        lastUpdated: new Date(),
+        lastUpdated: new Date().toISOString().split('T')[0], // Apenas a data
       };
 
       this.logger.log(

@@ -6,10 +6,29 @@ import {
   ManyToOne,
   JoinColumn,
   ManyToMany,
+  ValueTransformer,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { Distribution } from '../../distributions/entities/distribution.entity';
+
+// Transformer para formatar datas apenas como YYYY-MM-DD
+const dateOnlyTransformer: ValueTransformer = {
+  to: (value: Date | string) => {
+    if (!value) return null;
+    const date = typeof value === 'string' ? new Date(value) : value;
+    return date instanceof Date && !isNaN(date.getTime()) ? date : null;
+  },
+  from: (value: Date | string) => {
+    if (!value) return null;
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (date instanceof Date && !isNaN(date.getTime())) {
+      // Retorna apenas a data no formato YYYY-MM-DD
+      return date.toISOString().split('T')[0];
+    }
+    return null;
+  },
+};
 // import { Category } from './category.entity'; // Será criada depois
 
 export enum ItemType {
@@ -48,8 +67,9 @@ export class Item {
   @CreateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP',
+    transformer: dateOnlyTransformer,
   })
-  receivedDate: Date; // Data de recebimento
+  receivedDate: string; // Data de recebimento - alterado para string
 
   @Column({
     type: 'enum',
