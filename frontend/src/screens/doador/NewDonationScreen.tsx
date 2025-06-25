@@ -395,6 +395,8 @@ const NewDonationScreen: React.FC = () => {
         // Usar a função combinada do hook
         const result = await createItemWithPhotos(itemData, photosFormData);
 
+        console.log("🔍 Resultado completo:", result);
+
         if (result.itemResult.success) {
           let successMessage = "Doação cadastrada com sucesso!";
           let successDescription =
@@ -403,13 +405,23 @@ const NewDonationScreen: React.FC = () => {
           // Verificar se houve problemas com fotos
           if (photosFormData && result.photoResult) {
             if (!result.photoResult.success) {
+              console.error(
+                "❌ Erro no upload de fotos:",
+                result.photoResult.error
+              );
               successMessage =
                 "Doação cadastrada, mas houve problemas com as fotos";
               successDescription =
-                "O item foi criado mas algumas fotos não foram enviadas. Você pode tentar novamente.";
+                "O item foi criado mas algumas fotos não foram enviadas. Você pode tentar adicionar fotos mais tarde.";
             } else if (result.photoResult.uploadedCount) {
               successDescription += ` ${result.photoResult.uploadedCount} foto(s) enviada(s) com sucesso.`;
             }
+          } else if (photosFormData) {
+            // Se havia fotos para enviar mas não há resultado
+            console.warn("⚠️ Fotos não foram processadas");
+            successMessage = "Doação cadastrada, mas fotos não foram enviadas";
+            successDescription =
+              "O item foi criado mas as fotos não foram processadas. Você pode tentar adicionar fotos mais tarde.";
           }
 
           showNotification({
@@ -915,9 +927,15 @@ const NewDonationScreen: React.FC = () => {
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                   >
+                    <MaterialIcons
+                      name="close"
+                      size={18}
+                      color={theme.colors.neutral.darkGray}
+                    />
                     <Typography
                       variant="body"
                       color={theme.colors.neutral.darkGray}
+                      style={styles.cancelButtonText}
                     >
                       Cancelar
                     </Typography>
@@ -952,7 +970,7 @@ const NewDonationScreen: React.FC = () => {
                         formikHandleSubmit();
                       }
                     }}
-                    activeOpacity={0.8}
+                    activeOpacity={isLoading || !isValid ? 1 : 0.8}
                     disabled={isLoading || !isValid}
                   >
                     <LinearGradient
@@ -962,39 +980,46 @@ const NewDonationScreen: React.FC = () => {
                               theme.colors.neutral.mediumGray,
                               theme.colors.neutral.darkGray,
                             ]
-                          : ["#173F5F", "#006E58"]
+                          : ["#006E58", "#20558F", "#173F5F"]
                       }
                       start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
+                      end={{ x: 1, y: 1 }}
                       style={styles.submitButton}
                     >
                       {isLoading ? (
                         <View style={styles.loadingContainer}>
-                          <MaterialIcons
-                            name="refresh"
-                            size={20}
-                            color="white"
-                            style={{ marginRight: theme.spacing.xs }}
-                          />
+                          <View style={styles.loadingSpinner}>
+                            <MaterialIcons
+                              name="sync"
+                              size={20}
+                              color="white"
+                            />
+                          </View>
                           <Typography
                             variant="button"
                             color="white"
                             style={styles.submitButtonText}
                           >
-                            Cadastrando...
+                            Enviando...
                           </Typography>
                         </View>
                       ) : (
-                        <>
-                          <MaterialIcons name="add" size={20} color="white" />
+                        <View style={styles.submitButtonContent}>
+                          <View style={styles.submitIconContainer}>
+                            <MaterialIcons
+                              name="volunteer-activism"
+                              size={22}
+                              color="white"
+                            />
+                          </View>
                           <Typography
                             variant="button"
                             color="white"
                             style={styles.submitButtonText}
                           >
-                            Cadastrar Doação
+                            Confirmar Doação
                           </Typography>
-                        </>
+                        </View>
                       )}
                     </LinearGradient>
                   </TouchableOpacity>
@@ -1198,7 +1223,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: theme.colors.neutral.white,
     paddingTop: theme.spacing.s,
-    paddingBottom: Platform.OS === "ios" ? 34 : theme.spacing.m,
+    paddingBottom: Platform.OS === "ios" ? 28 : theme.spacing.m,
     paddingHorizontal: theme.spacing.m,
     borderTopWidth: 1,
     borderTopColor: theme.colors.neutral.mediumGray,
@@ -1210,41 +1235,86 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: theme.spacing.s,
     justifyContent: "space-between",
+    alignItems: "stretch",
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: theme.spacing.s,
+    flexDirection: "row",
+    paddingVertical: 12, // Reduzido de theme.spacing.m
+    paddingHorizontal: theme.spacing.s,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 12, // Reduzido de 14
+    borderWidth: 1.5,
     borderColor: theme.colors.neutral.mediumGray,
-    backgroundColor: theme.colors.neutral.lightGray,
-    ...theme.shadows.small,
+    backgroundColor: theme.colors.neutral.white,
+    gap: 6, // Reduzido
+    minHeight: 44, // Reduzido de 52
+    elevation: 1,
+    shadowColor: theme.colors.neutral.black,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  cancelButtonText: {
+    fontWeight: "500", // Reduzido de 600
+    fontSize: 14, // Reduzido de 15
   },
   submitButtonContainer: {
-    flex: 2,
-    borderRadius: 12,
+    flex: 1.8, // Reduzido de 2
+    borderRadius: 12, // Reduzido de 14
     overflow: "hidden",
-    ...theme.shadows.small,
+    elevation: 3, // Reduzido de 4
+    shadowColor: theme.colors.primary.main,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2, // Reduzido de 0.25
+    shadowRadius: 3, // Reduzido de 4
   },
   submitButton: {
     flexDirection: "row",
-    paddingVertical: theme.spacing.s,
+    paddingVertical: 12, // Reduzido de theme.spacing.m
+    paddingHorizontal: theme.spacing.s,
     alignItems: "center",
     justifyContent: "center",
-    gap: theme.spacing.xs,
-    minHeight: 48,
+    minHeight: 44, // Reduzido de 52
+  },
+  submitButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6, // Reduzido
+  },
+  submitIconContainer: {
+    padding: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   submitButtonText: {
-    fontWeight: "600",
-    fontSize: 16,
+    fontWeight: "600", // Reduzido de 700
+    fontSize: 14, // Reduzido de 16
+    letterSpacing: 0.3, // Reduzido de 0.5
   },
   disabledSubmitButton: {
-    opacity: 0.6,
+    opacity: 0.5,
+    elevation: 1,
+    shadowOpacity: 0.1,
   },
   loadingContainer: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6, // Reduzido
+  },
+  loadingSpinner: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 12,
+    padding: 3, // Reduzido
     alignItems: "center",
     justifyContent: "center",
   },

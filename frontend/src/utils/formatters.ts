@@ -8,20 +8,46 @@
  * @returns Data formatada
  */
 export const formatDate = (
-  dateString: string | Date | undefined | null
+  dateString: string | Date | undefined | null | any
 ): string => {
   try {
+    console.log("[formatDate] Input:", { dateString, type: typeof dateString });
+
     if (!dateString) return "-";
+
+    // Verificar se é um objeto vazio (comum quando há problemas de serialização)
+    if (
+      typeof dateString === "object" &&
+      dateString !== null &&
+      !(dateString instanceof Date)
+    ) {
+      console.warn("[formatDate] Objeto inválido recebido:", dateString);
+      return "Data inválida";
+    }
+
     const date =
       typeof dateString === "string" ? new Date(dateString) : dateString;
-    if (!date || isNaN((date as Date).getTime())) return "-";
+
+    if (!date || isNaN((date as Date).getTime())) {
+      console.warn("[formatDate] Data inválida:", {
+        dateString,
+        parsedDate: date,
+      });
+      return "-";
+    }
+
     return (date as Date).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
   } catch (error) {
-    console.error("Erro ao formatar data:", error);
+    console.error(
+      "[formatDate] Erro ao formatar data:",
+      error,
+      "Input:",
+      dateString
+    );
     return "Data inválida";
   }
 };
