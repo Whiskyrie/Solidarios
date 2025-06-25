@@ -89,12 +89,34 @@ export class S3Service {
           delete args.request.headers['x-amz-checksum-crc32c'];
           delete args.request.headers['x-amz-checksum-sha1'];
           delete args.request.headers['x-amz-checksum-sha256'];
+          delete args.request.headers['x-amz-sdk-checksum-algorithm'];
+          delete args.request.headers['x-amz-content-sha256'];
         }
         return next(args);
       },
       {
         step: 'finalizeRequest',
         name: 'removeB2IncompatibleHeaders',
+        priority: 'high',
+      },
+    );
+
+    // Adicionar middleware adicional para interceptar mais cedo
+    this.s3Client.middlewareStack.add(
+      (next) => async (args: any) => {
+        // Interceptar e modificar parâmetros antes do processamento
+        if (args.input) {
+          delete args.input.ChecksumAlgorithm;
+          delete args.input.ChecksumCRC32;
+          delete args.input.ChecksumCRC32C;
+          delete args.input.ChecksumSHA1;
+          delete args.input.ChecksumSHA256;
+        }
+        return next(args);
+      },
+      {
+        step: 'initialize',
+        name: 'removeChecksumParams',
         priority: 'high',
       },
     );
@@ -209,6 +231,8 @@ export class S3Service {
             originalName: file.originalname,
             uploadedAt: new Date().toISOString(),
           },
+          // Desabilitar checksums explicitamente
+          ChecksumAlgorithm: undefined,
         },
         // Configurações otimizadas para Backblaze B2
         partSize: 1024 * 1024 * 5, // 5MB - menor para melhor compatibilidade
@@ -244,6 +268,8 @@ export class S3Service {
                 originalName: `${file.originalname}_thumbnail`,
                 uploadedAt: new Date().toISOString(),
               },
+              // Desabilitar checksums explicitamente
+              ChecksumAlgorithm: undefined,
             },
             partSize: 1024 * 1024 * 5, // 5MB para thumbnails
             queueSize: 1,
