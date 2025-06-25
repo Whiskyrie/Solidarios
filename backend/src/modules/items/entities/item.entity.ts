@@ -15,9 +15,9 @@ import { Distribution } from '../../distributions/entities/distribution.entity';
 // Transformer para formatar datas apenas como YYYY-MM-DD
 const dateOnlyTransformer: ValueTransformer = {
   to: (value: Date | string) => {
-    if (!value) return null;
+    if (!value) return undefined; // Permite que o @CreateDateColumn funcione
     const date = typeof value === 'string' ? new Date(value) : value;
-    return date instanceof Date && !isNaN(date.getTime()) ? date : null;
+    return date instanceof Date && !isNaN(date.getTime()) ? date : undefined;
   },
   from: (value: Date | string) => {
     if (!value) return null;

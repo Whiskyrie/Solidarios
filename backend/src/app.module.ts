@@ -91,7 +91,7 @@ import helmet from 'helmet';
             type: 'postgres',
             url: databaseUrl,
             entities: [__dirname + '/**/*.entity{.ts,.js}'],
-            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
+            synchronize: configService.get<boolean>('DB_SYNCHRONIZE', true),
             ...baseConfig,
             ...sslConfig,
           };
